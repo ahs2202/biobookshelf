@@ -1,21 +1,27 @@
-import pathlib
+"""Setup script for bio-bookshelf"""
+
+import os.path
 from setuptools import setup, find_packages
 
 # The directory containing this file
-HERE = pathlib.Path(__file__).parent
+HERE = os.path.abspath(os.path.dirname(__file__))
 
 # The text of the README file
-README = (HERE / "README.md").read_text( )
+with open(os.path.join(HERE, "README.md")) as fid:
+    README = fid.read()
 
 setup(
     name='biobookshelf',
-    version='0.1.0',
+    version='0.1.1',
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
     long_description=README,
     long_description_content_type="text/markdown",
-    packages=find_packages(include=['bookshelf', 'bookshelf.*']),
+    url="https://github.com/ahs2202/biobookshelf",
+    license="GPLv3",
+    packages=find_packages(include=['biobookshelf', 'biobookshelf.*']),
+    include_package_data=True,
     install_requires=[
         'plotly>=4.11.0',
         'plotnine>=0.7.1',
@@ -33,5 +39,9 @@ setup(
         'numba>=0.52.0',
         'scikit-learn>=0.24.1'
     ],
-    scripts=[ 'biobookshelf/ONT/check_plasmid_with_nanopore_sequencing.py' ]
+    entry_points={
+        "console_scripts": [
+            "check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main",
+        ]
+    },
 )

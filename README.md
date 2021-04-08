@@ -1,2 +1,4 @@
-# biobookshelf
- a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python
+Bio-Bookshelf
+
+a collection of python scripts and functions for exploratory 
+analysis of bioinformatic data in Python
