@@ -1,0 +1,8 @@
+README.md
+setup.py
+biobookshelf.egg-info/PKG-INFO
+biobookshelf.egg-info/SOURCES.txt
+biobookshelf.egg-info/dependency_links.txt
+biobookshelf.egg-info/requires.txt
+biobookshelf.egg-info/top_level.txt
+biobookshelf/ONT/check_plasmid_with_nanopore_sequencing.py
