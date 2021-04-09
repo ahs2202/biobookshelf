@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name='biobookshelf',
-    version='0.1.1',
+    version='0.1.7',
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -23,11 +23,11 @@ setup(
     packages=find_packages(include=['biobookshelf', 'biobookshelf.*']),
     include_package_data=True,
     install_requires=[
+        'ipython>=7.19.0',
         'plotly>=4.11.0',
         'plotnine>=0.7.1',
         'pandas>=1.1.4',
         'numpy>=1.19.2',
-        'jupyter-contrib-nbextensions>=0.5.1',
         'pysam>=0.16.0.1',
         'scanpy>=1.6.0',
         'intervaltree>=3.1.0',
@@ -37,7 +37,13 @@ setup(
         'matplotlib>=3.3.2',
         'leidenalg>=0.8.3',
         'numba>=0.52.0',
-        'scikit-learn>=0.24.1'
+        'scikit-learn>=0.24.1',
+        'bokeh>=2.2.3',
+        'seaborn>=0.11.1',
+	    'statsmodels>=0.12.0',
+        'bitarray>=1.6.1',
+        'xmltodict>=0.12.0',
+        'beautifulsoup4>=4.9.3'
     ],
     entry_points={
         "console_scripts": [

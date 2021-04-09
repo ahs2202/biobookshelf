@@ -1,3 +1,3 @@
 [console_scripts]
-check_plasmid_with_nanopore_sequencing2 = biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main
+check_plasmid_with_nanopore_sequencing = biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main
 

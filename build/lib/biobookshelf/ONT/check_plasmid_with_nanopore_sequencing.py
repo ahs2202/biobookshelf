@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # 20210401
 
-from bookshelf.main import *
-from bookshelf import *
+from biobookshelf.main import *
+from biobookshelf import *
 import argparse
 import os, sys, getopt
 from io import StringIO

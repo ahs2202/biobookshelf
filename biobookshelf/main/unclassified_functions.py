@@ -1,7 +1,7 @@
 import biobookshelf.STR as STR
 import biobookshelf.MAP as MAP
 
-
+# basic python packages
 import sys # to measure the size of an object
 import os # Import library to interact with operating system
 import subprocess # for running commands 
@@ -27,31 +27,36 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors # for normalization
 from matplotlib import cm # to map scalar values to color using colormap
 from matplotlib.collections import BrokenBarHCollection # for chromosome plotting
-import seaborn as sns
-import scipy
 import math
-import regex # regular expression modules for searching substrings in a string
 import re # older version of regular expression module
-# modules for calculating Pearson correlations 
-from scipy.stats import fisher_exact # usage : For GESA p_value, stats.fisher_exact([[80, 2000], [80, 200]])
-from scipy.stats import mstats # import module for masked arrays
-from scipy import stats
-# from scipy import optimize as so # import a module for methods that can find minumum or maximum of functions 
-
 # module for generating pairs for iteration
 from itertools import combinations
 import itertools
-
 # import module for displaying Dataframe
 # for adjusting jupyter notebook cell width
 from IPython.core.display import display, HTML
-
 # import module for copying object
 from copy import deepcopy # deepcopy
 from copy import copy # shallow_copy
-# import statistical model for adjusting p-values
-from statsmodels.stats.multitest import multipletests
+import collections # count elements # usage : dict( collections.Counter( b))
+from collections import defaultdict
+import ast# usage : ast.literal_eval( string) # to convert string representation of list to list
+import pickle # module for saving dictionary and dataframe (very fast when saving as binary!)
+import traceback # printing traceback of exceptions
+import mmap # for random access of file
+from multiprocessing import Pool, get_context, set_start_method # for multiple processing  # with get_context("spawn").Pool() as pool:
+import heapq # merge sorting files.
+import contextlib # for use with heapq
+import shlex, subprocess # for running multiple shell commands in python
+## defining short cut for modules
+np_str = np.core.defchararray
+import importlib # for reloading custom modules after modifications
+import requests # for retriving HTML documents
+from ftplib import FTP # for interacting with ftp server
+import urllib.request # to retrive html document from the internet
+from xml.parsers.expat import ExpatError
 
+# python modules that requires independent anaconda install
 # import module for interactive plotting (with hover tool)
 from bokeh.plotting import figure, output_file, show, output_notebook
 # import module for opening URL by clicking entries
@@ -60,62 +65,59 @@ from bokeh.layouts import row, gridplot, widgetbox
 from bokeh.transform import jitter
 from bokeh.io import reset_output
 
-import umap
-from sklearn.decomposition import PCA, FactorAnalysis # import modules for multi-dimentional data visualization (t-SNE)
-from sklearn.manifold import TSNE 
-from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN # # modules for clustering
-
-import collections # count elements # usage : dict( collections.Counter( b))
-from collections import defaultdict
-
-import ast# usage : ast.literal_eval( string) # to convert string representation of list to list
-import pickle # module for saving dictionary and dataframe (very fast when saving as binary!)
-
-import traceback # printing traceback of exceptions
 
 # from bioservices.kegg import KEGG # module for KEGG REST service
 # from Bio import SeqIO
 
-import scipy # functions for hierarchial clusteringd
-import scipy.cluster.hierarchy as sch
-from scipy.spatial.distance import pdist # c, coph_dists = cophenet(Z, pdist(X)) #compares (correlates) the actual pairwise distances of all your samples to those implied by the hierarchical clustering.
-import plotnine as p9
-
-## binary arrays
-from bitarray import bitarray
-## for interval overlap searching
-import intervaltree
-
-import mmap # for random access of file
 import pysam # to read SAM and BAM file
 
-from multiprocessing import Pool, get_context, set_start_method # for multiple processing  # with get_context("spawn").Pool() as pool:
-import heapq # merge sorting files.
-import contextlib # for use with heapq
-import shlex, subprocess # for running multiple shell commands in python
-## defining short cut for modules
-np_str = np.core.defchararray
-
-from ftplib import FTP # for interacting with ftp server
-import urllib.request # to retrive html document from the internet
 
 import xmltodict # read xml as an ordered dictionary
-from xml.parsers.expat import ExpatError
 # HTML
-import requests # for retriving HTML documents
 from bs4 import BeautifulSoup # for parsing HTML
+
+
+
+
 
 # for plotly python
 import plotly.express as px
 import plotly 
 import plotly.graph_objects as go
 
+import plotnine as p9
+import seaborn as sns
+
+
 # single cell RNA-Seq data in Python
 import scanpy as sc 
 import scanpy.external as sce
 import anndata
 
-import importlib # for reloading custom modules after modifications
+## binary arrays
+from bitarray import bitarray
+## for interval overlap searching
+import intervaltree
+
+# import statistical model for adjusting p-values
+from statsmodels.stats.multitest import multipletests
+import regex # regular expression modules for searching substrings in a string
+
+# modules for calculating Pearson correlations 
+import scipy
+from scipy.stats import fisher_exact # usage : For GESA p_value, stats.fisher_exact([[80, 2000], [80, 200]])
+from scipy.stats import mstats # import module for masked arrays
+from scipy import stats
+# from scipy import optimize as so # import a module for methods that can find minumum or maximum of functions 
+import scipy # functions for hierarchial clusteringd
+import scipy.cluster.hierarchy as sch
+from scipy.spatial.distance import pdist # c, coph_dists = cophenet(Z, pdist(X)) #compares (correlates) the actual pairwise distances of all your samples to those implied by the hierarchical clustering.
+
+import umap
+from sklearn.decomposition import PCA, FactorAnalysis # import modules for multi-dimentional data visualization (t-SNE)
+from sklearn.manifold import TSNE 
+from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN # # modules for clustering
+
 
 
 def Wide( int_percent_html_code_cell_width = 95 ) :
