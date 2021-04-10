@@ -40,14 +40,15 @@ setup(
         'scikit-learn>=0.24.1',
         'bokeh>=2.2.3',
         'seaborn>=0.11.1',
-	    'statsmodels>=0.12.0',
+        'statsmodels>=0.12.0',
         'bitarray>=1.6.1',
         'xmltodict>=0.12.0',
         'beautifulsoup4>=4.9.3'
     ],
     entry_points={
         "console_scripts": [
-            "check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main",
+            "biobook-check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main",
+            "biobook-run_guppy_and_combine_output=biobookshelf.ONT.run_guppy_and_combine_output:main",
         ]
     },
 )

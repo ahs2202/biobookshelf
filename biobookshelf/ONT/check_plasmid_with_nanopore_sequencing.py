@@ -106,3 +106,7 @@ def main( ) :
         l_l.append( [ str_fasta_consensus[ sl ], str_fasta_ref[ sl ] ] )
     df_substitution = df_substitution.join( pd.DataFrame( l_l, columns = [ 'flanking_sequence_consensus', 'flanking_sequence_reference' ] ) )
     df_substitution.to_excel( f"{dir_folder_output}summary__substitution.xlsx" )
+    
+if __name__ == "__main__" :
+    main( )
+    
