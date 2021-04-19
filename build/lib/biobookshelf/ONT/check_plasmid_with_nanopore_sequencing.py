@@ -69,9 +69,11 @@ def main( ) :
                     arr_count_base[ dict_base_to_index[ '-' if pos_read is None else r.seq[ pos_read ] ] ][ pos_ref ] += 1 # detect deletion by checking aligned positions of a read
 
     # summerize results
-    df_summary = pd.DataFrame( arr_count_base / arr_count_base.sum( axis = 0 ), index = list( str_list_of_bases ), columns = np.arange( 1, len( str_fasta_ref ) + 1 ) ) # 1-based coordinates
+    arr_coverage = arr_count_base.sum( axis = 0 )
+    arr_coverage[ arr_coverage == 0 ] = -1 # mask positions with zero coverage
+    df_summary = pd.DataFrame( arr_count_base / arr_coverage, index = list( str_list_of_bases ), columns = np.arange( 1, len( str_fasta_ref ) + 1 ) ) # 1-based coordinates
     df_summary.loc[ 'coverage' ] = arr_count_base.sum( axis = 0 )
-    str_fasta_consensus = ''.join( list( str_list_of_bases[ index ] for index in ( arr_count_base / arr_count_base.sum( axis = 0 ) ).argmax( axis = 0 ) ) )
+    str_fasta_consensus = ''.join( list( str_list_of_bases[ arr_freq.argmax( ) ] if arr_freq.sum( ) > 0.1 else '*' for arr_freq in ( arr_count_base / arr_coverage ).T ) ) # if arr_frequency contains only zero values (no coverage), put '*' in the sequence
     df_summary.loc[ 'consensus_sequence' ] = list( str_fasta_consensus )
     df_summary.loc[ 'reference_sequence' ] = list( str_fasta_ref )
     l = [ ]
@@ -84,6 +86,8 @@ def main( ) :
             str_mut_type = 'deletion'
         elif base_ref == 'N' :
             pass
+        elif base_consensus == '*' :
+            str_mut_type = 'unknown'
         else :
             str_mut_type = 'substitution'
         l.append( str_mut_type )
@@ -102,3 +106,7 @@ def main( ) :
         l_l.append( [ str_fasta_consensus[ sl ], str_fasta_ref[ sl ] ] )
     df_substitution = df_substitution.join( pd.DataFrame( l_l, columns = [ 'flanking_sequence_consensus', 'flanking_sequence_reference' ] ) )
     df_substitution.to_excel( f"{dir_folder_output}summary__substitution.xlsx" )
+    
+if __name__ == "__main__" :
+    main( )
+    

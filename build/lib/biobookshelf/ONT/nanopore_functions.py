@@ -1,16 +1,22 @@
 # load internal module
 from biobookshelf.main import *
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barcoding_was_used ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barcoding_was_used = False, dir_folder_output_fastq = None ) :
     """
     # 2021-03-25 22:52:55 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
     'dir_folder_nanopore_sequencing_data' : Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
     'flag_barcoding_was_used' : flag of whether a barcoding kit was used during sequencing
     """
-
+    # [input] parse arguments
+    dir_folder_nanopore_sequencing_data = Program__Get_Absolute_Path_of_a_File( dir_folder_nanopore_sequencing_data )
+    if dir_folder_nanopore_sequencing_data[ -1 ] != '/' : # add '/' to the end of the directory
+        dir_folder_nanopore_sequencing_data += '/'
+    
     # define and create a folder for all fast5 files
     dir_folder_fast5 = dir_folder_nanopore_sequencing_data + 'fast5/'
+    if os.path.exists( dir_folder_fast5 ) : # if the folder already exists, empty the folder
+        shutil.rmtree( dir_folder_fast5 )
     os.makedirs( dir_folder_fast5, exist_ok = True )
     # move all fast5 files into one folder
     l_dir_file = glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*fast5" ) + glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*/*fast5" ) # retrieve fast5 files
@@ -35,14 +41,26 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barc
     with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
         file.write( run_guppy.stdout.decode( ) )
     # combine fastq.gz output files of guppy_basecaller output
+    l_dir_file_fastq_gz = [ ] # list of output fastq files
     if flag_barcoding_was_used :
         for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/' ) :
             name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
-            dir_file_fastq_gz = dir_folder_guppy_output + name_barcode + '.fastq.gz'
+            dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
             OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_barcode + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+            l_dir_file_fastq_gz.append( dir_file_fastq_gz )
     else :
         dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
         OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_guppy_output + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+        l_dir_file_fastq_gz.append( dir_file_fastq_gz )
+        
+    if dir_folder_output_fastq is not None : # if output folder of fastq files was given
+        dir_folder_output_fastq = Program__Get_Absolute_Path_of_a_File( dir_folder_output_fastq )
+        if dir_folder_output_fastq[ -1 ] != '/' : # add '/' to the end of the directory
+            dir_folder_output_fastq += '/'
+        for dir_file_fastq_gz in l_dir_file_fastq_gz : # for each output fastq file, copy the file to the given fastq folder
+            shutil.copyfile( dir_file_fastq_gz, f"{dir_folder_output_fastq}{dir_file_fastq_gz.rsplit( '/', 1 )[ 1 ]}" )
+            
+            
         
 def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True ) :
     """ 
