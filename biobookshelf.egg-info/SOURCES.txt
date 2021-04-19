@@ -67,3 +67,5 @@ dist/biobookshelf-0.1.6-py3-none-any.whl
 dist/biobookshelf-0.1.6.tar.gz
 dist/biobookshelf-0.1.7-py3-none-any.whl
 dist/biobookshelf-0.1.7.tar.gz
+dist/biobookshelf-0.1.8-py3-none-any.whl
+dist/biobookshelf-0.1.8.tar.gz
