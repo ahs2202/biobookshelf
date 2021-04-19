@@ -55,6 +55,7 @@ import requests # for retriving HTML documents
 from ftplib import FTP # for interacting with ftp server
 import urllib.request # to retrive html document from the internet
 from xml.parsers.expat import ExpatError
+import pkg_resources
 
 # python modules that requires independent anaconda install
 # import module for interactive plotting (with hover tool)
