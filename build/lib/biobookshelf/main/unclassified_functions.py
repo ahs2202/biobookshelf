@@ -6623,6 +6623,27 @@ def OS_Run( l_args, dir_file_stdout = None, dir_file_stderr = None, return_outpu
             
     return { 'stdout' : stdout, 'stderr' : stderr } if return_output else None
 
+def OS_Download( url_remote, dir_destination, download_file = True ) :
+    """ # 2021-04-19 20:29:02 
+    download a remote file or folder (recursively) using wget program in Linux
+    'url_remote' : URL of remote file or folder
+    'dir_destination' : destination directory to save the remote file or folder
+    'download_file' : FLAG for downloading a remote file. To download directory, set this flag to False. This flag is automatically set to False if given 'dir_destination' or 'url_remote' ends with '/'
+    """
+    if url_remote[ -1 ] == '/' or dir_destination[ -1 ] == '/' : # automatically set 'download_file' FLAG to False if given 'dir_destination' or 'url_remote' ends with '/'
+        download_file = False
+        # add '/' to the end of directories (for consistency)
+        if url_remote[ -1 ] != '/' :
+            url_remote += '/'
+        if dir_destination[ -1 ] != '/' :
+            dir_destination += '/'
+        os.makedirs( dir_destination, exist_ok = True ) # create destination folder if it does not exist
+            
+    l_args = [ 'wget', '--retry-connrefused', '--waitretry=1', '--read-timeout=20', '--timeout=15', '-t', '0' ]
+    l_args.extend( [ '-O' ] if download_file else [ '-R', 'index.html', "--recursive", "--no-parent", "--no-host-directorie", '-P' ] )
+    OS_Run( l_args + [ dir_destination, url_remote ], dir_file_stdout = f"{dir_destination}.wget.stdout.out", dir_file_stderr = f"{dir_destination}.wget.stderr.out" )
+    
+
 
 def TE_eQTL_Swarm_Plot( df_expr, df_genotype, index_entry, index_genotype ) :
     ''' Draw a swamplots showing differeing expressions in different genotypes '''

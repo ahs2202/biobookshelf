@@ -26,6 +26,7 @@ biobookshelf/ONT/run_guppy_and_combine_output.py
 biobookshelf/ONT/__pycache__/__init__.cpython-38.pyc
 biobookshelf/ONT/__pycache__/check_plasmid_with_nanopore_sequencing.cpython-38.pyc
 biobookshelf/ONT/__pycache__/nanopore_functions.cpython-38.pyc
+biobookshelf/ONT/__pycache__/run_guppy_and_combine_output.cpython-38.pyc
 biobookshelf/PD/__init__.py
 biobookshelf/PD/pd_functions.py
 biobookshelf/PD/__pycache__/__init__.cpython-38.pyc
@@ -64,3 +65,5 @@ dist/biobookshelf-0.1.5-py3-none-any.whl
 dist/biobookshelf-0.1.5.tar.gz
 dist/biobookshelf-0.1.6-py3-none-any.whl
 dist/biobookshelf-0.1.6.tar.gz
+dist/biobookshelf-0.1.7-py3-none-any.whl
+dist/biobookshelf-0.1.7.tar.gz
