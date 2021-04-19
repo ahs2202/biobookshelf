@@ -6638,13 +6638,15 @@ def OS_Download( url_remote, dir_destination, download_file = True ) :
             url_remote += '/'
         if dir_destination[ -1 ] != '/' :
             dir_destination += '/'
-        os.makedirs( dir_destination, exist_ok = True ) # create destination folder if it does not exist
-            
+    # create destination folder if it does not exist
+    if download_file :
+        os.makedirs( dir_destination.rsplit( '/', 1 )[ 0 ] + '/', exist_ok = True )     
+    else :
+        os.makedirs( dir_destination, exist_ok = True )     
     l_args = [ 'wget', '--retry-connrefused', '--waitretry=1', '--read-timeout=20', '--timeout=15', '-t', '0' ]
     l_args.extend( [ '-O' ] if download_file else [ '-R', 'index.html', "--recursive", "--no-parent", "--no-host-directorie", '-P' ] )
     OS_Run( l_args + [ dir_destination, url_remote ], dir_file_stdout = f"{dir_destination}.wget.stdout.out", dir_file_stderr = f"{dir_destination}.wget.stderr.out" )
     
-
 
 def TE_eQTL_Swarm_Plot( df_expr, df_genotype, index_entry, index_genotype ) :
     ''' Draw a swamplots showing differeing expressions in different genotypes '''
