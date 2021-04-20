@@ -55,7 +55,7 @@ import requests # for retriving HTML documents
 from ftplib import FTP # for interacting with ftp server
 import urllib.request # to retrive html document from the internet
 from xml.parsers.expat import ExpatError
-import pkg_resources
+import pkg_resources # for working with packages
 
 # python modules that requires independent anaconda install
 # import module for interactive plotting (with hover tool)
@@ -6604,10 +6604,12 @@ def OS_Run( l_args, dir_file_stdout = None, dir_file_stderr = None, return_outpu
     flag_dir_file_stdout_was_given = dir_file_stdout is not None
     flag_dir_file_stderr_was_given = dir_file_stderr is not None
     
+    # default stdout/stderr files will be written to the current working directory
+    dir_cwd = os.getcwd( )
     if not flag_dir_file_stdout_was_given :
-        dir_file_stdout = f'/tmp/{uuid_process}.out.txt'
+        dir_file_stdout = f'{dir_cwd}/{uuid_process}.out.txt'
     if not flag_dir_file_stderr_was_given :
-        dir_file_stderr = f'/tmp/{uuid_process}.err.txt'
+        dir_file_stderr = f'{dir_cwd}/{uuid_process}.err.txt'
     
     with open( dir_file_stdout, 'w+b' if stdout_binary else 'w+' ) as fout : # excute and read std output and std errors of a process
         with open( dir_file_stderr, 'w+' ) as ferr :
