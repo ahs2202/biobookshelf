@@ -1,0 +1,4 @@
+[console_scripts]
+biobook-check_plasmid_with_nanopore_sequencing = biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main
+biobook-run_guppy_and_combine_output = biobookshelf.ONT.run_guppy_and_combine_output:main
+

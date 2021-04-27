@@ -1,0 +1,15 @@
+Metadata-Version: 2.1
+Name: biobookshelf
+Version: 0.1.14
+Summary: a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python
+Home-page: https://github.com/ahs2202/biobookshelf
+Author: Hyunsu An
+Author-email: ahs2202@gm.gist.ac.kr
+License: GPLv3
+Description: Bio-Bookshelf
+        
+        a collection of python scripts and functions for exploratory 
+        analysis of bioinformatic data in Python
+        
+Platform: UNKNOWN
+Description-Content-Type: text/markdown
