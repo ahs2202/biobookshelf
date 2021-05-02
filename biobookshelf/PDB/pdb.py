@@ -158,7 +158,8 @@ def Compose_ATOM_or_HETATM_line( arr_values ) :
 
 
 def Read_Single_Module( dir_file, enable_automatic_correction = False, verbose = False ) : # 2020-07-07 15:59:00 
-    '''   Read PDB file with a single module (one chain A and one chain B, etc), and return dataframes of ATOM and HETATM records. If missing chain identifiers are detected, reassign chain identifiers based on chain transitions inferred by residue_numbers  '''
+    '''   # 2021-04-27 11:25:12 
+    Read PDB file with a single module (one chain A and one chain B, etc), and return dataframes of ATOM and HETATM records. If missing chain identifiers are detected, reassign chain identifiers based on chain transitions inferred by residue_numbers  '''
     if '/' in dir_file : 
         with open( dir_file, 'r' ) as file :
             l_lines = file.read( ).split( '\n' )
@@ -166,9 +167,16 @@ def Read_Single_Module( dir_file, enable_automatic_correction = False, verbose =
         l_lines = dir_file.split( '\n' )
     l_lines = list( line for line in l_lines if 'HEADER' not in line and 'REMARK' not in line ) # remove header or remarks from the data
     n_terminations = len( list( line for line in l_lines if 'TER' in line[ : 3 ] ) ) # count the number of terminations
-    l_lines = list( Parse_ATOM_or_HETATM_line( line ) for line in l_lines if 'ATOM' in line[ : 6 ] or 'HETATM' in line[ : 6 ] ) # parse all lines containing ATOM or HETATM records
-    if verbose : print( "{} lines of ATOM or HETATM and {} terminations are found".format( str( len( l_lines ) ), n_terminations ) )
-    df = pd.DataFrame( np.vstack( l_lines ), columns = df_meta_pdb_format.Data.values ).sort_values( [ 'Chain_identifier', 'Residue_sequence_number', 'Atom_serial_number' ], ignore_index = True )  # build dataframes of ATOM and HETATM records (except the five last data columns)
+    # parse all lines containing ATOM or HETATM records
+    l_arr = [ ]
+    for line in l_lines :
+        if 'ATOM' in line[ : 6 ] or 'HETATM' in line[ : 6 ] : # parse all lines containing ATOM or HETATM records
+            arr = Parse_ATOM_or_HETATM_line( line )
+            if arr[ 1 ] is None : # if atom_number contain invalid number 
+                arr[ 1 ] = l_arr[ -1 ][ 1 ] + 1 # set atom_number as previous_atom_number + 1
+            l_arr.append( arr )
+    if verbose : print( "{} lines of ATOM or HETATM and {} terminations are found".format( str( len( l_arr ) ), n_terminations ) )
+    df = pd.DataFrame( np.vstack( l_arr ), columns = df_meta_pdb_format.Data.values ).sort_values( [ 'Chain_identifier', 'Residue_sequence_number', 'Atom_serial_number' ], ignore_index = True )  # build dataframes of ATOM and HETATM records (except the five last data columns)
     arr_index_chain_transition = np.where( np.diff( df.Residue_sequence_number.values ) < 0 )[ 0 ] # retrive array of row indices where chain transiton exist (where new chain starts) (values in arr_index_chain_transition indicates locations of new chain starts)
     n_chains_in_pdb, n_chains_inferred = len( df.Chain_identifier.unique( ) ), len( arr_index_chain_transition ) + 1
     if n_chains_in_pdb < n_chains_inferred and enable_automatic_correction : # detect error in chain identifier assignment and try to correct it

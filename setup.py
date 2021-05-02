@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name='biobookshelf',
-    version='0.1.14',
+    version='0.1.15',
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -40,10 +40,11 @@ setup(
         'scikit-learn>=0.24.1',
         'bokeh>=2.2.3',
         'seaborn>=0.11.1',
-        'statsmodels>=0.12.0',
+        'statsmodels>=0.12.1',
         'bitarray>=1.6.1',
         'xmltodict>=0.12.0',
-        'beautifulsoup4>=4.9.3'
+        'beautifulsoup4>=4.9.3',
+        "parse>=1.18.0"
     ],
     entry_points={
         "console_scripts": [

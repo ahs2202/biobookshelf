@@ -180,7 +180,7 @@ def Gene_Read_Length( dir_file_bam, dir_file_gtf, return_list_of_read_length = F
 
 def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_rate = 0.15 ) :
     """ 
-    # 2021-04-26 21:06:12 
+    # 2021-04-27 11:30:13 
     'dir_file_bam' : BAM file containing aligned nanopore reads
     'dir_file_gtf' : GTF file containing gene annotations of the reference genome to which the nanopore reads have been aligned
     'thres_mapq' : threshold for mapping quality
@@ -247,4 +247,6 @@ def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_r
     df = pd.DataFrame( dict_adaptor ).T
     df.fillna( 0, inplace = True )
     df[ 'total_count' ] = df.sum( axis = 1 )
+    df.sort_values( 'total_count', ascending = False, inplace = True )
+    df.index.name = 'name_gene'
     return df
