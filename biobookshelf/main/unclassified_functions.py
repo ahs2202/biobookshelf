@@ -6630,7 +6630,7 @@ def OS_Memory( ) :
     return dict_mem
 
 def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False ) : # 2020-07-20 11:47:29 
-    ''' # 2021-05-02 19:45:34 
+    ''' # 2021-05-04 01:13:38 
     combine contents of files in l_dir_file and write at dir_newfile. if header is given, append header (string type with \n at the end) at the front of the file. if 'remove_n_lines' > 0, remove n lines from each files.
     gzipped files are also supported. However, when input files and output files have mixed gzipped status, it will cause a TypeError 
     
@@ -6638,6 +6638,12 @@ def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_
     '''
     if os.path.exists( dir_newfile ) and not overwrite_existing_file : print( "[OS_FILE_Combine_Files_in_order][ERROR] output file already exists" )
     elif len( l_dir_file ) == 0 : print( "[OS_FILE_Combine_Files_in_order][ERROR] given list of files is empty" )
+    elif len( l_dir_file ) == 1 : # if the list of input files contains only a single file, copy the file to the given directory
+        dir_file = l_dir_file[ 0 ]
+        if delete_input_files : # if 'delete_input_files' is set to True, simply rename the file
+            os.rename( dir_file, dir_newfile )
+        else :
+            shutil.copyfile( dir_file, dir_newfile )
     else : # if at least one input file is given (l_dir_file) and given directory of a newfile already exist (or overwriting is allowed)
         bool_flag_gzipped_output = dir_newfile[ - 3 : ] == '.gz' # set boolean flag for gzipped output file
         newfile = gzip.open( dir_newfile, 'wb' ) if bool_flag_gzipped_output else open( dir_newfile, 'w' ) # open a file that will contained combined contents
