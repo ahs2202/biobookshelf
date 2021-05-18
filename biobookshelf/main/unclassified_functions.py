@@ -119,7 +119,8 @@ from sklearn.decomposition import PCA, FactorAnalysis # import modules for multi
 from sklearn.manifold import TSNE 
 from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN # # modules for clustering
 
-
+# visualization
+import upsetplot 
 
 def Wide( int_percent_html_code_cell_width = 95 ) :
     """ 
@@ -6371,12 +6372,12 @@ def GTF_Parse_Attribute( attr ) :
 
 def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False ) :
     ''' 
-    # 2021-04-23 19:15:08 
+    # 2021-05-17 16:02:58  
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
+    'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
     '''
-    
-    df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) # ignore comments
+    df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
     df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
     df = df.sort_values( [ 'seqname', 'start' ] ).reset_index( drop = True )
     if parse_attr :

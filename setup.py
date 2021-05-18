@@ -44,7 +44,8 @@ setup(
         'bitarray>=1.6.1',
         'xmltodict>=0.12.0',
         'beautifulsoup4>=4.9.3',
-        "parse>=1.18.0"
+        "parse>=1.18.0",
+        "UpSetPlot>=0.4.1"
     ],
     entry_points={
         "console_scripts": [
