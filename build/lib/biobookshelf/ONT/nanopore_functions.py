@@ -1,64 +1,90 @@
 # load internal module
 from biobookshelf.main import *
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barcoding_was_used = False, dir_folder_output_fastq = None ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None ) :
     """
     # 2021-03-25 22:52:55 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
-    'dir_folder_nanopore_sequencing_data' : Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
+    Automatically detect 'id_flowcell' and 'id_lib_prep' from the metadata saved in the folder (they can be manually set through arguments)
+    
+    'dir_folder_nanopore_sequencing_data' : Run Guppy basecaller on the nanopore sequencing datafiles in the given folder. a list of nanopore sequencing datafolders of multiple runs of the same sample (due to failed runs, etc.) can be also given
     'flag_barcoding_was_used' : flag of whether a barcoding kit was used during sequencing
+    'id_flowcell' : manually set 'id_flowcell' for guppy_bascaller run.
+    'id_lib_prep' : manually set 'id_lib_prep' for guppy_bascaller run.
     """
-    # [input] parse arguments
-    dir_folder_nanopore_sequencing_data = Program__Get_Absolute_Path_of_a_File( dir_folder_nanopore_sequencing_data )
-    if dir_folder_nanopore_sequencing_data[ -1 ] != '/' : # add '/' to the end of the directory
-        dir_folder_nanopore_sequencing_data += '/'
-    
-    # define and create a folder for all fast5 files
-    dir_folder_fast5 = dir_folder_nanopore_sequencing_data + 'fast5/'
-    if os.path.exists( dir_folder_fast5 ) : # if the folder already exists, empty the folder
-        shutil.rmtree( dir_folder_fast5 )
-    os.makedirs( dir_folder_fast5, exist_ok = True )
-    # move all fast5 files into one folder
-    l_dir_file = glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*fast5" ) + glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*/*fast5" ) # retrieve fast5 files
-    for dir_file in l_dir_file : # no barcoding
-        shutil.copyfile( dir_file, dir_folder_fast5 + dir_file.rsplit( '/', 1 )[ 1 ] )
-    # retrieve flowcell type and library preperation method using summary file inside the directory
-    
-    l = glob.glob( f"{dir_folder_nanopore_sequencing_data}final_summary_*.txt" )
-    if len( l ) == 0 : 
-        print( '[Guppy_Run_and_Combine_Output] no summary file found, exiting' )
-        return -1
-    with open( l[ 0 ] ) as file :
-        l_line = file.read( ).strip( ).split( '\n' )
-    _, id_flowcell, id_lib_prep = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
-    
-    # run guppy basecaller and write output as a text file
-    dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
-    if flag_barcoding_was_used :
-        run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", "EXP-NBD104" if 'LSK' in id_lib_prep else "SQK-RBK004", "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
-    else :
-        run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
-    with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
-        file.write( run_guppy.stdout.decode( ) )
-    # combine fastq.gz output files of guppy_basecaller output
+    ''' run guppy_basecaller for each given 'dir_folder_nanopore_sequencing_data' '''
+    l_dir_folder_nanopore_sequencing_data = dir_folder_nanopore_sequencing_data if isinstance( dir_folder_nanopore_sequencing_data, ( list ) ) else [ dir_folder_nanopore_sequencing_data ] # set 'l_dir_folder_nanopore_sequencing_data' according to the given 'dir_folder_nanopore_sequencing_data'
     l_dir_file_fastq_gz = [ ] # list of output fastq files
-    if flag_barcoding_was_used :
-        for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/' ) :
-            name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
-            dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
-            OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_barcode + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+    for dir_folder_nanopore_sequencing_data in l_dir_folder_nanopore_sequencing_data : 
+        # [input] parse arguments
+        dir_folder_nanopore_sequencing_data = os.path.abspath( dir_folder_nanopore_sequencing_data )
+        if dir_folder_nanopore_sequencing_data[ -1 ] != '/' : # add '/' to the end of the directory
+            dir_folder_nanopore_sequencing_data += '/'
+
+        # define and create a folder for all fast5 files
+        dir_folder_fast5 = dir_folder_nanopore_sequencing_data + 'fast5/'
+        if not os.path.exists( dir_folder_fast5 ) : # if the folder already exists, skip moving fast5 files to a single folder (when fast-bascalling option has not been turned on, fast5 folder is present)
+            os.makedirs( dir_folder_fast5, exist_ok = True )
+            # move all fast5 files into one folder
+            l_dir_file = glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*fast5" ) + glob.glob( f"{dir_folder_nanopore_sequencing_data}*/*/*fast5" ) # retrieve fast5 files
+            for dir_file in l_dir_file : # no barcoding
+                shutil.copyfile( dir_file, dir_folder_fast5 + dir_file.rsplit( '/', 1 )[ 1 ] )
+        # retrieve flowcell type and library preperation method using summary file inside the directory
+
+        if id_flowcell is None or id_lib_prep is None :
+            l = glob.glob( f"{dir_folder_nanopore_sequencing_data}final_summary_*.txt" )
+            if len( l ) > 0 : 
+                with open( l[ 0 ] ) as file :
+                    l_line = file.read( ).strip( ).split( '\n' )
+                _, id_flowcell, id_lib_prep = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
+            
+            if id_flowcell is None or id_lib_prep is None :
+                l = glob.glob( f"{dir_folder_nanopore_sequencing_data}report_*" ) # retry
+                if len( l ) > 0 : 
+                    with open( l[ 0 ] ) as file :
+                        l_line = file.read( ).strip( ).split( '\n' )
+                    _, id_flowcell, id_lib_prep = list( e.replace( '",', '' ) for e in list( line.split( '"exp_script_name":' )[ 1 ].split( ':' ) for line in l_line if '"exp_script_name":' in line )[ 0 ] ) # retrieve flowcell type and library preperation method using summary file inside the directory
+                else :
+                    print( "[Guppy_Run_and_Combine_Output] appropriate 'id_flowcell' and/or 'id_lib_prep' were not found, exiting" )
+                    return -1
+
+        # run guppy basecaller and write output as a text file
+        dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
+        if flag_barcoding_was_used :
+            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", "EXP-NBD104" if 'LSK' in id_lib_prep else "SQK-RBK004", "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
+        else :
+            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
+        with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
+            file.write( run_guppy.stdout.decode( ) )
+        # combine fastq.gz output files of guppy_basecaller output
+        if flag_barcoding_was_used :
+            for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/' ) :
+                name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
+                dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
+                OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_barcode + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+                l_dir_file_fastq_gz.append( dir_file_fastq_gz )
+        else :
+            dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
+            OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_guppy_output + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
             l_dir_file_fastq_gz.append( dir_file_fastq_gz )
-    else :
-        dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
-        OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_guppy_output + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
-        l_dir_file_fastq_gz.append( dir_file_fastq_gz )
-        
+            
+    ''' copy and combine output fastq files to the output directory '''
     if dir_folder_output_fastq is not None : # if output folder of fastq files was given
-        dir_folder_output_fastq = Program__Get_Absolute_Path_of_a_File( dir_folder_output_fastq )
+        dir_folder_output_fastq = os.path.abspath( dir_folder_output_fastq )
         if dir_folder_output_fastq[ -1 ] != '/' : # add '/' to the end of the directory
             dir_folder_output_fastq += '/'
-        for dir_file_fastq_gz in l_dir_file_fastq_gz : # for each output fastq file, copy the file to the given fastq folder
-            shutil.copyfile( dir_file_fastq_gz, f"{dir_folder_output_fastq}{dir_file_fastq_gz.rsplit( '/', 1 )[ 1 ]}" )
+
+        # group 'dir_file_fastq_gz' based on 'name_file'
+        dict_name_file_to_dir = dict( )
+        for d in l_dir_file_fastq_gz :
+            name_file = d.rsplit( '/', 1 )[ 1 ] 
+            if name_file not in dict_name_file_to_dir :
+                dict_name_file_to_dir[ name_file ] = [ ]
+            dict_name_file_to_dir[ name_file ].append( d )
+
+        for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
+            OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{dir_folder_output_fastq}{name_file}" )
+            
             
             
         
@@ -180,7 +206,7 @@ def Gene_Read_Length( dir_file_bam, dir_file_gtf, return_list_of_read_length = F
 
 def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_rate = 0.15 ) :
     """ 
-    # 2021-04-26 21:06:12 
+    # 2021-04-27 11:30:13 
     'dir_file_bam' : BAM file containing aligned nanopore reads
     'dir_file_gtf' : GTF file containing gene annotations of the reference genome to which the nanopore reads have been aligned
     'thres_mapq' : threshold for mapping quality
@@ -247,4 +273,6 @@ def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_r
     df = pd.DataFrame( dict_adaptor ).T
     df.fillna( 0, inplace = True )
     df[ 'total_count' ] = df.sum( axis = 1 )
+    df.sort_values( 'total_count', ascending = False, inplace = True )
+    df.index.name = 'name_gene'
     return df

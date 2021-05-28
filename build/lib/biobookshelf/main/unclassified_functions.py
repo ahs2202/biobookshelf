@@ -67,18 +67,17 @@ from bokeh.layouts import row, gridplot, widgetbox
 from bokeh.transform import jitter
 from bokeh.io import reset_output
 
-
 # from bioservices.kegg import KEGG # module for KEGG REST service
 # from Bio import SeqIO
 
 import pysam # to read SAM and BAM file
 
-
 import xmltodict # read xml as an ordered dictionary
 # HTML
 from bs4 import BeautifulSoup # for parsing HTML
 
-
+# unknown anaconda dependencies
+import parse # opposite of format
 
 
 
@@ -120,7 +119,8 @@ from sklearn.decomposition import PCA, FactorAnalysis # import modules for multi
 from sklearn.manifold import TSNE 
 from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN # # modules for clustering
 
-
+# visualization
+import upsetplot 
 
 def Wide( int_percent_html_code_cell_width = 95 ) :
     """ 
@@ -459,6 +459,29 @@ def PARSE_Empty_Space_Delimited_with_Quotations( line ) : # 2020-07-17 01:04:25
 
 # In[ ]:
 
+def DICT_Apply( dict_data, Function = None, inplace = False, return_series = True, name_series = None ) :
+    """ # 2021-04-30 18:07:15 
+    Apply a given function to value in the given dict_data
+    'Function' : a function to apply for each value of the given dictionary. if none is given, does not apply any function
+    'inplace' : return the modified copy of the given object
+    'return_series' : return a pandas Series of the returned dictionary
+    'name_series' : set the name of the series with the given 'name_series'
+    """
+    dict_data_new = dict( )
+    if Function is not None : # if a valid function has been given
+        if inplace :
+            dict_data_new = dict_data
+        for key in dict_data :
+            dict_data_new[ key ] = Function( dict_data[ key ] )
+    else :
+        dict_data_new = dict_data
+            
+    if return_series :
+        s = pd.Series( dict_data_new )
+        s.name = name_series
+        return s
+    else :
+        return dict_data_new
 
 def DICTIONARY_convert_a_dict_into_key_and_value_lists( a_dict ) :
     ''' return list_keys, list_values '''
@@ -3294,6 +3317,16 @@ def MPL_SAVE_svg_png_pdf( fig_name, ** dict_save_fig ) :
     MATPLOTLIB_savefig( fig_name, ** dict_save_fig )
 MPL_SAVE_svg_png = MPL_SAVE_svg_png_pdf
 
+
+def MPL_SAVE( fig_name, l_format = [ '.pdf', '.png' ], close_fig = True, ** dict_save_fig ) :
+    ''' With the given 'fig_name', save fiqures in both svg and png format 
+    'l_format' : list of image extensions for saving files
+    '''
+    for str_format in l_format :
+        MATPLOTLIB_savefig( fig_name, format = str_format, close_fig = False, ** dict_save_fig )
+    if close_fig :
+        plt.close( )
+
 # In[ ]:
 
 
@@ -5108,31 +5141,56 @@ def ELBOW_Find( l, sort_array = True, return_index_of_an_elbow_point = False ) :
 # In[ ]:
 
 
-def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ] ) : 
-    """ # 2021-04-20 22:45:19 
-    split inputs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
+def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
+    """ # 2021-05-02 12:53:57 
+    split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
+    By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
     
     'Function_PostProcessing' : if given, Run the function before removing temporary files at the given temp folder. uuid of the current session and directory of the temporary folder are given as arguments to the function.
     'global_arguments' : a sort of environment variables (read only) given to each process as a list of additional arguments in addition to the directory of the input file. should be used to use local variables inside main( ) function if this function is called inside the main( ) function.
+    'col_split_load' : a name of column or a list of column names (or integer index of column or list of integer indices of columns if 'arr' is not a dataframe) for grouping given inputs when spliting the inputs into 'n_threads' number of dataframes. Each unique tuple in the column(s) will be present in only one of split dataframes.
     """
     if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
         arr = np.array( arr )
     str_uuid = UUID( ) # create a identifier for making temporary files
     l_dir_file = list( ) # split inputs given by 'arr' into 'n_threads' number of temporary files
-    if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
-        for index_chunk in range( n_threads ) :
-            dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-            arr.iloc[ index_chunk : : n_threads ].to_csv( dir_file_temp, sep = '\t', index = False )
-            l_dir_file.append( dir_file_temp )
-    else : # if arr is 1d or 2d array, the temporary file will be tsv file without header
-        l_chunk = LIST_Split( arr, n_threads )
-        for index, arr in enumerate( l_chunk ) : # save temporary files containing inputs
-            dir_file_temp = dir_temp + str_uuid + '_' + str( index ) + '.tsv'
-            if len( arr.shape ) == 1 : df = pd.DataFrame( arr.reshape( arr.shape[ 0 ], 1 ) )
-            elif len( arr.shape ) == 2 : df = pd.DataFrame( arr )
-            else : print( 'invalid inputs: input array should be 1D or 2D' ); return -1
-            df.to_csv( dir_file_temp, sep = '\t', header = None, index = False )
-            l_dir_file.append( dir_file_temp )
+    if col_split_load is not None : # (only valid when 'arr' is dataframe) a name of column for spliting a given dataframe into 'n_threads' number of dataframes. Each unique value in the column will be present in only one split dataframe.
+        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
+            if isinstance( col_split_load, ( str ) ) : # if only single column name is given, put it in a list
+                col_split_load = [ col_split_load ]    
+
+            # randomly distribute distinct tuples into 'n_threads' number of lists
+            dict_index = DF_Build_Index_Using_Dictionary( arr, col_split_load ) # retrieve index according to the tuple contained by 'col_split_load'
+            l_t = list( dict_index )
+            np.random.shuffle( l_t )
+            l_l_t = list( l_t[ i : : n_threads ] for i in range( n_threads ) )
+
+            for index_chunk in range( n_threads ) :
+                dict_select = dict( )
+                for arr_subset, name_col in zip( np.array( l_l_t[ index_chunk ], dtype = object ).reshape( len( col_split_load ), len( l_l_t[ index_chunk ] ) ), col_split_load ) :
+                    dict_select[ name_col ] = arr_subset
+                
+                dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                PD_Select( arr, ** dict_select ).to_csv( dir_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
+                l_dir_file.append( dir_file_temp )
+        else :
+            print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
+            return -1
+    else :
+        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
+            for index_chunk in range( n_threads ) :
+                dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                arr.iloc[ index_chunk : : n_threads ].to_csv( dir_file_temp, sep = '\t', index = False )
+                l_dir_file.append( dir_file_temp )
+        else : # if arr is 1d or 2d array, the temporary file will be tsv file without header
+            l_chunk = LIST_Split( arr, n_threads )
+            for index, arr in enumerate( l_chunk ) : # save temporary files containing inputs
+                dir_file_temp = dir_temp + str_uuid + '_' + str( index ) + '.tsv'
+                if len( arr.shape ) == 1 : df = pd.DataFrame( arr.reshape( arr.shape[ 0 ], 1 ) )
+                elif len( arr.shape ) == 2 : df = pd.DataFrame( arr )
+                else : print( 'invalid inputs: input array should be 1D or 2D' ); return -1
+                df.to_csv( dir_file_temp, sep = '\t', header = None, index = False )
+                l_dir_file.append( dir_file_temp )
 
     with Pool( n_threads ) as p : 
         l = p.starmap( Function, list( [ dir_file ] + list( global_arguments ) for dir_file in l_dir_file ) ) # use multiple process to run the given function
@@ -5141,6 +5199,7 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
         Function_PostProcessing( str_uuid, dir_temp ) 
         
     for dir_file in glob.glob( dir_temp + str_uuid + '*' ) : os.remove( dir_file ) # remove temporary files
+        
     return l # return mapped results
 
 
@@ -6313,18 +6372,42 @@ def GTF_Parse_Attribute( attr ) :
 
 def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False ) :
     ''' 
-    # 2021-04-23 19:15:08 
+    # 2021-05-17 16:02:58  
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
+    'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
     '''
-    
-    df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) # ignore comments
+    df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
     df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
     df = df.sort_values( [ 'seqname', 'start' ] ).reset_index( drop = True )
     if parse_attr :
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
 
+
+def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
+    """ # 2021-04-30 13:21:03 
+    Return an interval tree containing intervals retrieved from the given gtf file.
+    
+    'dir_file_gtf' : directory to the gtf file or dataframe iteslf
+    'feature' : list of features in the gtf to retrieve intervals from the gtf file
+    'value' : list of columne names (including GTF attributes) to include as a list of values for each interval in the returned interval tree.
+    """
+    # read GTF file
+    if isinstance( dir_file_gtf, ( str ) ) : # if 'dir_file_gtf' is a string object, used the value to read a GTF file.
+        df_gtf = GTF_Read( dir_file_gtf, parse_attr = True )
+    else : # assumes 'dir_file_gtf' is a dataframe containing GTF records if it is not a string object
+        df_gtf = dir_file_gtf
+        
+    df_gtf = PD_Select( df_gtf, feature = feature ) # retrieve gtf records of given list of features
+    
+    dict_it = dict( )
+    for arr_interval, arr_value in zip( df_gtf[ [ 'seqname', 'start', 'end' ] ].values, df_gtf[ value ].values ) :
+        seqname, start, end = arr_interval
+        if seqname not in dict_it :
+            dict_it[ seqname ] = intervaltree.IntervalTree( )
+        dict_it[ seqname ].addi( start, end, arr_value ) # add the interval with a given list of value
+    return dict_it
 
 # In[ ]:
 
@@ -6547,15 +6630,29 @@ def OS_Memory( ) :
             
     return dict_mem
 
-def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0 ) : # 2020-07-20 11:47:29 
-    ''' # 2021-01-04 14:51:40 
+def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False ) : # 2020-07-20 11:47:29 
+    ''' # 2021-05-04 01:13:38 
     combine contents of files in l_dir_file and write at dir_newfile. if header is given, append header (string type with \n at the end) at the front of the file. if 'remove_n_lines' > 0, remove n lines from each files.
-    gzipped files are also supported. However, when input files and output files have mixed gzipped status, it will cause a TypeError '''
+    gzipped files are also supported. However, when input files and output files have mixed gzipped status, it will cause a TypeError 
+    
+    'flag_use_header_from_first_file' : copy header from the first file to the new file
+    '''
     if os.path.exists( dir_newfile ) and not overwrite_existing_file : print( "[OS_FILE_Combine_Files_in_order][ERROR] output file already exists" )
     elif len( l_dir_file ) == 0 : print( "[OS_FILE_Combine_Files_in_order][ERROR] given list of files is empty" )
+    elif len( l_dir_file ) == 1 : # if the list of input files contains only a single file, copy the file to the given directory
+        dir_file = l_dir_file[ 0 ]
+        if delete_input_files : # if 'delete_input_files' is set to True, simply rename the file
+            os.rename( dir_file, dir_newfile )
+        else :
+            shutil.copyfile( dir_file, dir_newfile )
     else : # if at least one input file is given (l_dir_file) and given directory of a newfile already exist (or overwriting is allowed)
         bool_flag_gzipped_output = dir_newfile[ - 3 : ] == '.gz' # set boolean flag for gzipped output file
         newfile = gzip.open( dir_newfile, 'wb' ) if bool_flag_gzipped_output else open( dir_newfile, 'w' ) # open a file that will contained combined contents
+        if flag_use_header_from_first_file : # if a flag indicating copying header from the first file to the new file is set, open the first file and read the header line
+            dir_file = l_dir_file[ 0 ]
+            bool_flag_gzipped_input = dir_file[ - 3 : ] == '.gz' # set boolean flag for gzipped input file
+            with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
+                header = file.readline( )
         if header : 
             header = header.decode( ) if not isinstance( header, ( str ) ) else header # convert header byte string to string if header is not a string type
             newfile.write( ( header.encode( ) if bool_flag_gzipped_output else header ) ) # write a header line to the output file 
