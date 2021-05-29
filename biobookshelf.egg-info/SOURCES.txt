@@ -57,7 +57,3 @@ biobookshelf/main/__init__.py
 biobookshelf/main/unclassified_functions.py
 biobookshelf/main/__pycache__/__init__.cpython-38.pyc
 biobookshelf/main/__pycache__/unclassified_functions.cpython-38.pyc
-dist/biobookshelf-0.1.13-py3-none-any.whl
-dist/biobookshelf-0.1.13.tar.gz
-dist/biobookshelf-0.1.14-py3-none-any.whl
-dist/biobookshelf-0.1.14.tar.gz

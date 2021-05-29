@@ -5142,12 +5142,13 @@ def ELBOW_Find( l, sort_array = True, return_index_of_an_elbow_point = False ) :
 
 
 def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
-    """ # 2021-05-02 12:53:57 
+    """ # 2021-05-29 14:34:38 
     split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
     By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
     
     'Function_PostProcessing' : if given, Run the function before removing temporary files at the given temp folder. uuid of the current session and directory of the temporary folder are given as arguments to the function.
     'global_arguments' : a sort of environment variables (read only) given to each process as a list of additional arguments in addition to the directory of the input file. should be used to use local variables inside main( ) function if this function is called inside the main( ) function.
+                         'global_arguments' will be passed to 'Function_PostProcessing', too.
     'col_split_load' : a name of column or a list of column names (or integer index of column or list of integer indices of columns if 'arr' is not a dataframe) for grouping given inputs when spliting the inputs into 'n_threads' number of dataframes. Each unique tuple in the column(s) will be present in only one of split dataframes.
     """
     if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
@@ -5196,7 +5197,7 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
         l = p.starmap( Function, list( [ dir_file ] + list( global_arguments ) for dir_file in l_dir_file ) ) # use multiple process to run the given function
         
     if Function_PostProcessing is not None :
-        Function_PostProcessing( str_uuid, dir_temp ) 
+        Function_PostProcessing( str_uuid, dir_temp, * global_arguments ) 
         
     for dir_file in glob.glob( dir_temp + str_uuid + '*' ) : os.remove( dir_file ) # remove temporary files
         
