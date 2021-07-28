@@ -26,9 +26,9 @@ def STAR_Index( dir_file_fasta, dir_file_annotation, dir_folder_index = None, in
     with open( f'{dir_folder_index}{name_file_fasta}.STAR_index.out', 'w' ) as file :
         file.write( run_star.stdout.decode( ) )
         
-def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_prefix_output = None, n_threads = 10, index_bam = True ) :
+def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_prefix_output = None, n_threads = 10, index_bam = True, star_option = None ) :
     """
-    # 2021-03-23 23:05:37 
+    # 2021-07-05 21:34:33 
     Align reads with STAR aligner
     
     'dir_folder_index' : dir_folder containing STAR index
@@ -36,6 +36,7 @@ def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_p
     'dir_file_read_2' : file containing read_2 (gzipped file supported). read_1 file and read_2 file should be all gzipped or unzipped.
     'dir_prefix_output' : prefix of the STAR output files
     'index_bam' : index bam file using samtools
+    'star_option' : additional command line option for star (arguments separated by spaces)
     
     return 'dir_file_bam' : aligned BAM file 
     """
@@ -49,6 +50,8 @@ def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_p
         dir_prefix_output = f'{dir_folder_read}STAR_out/{name_file_read}'  
     
     l_args = [ 'STAR', '--runMode', "alignReads", '--genomeDir', dir_folder_index, '--runThreadN', str( int( n_threads ) ), '--outFileNamePrefix', dir_prefix_output, '--outSAMtype', 'BAM', 'SortedByCoordinate', '--outSAMunmapped', 'Within', '--outSAMattributes', 'Standard' ] 
+    if star_option is not None :
+        l_args += star_option.strip( ).split( )
     if dir_file_read_1.rsplit( '.', 1 )[ 1 ].lower( ) == 'gz' : # if given input file containing reads is gzipped
         l_args += [ "--readFilesCommand", "zcat" ]
     # add read_1 and read_2 file to arguments
@@ -82,4 +85,101 @@ def Coverage( dir_file_bam, thres_mapq = 200 ) :
                     dict_refname_to_cov[ r.reference_name ][ start : end ] += 1 # increase coverage of aligned regions
 
     return dict_refname_to_cov
-        
+    
+def Variant_Calling( r, dict_genome, set_mut_filtered = None, return_corrected_read_sequence = False ) :
+    ''' perform variant calling of a single aligned read (pysam read object) using a given genome
+    return a list of mutations and corrected read sequence
+    'set_mut_filtered' : only consider mutations in the given 'set_mut_filtered'. only valid when 'return_corrected_read_sequence' = True
+    'return_corrected_read_sequence' : return aligned read sequence after hard-clipping and filtering variants using 'set_mut_filtered'
+    '''
+    pos_read, pos_ref = 0, 0 # current position in the extracted reference sequence and the current read
+    str_seq_ref = dict_genome[ r.reference_name ][ r.reference_start : r.reference_start + r.alen ] # retrieve a part of the reference sequence where the current read was aligned
+    l_mut = [ ]
+    
+    if return_corrected_read_sequence : # correction mode
+        str_seq_corrected_read = '' # corrected read sequence after hard clipping and filtering variants
+        for n_bases, str_oper in NGS_CIGAR_Iterate_a_CIGAR_String( r.cigarstring ) :
+            if str_oper == 'M' :
+                for _ in range( n_bases ) :
+                    str_base_read, str_base_ref = r.seq[ pos_read ], str_seq_ref[ pos_ref ]
+                    str_base_read_corrected = str_base_ref # default corrected read base = ref
+                    if str_base_read != str_base_ref :
+                        id_mut = f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_X_{str_base_read}" # compose id_mut, convert 0-based coordinate to 1-based coordinate
+                        if set_mut_filtered is None or id_mut in set_mut_filtered :
+                            l_mut.append( id_mut )
+                            str_base_read_corrected = str_base_read
+                    str_seq_corrected_read += str_base_read_corrected # add corrected read 
+                    pos_ref += 1
+                    pos_read += 1
+            elif str_oper == 'N' :
+                pos_ref += n_bases
+            elif str_oper == 'S' :
+                pos_read += n_bases
+            elif str_oper == 'I' :
+                id_mut = f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_I_{r.seq[ pos_read : pos_read + n_bases ]}" # compose id_mut, 0-based coordinate to 1-based coordinate
+                if set_mut_filtered is None or id_mut in set_mut_filtered :
+                    l_mut.append( id_mut ) 
+                    str_seq_corrected_read += r.seq[ pos_read : pos_read + n_bases ] # add inserted sequence (if insertion is valid)
+                pos_read += n_bases
+            elif str_oper == 'D' :
+                id_mut = f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_D_{n_bases}" # compose id_mut, 0-based coordinate to 1-based coordinate
+                if set_mut_filtered is None or id_mut in set_mut_filtered :
+                    l_mut.append( id_mut ) 
+                else :
+                    str_seq_corrected_read += str_seq_ref[ pos_ref : pos_ref + n_bases ] # add deleted reference sequence (if deletion is invalid)
+                pos_ref += n_bases
+            elif str_oper == 'H' :
+                pass
+            elif str_oper == 'P' :
+                pass
+            elif str_oper == '=' :
+                str_seq_corrected_read += r.seq[ pos_read : pos_read + n_bases ] # add read sequences
+                pos_ref += n_bases
+                pos_read += n_bases
+            elif str_oper == 'X' :
+                for _ in range( n_bases ) :
+                    str_base_read, str_base_ref = r.seq[ pos_read ], str_seq_ref[ pos_ref ]
+                    str_base_read_corrected = str_base_ref # default corrected read base = ref
+                    id_mut = f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_X_{str_base_read}" # compose id_mut, 0-based coordinate to 1-based coordinate
+                    if set_mut_filtered is None or id_mut in set_mut_filtered :
+                        l_mut.append( id_mut ) 
+                        str_base_read_corrected = str_base_read
+                    str_seq_corrected_read += str_base_read_corrected # add corrected read 
+                    pos_ref += 1
+                    pos_read += 1
+        return l_mut, str_seq_corrected_read
+    
+    else : # normal mutation calling mode
+        for n_bases, str_oper in NGS_CIGAR_Iterate_a_CIGAR_String( r.cigarstring ) :
+            if str_oper == 'M' :
+                for _ in range( n_bases ) :
+                    str_base_read, str_base_ref = r.seq[ pos_read ], str_seq_ref[ pos_ref ]
+                    if str_base_read != str_base_ref :
+                        l_mut.append( f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_X_{str_base_read}" ) # 0-based coordinate to 1-based coordinate
+                    pos_ref += 1
+                    pos_read += 1
+            elif str_oper == 'N' :
+                pos_ref += n_bases
+            elif str_oper == 'S' :
+                pos_read += n_bases
+            elif str_oper == 'I' :
+                l_mut.append( f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_I_{r.seq[ pos_read : pos_read + n_bases ]}" ) # 0-based coordinate to 1-based coordinate
+                pos_read += n_bases
+            elif str_oper == 'D' :
+                l_mut.append( f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_D_{n_bases}" ) # 0-based coordinate to 1-based coordinate
+                pos_ref += n_bases
+            elif str_oper == 'H' :
+                pass
+            elif str_oper == 'P' :
+                pass
+            elif str_oper == '=' :
+                pos_ref += n_bases
+                pos_read += n_bases
+            elif str_oper == 'X' :
+                for _ in range( n_bases ) :
+                    str_base_read = r.seq[ pos_read ]
+                    l_mut.append( f"{r.reference_name}:{r.reference_start + 1 + pos_ref}_X_{str_base_read}" ) # 0-based coordinate to 1-based coordinate
+                    pos_ref += 1
+                    pos_read += 1
+        return l_mut
+

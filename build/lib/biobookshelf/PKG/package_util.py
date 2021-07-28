@@ -31,3 +31,15 @@ def Gunzip_Data( dir_file, name_package ) :
             file.write( 'gunzip completed at ' + TIME_GET_timestamp( ) )
         print( f"data file {dir_file} of the package {name_package} has been gunzipped." )
         
+def Detect_Entry_Point( name_entry_point ) :
+    '''  # 2021-06-04 11:05:34 
+    check whether an entry point with the given name of entry point has been used when running the current application
+    return True if the given entry point was used and return False if not.
+    '''
+    # retrieve the name of a current executable
+    str_name_program = sys.argv[ 0 ] 
+    if '/' in str_name_program :
+        str_name_program = str_name_program.rsplit( '/', 1 )[ 1 ]
+    flag_usage_from_command_line_interface = str_name_program[ : len( name_entry_point ) ] == name_entry_point
+    return flag_usage_from_command_line_interface
+        

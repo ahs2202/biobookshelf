@@ -1,9 +1,10 @@
 # load internal module
 from biobookshelf.main import *
+import biobookshelf.PKG as PKG
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None ) :
     """
-    # 2021-03-25 22:52:55 
+    # 2021-06-01 21:52:00 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
     Automatically detect 'id_flowcell' and 'id_lib_prep' from the metadata saved in the folder (they can be manually set through arguments)
     
@@ -11,9 +12,55 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barc
     'flag_barcoding_was_used' : flag of whether a barcoding kit was used during sequencing
     'id_flowcell' : manually set 'id_flowcell' for guppy_bascaller run.
     'id_lib_prep' : manually set 'id_lib_prep' for guppy_bascaller run.
+    'id_barcoding_kit' : manually set 'id_barcoding_kit' for guppy_bascaller run.
     """
-    ''' run guppy_basecaller for each given 'dir_folder_nanopore_sequencing_data' '''
+
+    
+    flag_entry_point = PKG.Detect_Entry_Point( 'biobook' ) # detect whether an entry point was used
+    if flag_entry_point :
+        parser = argparse.ArgumentParser( description = "Run Guppy basecaller on the nanopore sequencing datafiles in the given folder . This program has been developed by Hyunsu An (2021/06/03)." )
+        parser.add_argument( 'dir_folder_nanopore_sequencing_data', metavar = 'dir_folder_nanopore_sequencing_data', type = str, nargs='+', help = '(Required) the nanopore sequencing data folder(s)' )
+        parser.add_argument( "-b", "--flag_barcoding_was_used", help = "Set a flag indicating a barcoding kit was used during sequencing", action = 'store_true' )
+        parser.add_argument( "-o", "--dir_folder_output_fastq", help = "(optional) copy fastq files in the guppy output folder to the given directory" )
+        parser.add_argument( "-F", "--id_flowcell", help = "(optional) explicitly define the flowcell type used in sequencing. e.g. FLO-MIN106" )
+        parser.add_argument( "-L", "--id_lib_prep", help = "(optional) explicitly define the library sequencing kit used in sequencing. e.g. SQK-LSK109" )
+        parser.add_argument( "-B", "--id_barcoding_kit", help = "(optional) explicitly define the library barcoding kit used in sequencing. e.g. EXP-NBD104" )
+        args = parser.parse_args( )
+
+        # [input] parse arguments from parse_args
+        dir_folder_nanopore_sequencing_data = args.dir_folder_nanopore_sequencing_data
+        flag_barcoding_was_used = args.flag_barcoding_was_used
+        dir_folder_output_fastq = args.dir_folder_output_fastq
+        id_flowcell = args.id_flowcell
+        id_lib_prep = args.id_lib_prep
+        id_barcoding_kit = args.id_barcoding_kit
+        
+    
+    ''' [parse arguments] '''
+    if dir_folder_nanopore_sequencing_data is None :
+        print( "required arguments are not given, exiting" )
+        if flag_entry_point :
+            sys.exit( ) 
+        else :
+            return -1
+    
+    # process dir_folder in 'l_dir_folder_nanopore_sequencing_data'
     l_dir_folder_nanopore_sequencing_data = dir_folder_nanopore_sequencing_data if isinstance( dir_folder_nanopore_sequencing_data, ( list ) ) else [ dir_folder_nanopore_sequencing_data ] # set 'l_dir_folder_nanopore_sequencing_data' according to the given 'dir_folder_nanopore_sequencing_data'
+    l = [ ]
+    for dir_folder in l_dir_folder_nanopore_sequencing_data :
+        dir_folder = os.path.abspath( dir_folder )
+        if dir_folder[ -1 ] != '/' : # add '/' to the end of the directory
+            dir_folder += '/'
+        l.append( dir_folder )
+    l_dir_folder_nanopore_sequencing_data = l
+    # process 'dir_folder_output_fastq'
+    if dir_folder_output_fastq is not None : # if output folder of fastq files was given
+        dir_folder_output_fastq = os.path.abspath( dir_folder_output_fastq )
+        if dir_folder_output_fastq[ -1 ] != '/' : # add '/' to the end of the directory
+            dir_folder_output_fastq += '/'
+            
+            
+    """ run Guppy basecaller for each nanopore sequencing data folder """
     l_dir_file_fastq_gz = [ ] # list of output fastq files
     for dir_folder_nanopore_sequencing_data in l_dir_folder_nanopore_sequencing_data : 
         # [input] parse arguments
@@ -51,7 +98,10 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barc
         # run guppy basecaller and write output as a text file
         dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
         if flag_barcoding_was_used :
-            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", "EXP-NBD104" if 'LSK' in id_lib_prep else "SQK-RBK004", "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
+            ''' automatically set barcoding_kit '''
+            if id_barcoding_kit is None :
+                id_barcoding_kit = "EXP-NBD104" if 'LSK' in id_lib_prep else id_lib_prep
+            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
         else :
             run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
         with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
@@ -70,10 +120,6 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barc
             
     ''' copy and combine output fastq files to the output directory '''
     if dir_folder_output_fastq is not None : # if output folder of fastq files was given
-        dir_folder_output_fastq = os.path.abspath( dir_folder_output_fastq )
-        if dir_folder_output_fastq[ -1 ] != '/' : # add '/' to the end of the directory
-            dir_folder_output_fastq += '/'
-
         # group 'dir_file_fastq_gz' based on 'name_file'
         dict_name_file_to_dir = dict( )
         for d in l_dir_file_fastq_gz :
@@ -84,9 +130,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data, flag_barc
 
         for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
             OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{dir_folder_output_fastq}{name_file}" )
-            
-            
-            
+
         
 def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True ) :
     """ 
@@ -276,3 +320,129 @@ def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_r
     df.sort_values( 'total_count', ascending = False, inplace = True )
     df.index.name = 'name_gene'
     return df
+
+
+def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_fastq = None, dir_folder_output = 'default', n_threads = 10, flag_correct_reference = False ) :
+    """
+    # 2021-06-03 21:52:00 
+    Correct plasmid sequence using nanopore sequencing 
+    
+    'dir_file_fastq' : (Required) directory of a fasta file containing the reference sequence. (e.g. a fasta sequence from AddGene)
+    'dir_folder_output' : (Default: subdirectory of the folder containing the given fastq file) directory of output folder
+    'n_threads' : number of threads to run the pipeline
+    
+    """
+    # 'flag_correct_reference' : manually set 'id_barcoding_kit' for guppy_bascaller run.
+    
+    flag_entry_point = PKG.Detect_Entry_Point( 'biobook' ) # detect whether an entry point was used
+    if flag_entry_point :
+        parser = argparse.ArgumentParser( description = "Analyze nanopore sequencing data of a plasmid. This program has been developed by Hyunsu An (2021/06/03)." )
+        parser.add_argument( "-r", "--dir_file_fasta_ref", help = "(Required) directory of a fasta file containing the reference sequence. (e.g. a fasta sequence from AddGene)" )
+        parser.add_argument( "-i", "--dir_file_fastq", help = "(Required) directory of a fastq file from a nanopore sequencing" )
+        parser.add_argument( "-o", "--dir_folder_output", help = "(Default: subdirectory of the folder containing the given fastq file) directory of output folder", default = 'default' )
+        parser.add_argument( "-t", "--threads", help = "(Default: 10) Number of threads to use in the current compute node.", default = '10' )
+#         parser.add_argument( "-D", "--flag_correct_reference", help = "(Default: False) correct reference using nanopore sequencing data", action = 'store_true' )
+
+        args = parser.parse_args( )
+        # [input] parse arguments from parse_args
+        dir_file_fasta_ref = args.dir_file_fasta_ref
+        dir_file_fastq = args.dir_file_fastq
+        dir_folder_output = args.dir_folder_output
+        # flag_correct_reference = args.flag_correct_reference
+        n_threads = int( args.threads )
+    
+    
+    ''' [parse arguments] '''
+    if dir_file_fastq is None or dir_file_fastq is None  :
+        print( "required arguments are not given, exiting" )
+        if flag_entry_point :
+            sys.exit( ) 
+        else :
+            return -1
+        
+
+    # [process input] output folder 
+    # set default output folder 
+    if dir_folder_output == 'default' : 
+        dir_folder, name_file = dir_file_fastq.rsplit( '/', 1 )
+        dir_folder += '/'
+        if name_file.rsplit( '.', 1 )[ 1 ].lower( ) == 'gz' :
+            name_file = name_file.rsplit( '.', 1 )[ 0 ]
+        name_file = name_file.rsplit( '.', 1 )[ 0 ]
+        dir_folder_output = f"{dir_folder}{name_file}/"
+    dir_folder_output = os.path.abspath( dir_folder_output )
+    if dir_folder_output[ -1 ] != '/' : # add '/' at the end of the output folder
+        dir_folder_output += '/'
+    if os.path.exists( dir_folder_output ) : # if output folder already exists, exit
+        print( 'output folder already exists, exiting' )
+        if flag_entry_point :
+            sys.exit( ) 
+        else :
+            return -1
+    else : # create an output folder
+        os.makedirs( dir_folder_output )
+    dir_file_fasta_ref = os.path.abspath( dir_file_fasta_ref )
+    dir_file_fastq = os.path.abspath( dir_file_fastq )
+            
+    """ analyze plasmid sequence """
+    dir_file_index_ref = f"{dir_folder_output}index.ont.mmi"
+    Minimap2_Index( dir_file_fasta_ref, dir_file_index_ref )
+    dir_folder_minimap2_output = f"{dir_folder_output}minimap2/"
+    Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = dir_file_index_ref, dir_folder_minimap2_output = dir_folder_minimap2_output, n_threads = n_threads )
+
+    dict_fasta = FASTA_Read( dir_file_fasta_ref )
+    str_fasta_ref = dict_fasta[ list( dict_fasta )[ 0 ] ].upper( ) # read genome sequence of the reference (first sequence of the reference fasta file)
+    shutil.copyfile( dir_file_fasta_ref, f"{dir_folder_minimap2_output}{dir_file_fasta_ref.rsplit( '/', 1 )[ 1 ]}" ) # copy reference sequence file to minimap2 output file (convenient minimap visualization
+
+    # count number of each base for each position of the reference genome
+    str_list_of_bases = "ATGC-"
+    dict_base_to_index = dict( ( ( str_base, i ) for i, str_base in enumerate( str_list_of_bases ) ) )
+    arr_count_base = np.zeros( ( 5, len( str_fasta_ref ) ) )
+
+    l = [ ]
+    with pysam.AlignmentFile( glob.glob( f"{dir_folder_minimap2_output}*.bam" )[ 0 ], 'rb' ) as samfile :
+        for r in samfile.fetch( ) :
+            for pos_read, pos_ref in r.aligned_pairs :
+                if pos_ref is not None and r.seq is not None : # ignore insertion mutation type # ignore secondary alignment (where sequence is None)
+                    arr_count_base[ dict_base_to_index[ '-' if pos_read is None else r.seq[ pos_read ] ] ][ pos_ref ] += 1 # detect deletion by checking aligned positions of a read
+
+    # summerize results
+    arr_coverage = arr_count_base.sum( axis = 0 )
+    arr_coverage[ arr_coverage == 0 ] = -1 # mask positions with zero coverage
+    df_summary = pd.DataFrame( arr_count_base / arr_coverage, index = list( str_list_of_bases ), columns = np.arange( 1, len( str_fasta_ref ) + 1 ) ) # 1-based coordinates
+    df_summary.loc[ 'coverage' ] = arr_count_base.sum( axis = 0 )
+    str_fasta_consensus = ''.join( list( str_list_of_bases[ arr_freq.argmax( ) ] if arr_freq.sum( ) > 0.1 else '*' for arr_freq in ( arr_count_base / arr_coverage ).T ) ) # if arr_frequency contains only zero values (no coverage), put '*' in the sequence
+    df_summary.loc[ 'consensus_sequence' ] = list( str_fasta_consensus )
+    df_summary.loc[ 'reference_sequence' ] = list( str_fasta_ref )
+    l = [ ]
+    # classify mutations
+    for base_consensus, base_ref in zip( df_summary.loc[ 'consensus_sequence' ].values, df_summary.loc[ 'reference_sequence' ].values ) :
+        str_mut_type = '.' # default mut_type
+        if base_consensus == base_ref :
+            pass
+        elif base_consensus == '-' :
+            str_mut_type = 'deletion'
+        elif base_ref == 'N' :
+            pass
+        elif base_consensus == '*' :
+            str_mut_type = 'unknown'
+        else :
+            str_mut_type = 'substitution'
+        l.append( str_mut_type )
+    df_summary.loc[ 'mutation_type' ] = l
+    df_summary.to_excel( f"{dir_folder_output}summary__base_frequency.xlsx" )
+
+    # detect substitutions and extract a flanking sequence for each substitution
+    df_substitution = df_summary.T[ df_summary.T.mutation_type == 'substitution' ]
+    df_substitution.index.name = 'location_of_mutation'
+    df_substitution.reset_index( inplace = True )
+
+    len_flanking_base = 5 # number of bases flanking a mutation
+    l_l = list( )
+    for index in df_substitution.location_of_mutation.values - 1 : # 0-based coordinates
+        sl = slice( index - len_flanking_base, index + len_flanking_base + 1 )
+        l_l.append( [ str_fasta_consensus[ sl ], str_fasta_ref[ sl ] ] )
+    df_substitution = df_substitution.join( pd.DataFrame( l_l, columns = [ 'flanking_sequence_consensus', 'flanking_sequence_reference' ] ) )
+    df_substitution.to_excel( f"{dir_folder_output}summary__substitution.xlsx" )
+    
+    

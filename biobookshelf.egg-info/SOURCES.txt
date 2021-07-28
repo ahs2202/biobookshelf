@@ -51,6 +51,8 @@ biobookshelf/UniProt/__init__.py
 biobookshelf/UniProt/uniprot.py
 biobookshelf/UniProt/__pycache__/__init__.cpython-38.pyc
 biobookshelf/UniProt/__pycache__/uniprot.cpython-38.pyc
+biobookshelf/WEB/__init__.py
+biobookshelf/WEB/web_application.py
 biobookshelf/__pycache__/__init__.cpython-38.pyc
 biobookshelf/__pycache__/__main__.cpython-38.pyc
 biobookshelf/main/__init__.py

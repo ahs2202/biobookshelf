@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name='biobookshelf',
-    version='0.1.17',
+    version='0.1.19',
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -33,7 +33,7 @@ setup(
         'intervaltree>=3.1.0',
         'umap-learn>=0.4.6',
         'regex>=2020.10.15',
-        'scipy>=1.5.2',
+        'scipy>=1.4.1',
         'matplotlib>=3.3.2',
         'leidenalg>=0.8.3',
         'numba>=0.52.0',
@@ -45,12 +45,14 @@ setup(
         'xmltodict>=0.12.0',
         'beautifulsoup4>=4.9.3',
         "parse>=1.18.0",
-        "UpSetPlot>=0.4.1"
+        "UpSetPlot>=0.4.1",
+        "seqfold>=0.7.7",
+        'mappy>=2.21',
     ],
     entry_points={
         "console_scripts": [
-            "biobook-check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.check_plasmid_with_nanopore_sequencing:main",
-            "biobook-run_guppy_and_combine_output=biobookshelf.ONT.run_guppy_and_combine_output:main",
+            "biobook-check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.nanopore_functions:Check_plasmid_with_nanopore_sequencing",
+            "biobook-run_guppy_and_combine_output=biobookshelf.ONT.nanopore_functions:Guppy_Run_and_Combine_Output",
         ]
     },
 )
