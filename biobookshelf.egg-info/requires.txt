@@ -22,3 +22,4 @@ beautifulsoup4>=4.9.3
 parse>=1.18.0
 UpSetPlot>=0.4.1
 seqfold>=0.7.7
+mappy>=2.21

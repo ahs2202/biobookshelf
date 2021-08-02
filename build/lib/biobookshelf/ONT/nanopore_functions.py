@@ -132,13 +132,53 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
             OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{dir_folder_output_fastq}{name_file}" )
 
         
-def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True ) :
+# def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20 ) :
+#     """ 
+#     # 2021-06-15 23:42:30 
+#     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
+#     reads not aligned to the reference ('SAM flag == 4') are not included in the output bam file
+    
+#     'dir_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
+#     'dir_file_minimap2_index' : minimap2 index file
+#     'dir_folder_minimap2_output' : minimap2 output folder
+#     'drop_unaligned' : a flag indicating whether reads not aligned to the reference ('SAM flag == 4') are included in the output bam file
+#     """
+#     dir_file_fastq = os.path.abspath( dir_file_fastq ) # retrieve an absolute path
+#     dir_folder_fastq, name_file_fastq = dir_file_fastq.rsplit( '/', 1 )
+#     if dir_folder_minimap2_output is None : # default output folder is a subdirectory of the folder containing the input fastq file
+#         dir_folder_minimap2_output = f'{dir_folder_fastq}/minimap2/'
+#     dir_folder_minimap2_output = os.path.abspath( dir_folder_minimap2_output ) # retrieve an absolute path
+#     if dir_folder_minimap2_output[ -1 ] != '/' : # add '/' at the end of the output directory if it does not exist
+#         dir_folder_minimap2_output += '/'
+#     os.makedirs( dir_folder_minimap2_output, exist_ok = True ) # create folder if it does not exist
+
+#     # define output file
+#     dir_file_bam = f"{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.bam"
+    
+#     # run minimap2 
+#     p_minimap2 = subprocess.Popen( [ 'minimap2', '-L', '-t', str( int( n_threads ) ), '-ax', 'splice', dir_file_minimap2_index, dir_file_fastq ], stdout = subprocess.PIPE, shell = False )
+#     # filter reads not aligned to reference
+#     p_samtools_filter = subprocess.Popen( [ 'samtools', 'view', '-h', '-F', '4' ], stdin = p_minimap2.stdout, stdout = subprocess.PIPE, shell = False )
+#     # sort output by coordinates
+#     p_samtools_sort = subprocess.Popen( [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', dir_file_bam ], stdin = p_samtools_filter.stdout, stdout = subprocess.PIPE, shell = False )
+
+#     p_minimap2.stdout.close( )
+#     p_samtools_filter.communicate( )
+#     p_samtools_filter.stdout.close( )
+#     p_samtools_sort.communicate( )
+
+#     # build index for the output bam file
+#     run = subprocess.run( [ 'samtools', 'index', dir_file_bam ], capture_output = False )
+        
+def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = True, return_bash_shellscript = False ) :
     """ 
-    # 2021-03-06 21:37:21 
+    # 2021-06-14 23:19:19 
     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
     'dir_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
     'dir_file_minimap2_index' : minimap2 index file
     'dir_folder_minimap2_output' : minimap2 output folder
+    'drop_unaligned' : a flag indicating whether reads not aligned to the reference ('SAM flag == 4') are included in the output bam file
+    'return_bash_shellscript' : return shellscript instead of running minimap2 using the subprocess module
     """
     dir_folder_fastq, name_file_fastq = dir_file_fastq.rsplit( '/', 1 )
     if dir_folder_minimap2_output is None : # default output folder is a subdirectory of the folder containing the input fastq file
@@ -149,16 +189,44 @@ def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shar
 
     dir_file_sam = f"{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.sam"
     dir_file_bam = f"{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.bam"
-    # perform minimap2 alignment
-    run = subprocess.run( [ 'minimap2', '-t', str( int( n_threads ) ), '-ax', 'splice', "-o", dir_file_sam, dir_file_minimap2_index, dir_file_fastq ], capture_output = True )
-    with open( f'{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.out', 'w' ) as file :
-        file.write( run.stdout.decode( ) )
-    if verbose :
-        print( 'minimap2 completed' )
-    run = subprocess.run( [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', dir_file_bam, dir_file_sam ], capture_output = False )
-    run = subprocess.run( [ 'samtools', 'index', dir_file_bam ], capture_output = False )
-    if verbose :
-        print( 'samtools bam file compressing and indexing completed' )
+    
+    l_bash_shellscript = [ ]
+    
+    ''' perform minimap2 alignment '''
+    l_arg = [ 'minimap2', '-t', str( int( n_threads ) ), '-ax', 'splice', "-o", dir_file_sam ] 
+    if drop_unaligned :
+        l_arg += [ '--sam-hit-only' ]
+    l_arg += [ dir_file_minimap2_index, dir_file_fastq ]
+    if return_bash_shellscript : # perform minimap2 alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+    else :
+        run = subprocess.run( l_arg + [ dir_file_minimap2_index, dir_file_fastq ], capture_output = True )
+        with open( f'{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.out', 'w' ) as file :
+            file.write( run.stdout.decode( ) )
+        if verbose :
+            print( 'minimap2 completed' )
+            
+    ''' sort output SAM file '''
+    l_arg = [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', dir_file_bam, dir_file_sam ]
+    if return_bash_shellscript : # perform minimap2 alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+        l_bash_shellscript.append( ' '.join( [ 'rm', '-f', dir_file_sam ] ) )
+    else :     
+        run = subprocess.run( l_arg, capture_output = False )
+        os.remove( dir_file_sam ) # remove sam file
+        
+    ''' index resulting BAM file '''
+    l_arg = [ 'samtools', 'index', dir_file_bam ]
+    if return_bash_shellscript : # perform minimap2 alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+    else :   
+        run = subprocess.run( l_arg, capture_output = False )
+        if verbose :
+            print( 'samtools bam file compressing and indexing completed' )
+    
+    if return_bash_shellscript : # retrun bash shell scripts
+        return ' && '.join( l_bash_shellscript )
+        
         
 def Minimap2_Index( dir_file_fasta, dir_file_minimap2_index = None, verbose = False ) :
     """ 
@@ -202,7 +270,45 @@ def FeatureCounts( dir_file_annotation, dir_file_output, * l_dir_file_input, str
     if return_dataframe : # return a dataframe containing the featureCounts output
         df = pd.read_csv( dir_file_output, sep = '\t', low_memory = False, skiprows = [ 0 ] )
         return df
-        
+
+def Gene_Read_Count( dir_file_bam, dict_it_gene, thres_mapq = 60 ) :
+    """ 
+    Count number of reads uniquely aligned to each gene 
+    
+    'dir_file_bam' : BAM file containing aligned nanopore reads
+    'dict_it_gene' : dictionary of interval trees from a GTF file containing gene annotations of the reference genome to which the nanopore reads have been aligned (returned by 'GTF_Interval_Tree')
+    'thres_mapq' : threshold for mapping quality
+    
+    return a dataframe
+    """
+
+    # retrieve aligned length of nanopore read for each gene
+    dict_count = dict( )
+    with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+        for r in samfile.fetch( ) :
+            if r.reference_name not in dict_it_gene : # skip read aligned to segment that does not contain genes
+                continue
+            if r.mapq < thres_mapq : # skip read whose mapq is below 'thres_mapq'
+                continue
+            if r.seq is None : # skip multi-mapped reads (minimap2 skip sequence information for multi-mapped reads)
+                continue
+            set_overlap = dict_it_gene[ r.reference_name ].overlap( r.reference_start, r.reference_end )
+            if len( set_overlap ) == 0 : # skip if the read has not been aligned to any genes
+                continue
+            name_gene = list( set_overlap )[ 0 ][ 2 ][ 0 ]
+            if name_gene not in dict_count :
+                dict_count[ name_gene ] = 0
+            dict_count[ name_gene ] += 1
+    return dict_count
+    
+    # summarize read length distribution for each gene
+    l_l = [ ]
+    for name_gene in dict_length :
+        arr = np.array( dict_length[ name_gene ], dtype = int )
+        l_l.append( [ name_gene, len( arr ), np.mean( arr ), np.std( arr ) ] )
+    df_gene_read_length_summary = pd.DataFrame( l_l, columns = [ 'name_gene', 'n_reads', 'mean_read_length', 'std_read_length' ] )
+    return df_gene_read_length_summary
+    
 def Gene_Read_Length( dir_file_bam, dir_file_gtf, return_list_of_read_length = False, thres_mapq = 30 ) :
     """ 
     # 2021-04-23 19:19:33 
@@ -362,6 +468,9 @@ def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_
         
 
     # [process input] output folder 
+    # retrieve absolute paths
+    dir_file_fasta_ref = os.path.abspath( dir_file_fasta_ref )
+    dir_file_fastq = os.path.abspath( dir_file_fastq )
     # set default output folder 
     if dir_folder_output == 'default' : 
         dir_folder, name_file = dir_file_fastq.rsplit( '/', 1 )
@@ -381,8 +490,6 @@ def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_
             return -1
     else : # create an output folder
         os.makedirs( dir_folder_output )
-    dir_file_fasta_ref = os.path.abspath( dir_file_fasta_ref )
-    dir_file_fastq = os.path.abspath( dir_file_fastq )
             
     """ analyze plasmid sequence """
     dir_file_index_ref = f"{dir_folder_output}index.ont.mmi"

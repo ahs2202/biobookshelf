@@ -123,6 +123,9 @@ from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN # # modules 
 # visualization
 import upsetplot 
 
+# oligo analysis
+import seqfold
+
 def Wide( int_percent_html_code_cell_width = 95 ) :
     """ 
     # 20210224
@@ -6386,6 +6389,10 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False ) :
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
 
+def GTF_Write( df_gtf, dir_file ) :
+    ''' # 2021-07-22 22:54:30 
+    write gtf file as an unzipped tsv file '''
+    df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
 
 def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
     """ # 2021-04-30 13:21:03 
@@ -6408,7 +6415,8 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         seqname, start, end = arr_interval
         if seqname not in dict_it :
             dict_it[ seqname ] = intervaltree.IntervalTree( )
-        dict_it[ seqname ].addi( start, end, arr_value ) # add the interval with a given list of value
+        # add the interval with a given list of value
+        dict_it[ seqname ].addi( start, end + 1, arr_value ) # use 0-based coordinate like 1-based coordinate system
     return dict_it
 
 # In[ ]:
@@ -7001,9 +7009,11 @@ def NGS_SEQ_Calculate_Simple_Repeat_Proportion_in_a_read( seq, int_len_kmer = 4,
 # In[ ]:
 
 
-def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False ) : # 2020-08-21 14:38:09 
+def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
     ''' for a file-like object of file of 'dir_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
-    'parse_uniprot_header': if set to True and 'return_dataframe' is set to True, parse uniprot sequence header into [ 'accession', 'description', 'uniprot_source', 'uniprot_acc', 'uniprot_name' ] '''
+    'parse_uniprot_header': if set to True and 'return_dataframe' is set to True, parse uniprot sequence header into [ 'accession', 'description', 'uniprot_source', 'uniprot_acc', 'uniprot_name' ]
+    'header_split_at_space' : split a header at the first space, and use the string before the first space as a header string
+    '''
     dict_header_to_seq = dict( )
     dict_duplicated_header_count = dict( )
     bool_flag_input_gzipped = False
@@ -7020,6 +7030,8 @@ def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False
             if not line or line[ : 1 ] == '>' : break
             l_seq.append( line )
         header, seq = str_header[ 1 : ], ''.join( l_seq )
+        if header_split_at_space : # if 'header_split_at_space' is true : split a header at the first space, and use the string before the first space as a header string
+            header = header.split( ' ', 1 )[ 0 ]
         if header in dict_duplicated_header_count : dict_duplicated_header_count[ header ] += 1 # handle sequences with duplicated headers
         else : dict_duplicated_header_count[ header ] = 1
         if dict_duplicated_header_count[ header ] > 1 in dict_header_to_seq : dict_header_to_seq[ header + '_dup_{index}'.format( index = dict_duplicated_header_count[ header ] ) ] = ''.join( l_seq ) # if current fastq header in already exists, add '_dup_{index}' to the header to make it unique 
@@ -7048,17 +7060,23 @@ def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False
 
 
 def FASTA_Write( dir_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False ) :
-    ''' write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq '''
+    '''  # 2021-07-12 22:21:01 
+    write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq '''
     if os.path.exists( dir_fasta ) and not overwrite_existing_file : 
         print( 'the file already exists' )
         return -1
     if dict_fasta is not None : # if dict_fasta was given.
-        with open( dir_fasta, 'w' ) as file : file.write( ''.join( list( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( dict_fasta[ name ], 60, insert_characters = '\n' ) ) for name in dict_fasta ) ) )
+        with open( dir_fasta, 'w' ) as file : 
+            for name in dict_fasta :
+                file.write( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( dict_fasta[ name ], 60, insert_characters = '\n' ) ) )
     else : # if l_id and l_seq were given.
         if type( l_id ) is str and type( l_seq ) is str : # if only one sequence and sequence name were given
-            with open( dir_fasta, 'w' ) as file : file.write( ">{}\n{}\n".format( l_id, STR.Insert_characters_every_n_characters( l_seq, 60, insert_characters = '\n' ) ) )
+            with open( dir_fasta, 'w' ) as file : 
+                file.write( ">{}\n{}\n".format( l_id, STR.Insert_characters_every_n_characters( l_seq, 60, insert_characters = '\n' ) ) )
         else : # if list of sequences and sequence names were given
-            with open( dir_fasta, 'w' ) as file : file.write( ''.join( list( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( seq, 60, insert_characters = '\n' ) ) for name, seq in zip( l_id, l_seq ) ) ) )
+            with open( dir_fasta, 'w' ) as file : 
+                for name, seq in zip( l_id, l_seq ) :
+                    file.write( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( seq, 60, insert_characters = '\n' ) ) )
 
 
 # In[ ]:
@@ -7449,6 +7467,19 @@ def FASTQ_Read( dir_file, return_only_at_index = None, return_generator = False 
         else : l_l_values.append( [ record[ 0 ], record[ 1 ], record[ 3 ] ] )  
     file.close( )
     return l_seq if return_only_at_index is not None else pd.DataFrame( l_l_values, columns = [ 'readname', 'seq', 'quality' ] )
+
+def FASTQ_Read_Generator( dir_file, return_only_at_index = None ) : # 2020-08-18 22:31:31 
+    ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
+    return a generator that return a tuple of 3 length (name, sequence, and quality) or a value at the index given by "return_only_at_index".  '''
+    if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
+    bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
+    file = gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file )
+    while True :
+        record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
+        if len( record[ 0 ] ) == 0 : break
+        if return_only_at_index is not None : yield record[ return_only_at_index ]
+        else : yield[ record[ 0 ], record[ 1 ], record[ 3 ] ]
+    file.close( )
 
 
 # In[ ]:
@@ -8096,12 +8127,18 @@ def Bookshelves_pipeline_run_a_function_in_command_line_as_a_script( func, dir_f
 # In[ ]:
 
 
-def Base64_Encode( dir_file_binary, dir_file_binary_base64 = None ) : # 2020-11-18 11:58:53 
-    """ Perform Base64 Encoding for the given binary file.
-    'dir_file_binary_base64' : default directory is 'dir_file_binary' + ".base64.txt" """
+def Base64_Encode( dir_file_binary, dir_file_binary_base64 = None, header = None ) : 
+    """ # 2021-07-12 13:14:24 
+    Perform Base64 Encoding for the given binary file.
+    'dir_file_binary_base64' : default directory is 'dir_file_binary' + ".base64.txt"
+    'header' : write a header string (no needs to include the new line character) in front of the base64-encoded string in the output file
+    """
     dir_file_binary_base64 = dir_file_binary + ".base64.txt" if dir_file_binary_base64 is None else dir_file_binary_base64
     with open( dir_file_binary, 'rb' ) as file : 
         with open( dir_file_binary_base64, 'w' ) as newfile :
+            # write the header string isinstancenceas been given
+            if header is not None and isinstance( header, ( str ) ) :
+                newfile.write( header )
             newfile.write( base64.b64encode( file.read( ) ).decode( 'ascii' ) )
     return dir_file_binary_base64
 
