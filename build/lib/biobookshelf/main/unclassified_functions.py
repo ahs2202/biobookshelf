@@ -1472,6 +1472,13 @@ def GET_MASK_of_intersection( arr, annotation ) :
 
 
 
+def Series_Subset( s, set_index ) :
+    """ # 2021-08-01 19:10:01 
+    subset index of a given series using a given set of index 'index' """
+    if not isinstance( set_index, set ) :
+        set_index = set( set_index )
+    return s[ list( True if e in set_index else False for e in s.index.values ) ]
+
 def PD_Threshold( df, AND_operation = True, ** dict_thresholds ) :
     '''  Select rows of a given DataFrame or indices of Series based on a given threshold for each given column or the given series. 
     Add 'b' or 'B' at the end of column_label to select rows below the threshold, or add 'a' or 'A' to select rows above the threshold.
@@ -1531,9 +1538,9 @@ def PD_Subset( df, subset = None, axis = 0, index = None, columns = None, preser
     'return_numeric_column_only' : if True, return columns with only numeric datatypes
     '''
     if index is not None : # subset df according to given index and columns before subsetting
-        df = Subset( df, subset = index, axis = 0, preserve_order_in_df = preserve_order_in_df )
+        df = PD_Subset( df, subset = index, axis = 0, preserve_order_in_df = preserve_order_in_df )
     if columns is not None :
-        df = Subset( df, subset = columns, axis = 1, preserve_order_in_df = preserve_order_in_df )
+        df = PD_Subset( df, subset = columns, axis = 1, preserve_order_in_df = preserve_order_in_df )
     if subset is not None :
         if type( subset ) is pd.Series :
             subset = LIST_Deduplicate( subset.values )
@@ -3465,11 +3472,11 @@ def MPL_Scatter_Align_Two_Series( s_1, s_2, ls = '', marker = 'o', alpha = 0.5, 
     arr_1, arr_2, arr_labels = s_1.values.astype( float ), s_2.values.astype( float ), s_1.index.values
     if label_split_char is not None and type( arr_labels[ 0 ] ) is str :
         arr_labels = np.array( list( label.split( '_' )[ 0 ] for label in arr_labels ) ) # split labels to reduce complexity of annotations
-    if not isinstance( arr_labels[ 0 ], ( str, np.str_ ) ) :
-        labels, mask = List_Gene_ID__2__List_Gene_Symbol( arr_labels, return_mask_mapped = True )
-        arr_labels = arr_labels.astype( object )
-        arr_labels[ mask ] = labels
-        arr_labels[ ~ mask ] = 'Gene Not Mapped'
+#     if not isinstance( arr_labels[ 0 ], ( str, np.str_ ) ) :
+#         labels, mask = List_Gene_ID__2__List_Gene_Symbol( arr_labels, return_mask_mapped = True )
+#         arr_labels = arr_labels.astype( object )
+#         arr_labels[ mask ] = labels
+#         arr_labels[ ~ mask ] = 'Gene Not Mapped'
     min_1, max_1 = MPL_Internal_Util_get_min_max_for_plotting_an_axis( arr_1 ) # retrive min, max, range of x and y values for plotting
     min_2, max_2 = MPL_Internal_Util_get_min_max_for_plotting_an_axis( arr_2 )
     range_x, range_y = max_1 - min_1, max_2 - min_2
@@ -6395,7 +6402,7 @@ def GTF_Write( df_gtf, dir_file ) :
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
 
 def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
-    """ # 2021-04-30 13:21:03 
+    """ # 2021-08-01 17:12:10 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
     'dir_file_gtf' : directory to the gtf file or dataframe iteslf
@@ -6409,6 +6416,7 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         df_gtf = dir_file_gtf
         
     df_gtf = PD_Select( df_gtf, feature = feature ) # retrieve gtf records of given list of features
+    df_gtf.dropna( subset = value, inplace = True ) # value should be valid
     
     dict_it = dict( )
     for arr_interval, arr_value in zip( df_gtf[ [ 'seqname', 'start', 'end' ] ].values, df_gtf[ value ].values ) :
@@ -7440,9 +7448,11 @@ def STAR_Parse_final_out( dir_file, return_numeric = False ) :
 # In[ ]:
 
 
-def FASTQ_Iterate( dir_file, return_only_at_index = 1 ) :
+def FASTQ_Iterate( dir_file, return_only_at_index = None ) :
     """ # 2020-12-09 22:22:34 
-    iterate through a given fastq file """
+    iterate through a given fastq file.
+    'return_only_at_index' : return value only at the given index. For example, for when 'return_only_at_index' == 1, return sequence only.
+    """
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
     bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
     with gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file ) as file :

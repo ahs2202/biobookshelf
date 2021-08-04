@@ -170,7 +170,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
 #     # build index for the output bam file
 #     run = subprocess.run( [ 'samtools', 'index', dir_file_bam ], capture_output = False )
         
-def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = True, return_bash_shellscript = False ) :
+def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False ) :
     """ 
     # 2021-06-14 23:19:19 
     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
@@ -200,7 +200,7 @@ def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shar
     if return_bash_shellscript : # perform minimap2 alignment using subprocess module
         l_bash_shellscript.append( ' '.join( l_arg ) )
     else :
-        run = subprocess.run( l_arg + [ dir_file_minimap2_index, dir_file_fastq ], capture_output = True )
+        run = subprocess.run( l_arg, capture_output = True )
         with open( f'{dir_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.out', 'w' ) as file :
             file.write( run.stdout.decode( ) )
         if verbose :
@@ -250,6 +250,93 @@ def Minimap2_Index( dir_file_fasta, dir_file_minimap2_index = None, verbose = Fa
         file.write( run.stdout.decode( ) )
     if verbose :
         print( 'minimap2 indexing completed' )
+        
+        
+def Desalt_Index( dir_file_fasta, dir_folder_desalt_index = None, verbose = False ) :
+    """ 
+    # 2021-08-02 11:26:56 
+    index given fasta file for nanopore reads alignment using deSALT
+    'dir_file_fasta' : input reference fasta file
+    'dir_folder_desalt_index' : a folder where the index will be saved.
+    """
+    dir_folder_fastq, name_file_fasta = dir_file_fasta.rsplit( '/', 1 )
+    if dir_folder_desalt_index is None : # set the default directory of the minimap index 
+        os.makedirs( f'{dir_folder_fastq}/index/desalt/', exist_ok = True )
+        dir_folder_desalt_index = f'{dir_folder_fastq}/index/desalt/{name_file_fasta}.desalt.idx/'
+    # build desalt index
+    run = subprocess.run( [ 'deSALT', 'index', dir_file_fasta, dir_folder_desalt_index ], capture_output = True )
+    with open( f"{dir_folder_desalt_index.rsplit( '/', 1 )[ 0 ]}.desalt_index.out", 'w' ) as file :
+        file.write( run.stdout.decode( ) )
+    if verbose :
+        print( f'deSALT indexing of {dir_file_fasta} completed' )
+        
+def Desalt_Align( dir_file_fastq, dir_folder_desalt_index = None, dir_folder_desalt_output = None, arg_read_type = 'ont2d', dir_file_gtf = None, n_threads = 20, verbose = True, return_bash_shellscript = False ) :
+    """ 
+    # 2021-06-14 23:19:19 
+    align given fastq file of nanopore reads using deSALT and write an output as a bam file 
+    'dir_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
+    'dir_folder_desalt_index' : desalt index file
+    'dir_folder_desalt_output' : desalt output folder
+    'arg_read_type' : parameter sets for each read type. available parameter sets are the following: 
+                                   'ccs' (PacBio SMRT CCS reads): error rate 1%
+                                   'clr' (PacBio SMRT CLR reads): error rate 15%
+                                   'ont1d' (Oxford Nanopore 1D reads): error rate > 20%
+                                   'ont2d' (Oxford Nanopore 2D reads): error rate > 12%
+    'dir_file_gtf' : directory of reference transcriptome annotations (for more accurate alignment)
+    'return_bash_shellscript' : return shellscript instead of running desalt using the subprocess module
+    """
+    dir_folder_fastq, name_file_fastq = dir_file_fastq.rsplit( '/', 1 )
+    if dir_folder_desalt_output is None : # default output folder is a subdirectory of the folder containing the input fastq file
+        dir_folder_desalt_output = f'{dir_folder_fastq}/desalt/'
+    if dir_folder_desalt_output[ -1 ] != '/' : # add '/' at the end of the output directory if it does not exist
+        dir_folder_desalt_output += '/'
+    os.makedirs( dir_folder_desalt_output, exist_ok = True ) # create folder if it does not exist
+
+    dir_file_sam = f"{dir_folder_desalt_output}{name_file_fastq}.desalt_aligned.sam"
+    dir_file_bam = f"{dir_folder_desalt_output}{name_file_fastq}.desalt_aligned.bam"
+    
+    l_bash_shellscript = [ ]
+    
+    ''' perform desalt alignment '''
+    l_arg = [ 'deSALT', 'aln', '-t', str( int( n_threads ) ), '-x', arg_read_type, "-o", dir_file_sam ] 
+    if dir_file_gtf is not None :
+        dir_file_gtf_info = f"{dir_file_gtf}.desalt.info" # directory of a processed gtf file
+        # process a given gtf file into deSALT GTF info
+        if not os.path.exists( dir_file_gtf_info ) :
+            run = subprocess.run( [ 'Annotation_Load.py', dir_file_gtf, dir_file_gtf_info ], capture_output = True )
+            with open( f'{dir_file_gtf}.desalt_annotation_load.out', 'w' ) as file :
+                file.write( run.stdout.decode( ) )
+        l_arg += [ '-G', dir_file_gtf ]
+    l_arg += [ dir_folder_desalt_index, dir_file_fastq ]
+    if return_bash_shellscript : # perform desalt alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+    else :
+        run = subprocess.run( l_arg, capture_output = True )
+        with open( f'{dir_folder_desalt_output}{name_file_fastq}.desalt_aligned.out', 'w' ) as file :
+            file.write( run.stdout.decode( ) )
+        if verbose :
+            print( 'desalt completed' )
+            
+    ''' sort output SAM file '''
+    l_arg = [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', dir_file_bam, dir_file_sam ]
+    if return_bash_shellscript : # perform desalt alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+        l_bash_shellscript.append( ' '.join( [ 'rm', '-f', dir_file_sam ] ) )
+    else :     
+        run = subprocess.run( l_arg, capture_output = False )
+        os.remove( dir_file_sam ) # remove sam file
+        
+    ''' index resulting BAM file '''
+    l_arg = [ 'samtools', 'index', dir_file_bam ]
+    if return_bash_shellscript : # perform desalt alignment using subprocess module
+        l_bash_shellscript.append( ' '.join( l_arg ) )
+    else :   
+        run = subprocess.run( l_arg, capture_output = False )
+        if verbose :
+            print( 'samtools bam file compressing and indexing completed' )
+    
+    if return_bash_shellscript : # retrun bash shell scripts
+        return ' && '.join( l_bash_shellscript )
         
 def FeatureCounts( dir_file_annotation, dir_file_output, * l_dir_file_input, str_type_attribute = 'gene_id', verbose = False, return_dataframe = True ) :
     """ 

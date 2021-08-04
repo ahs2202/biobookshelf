@@ -6372,7 +6372,7 @@ def GTF_Parse_Attribute( attr ) :
     parse attribute string of a gtf file
     """
     dict_data = dict( )
-    for e in attr.split( ';' ) :
+    for e in attr.split( '";' ) :
         e = e.strip( )
         if len( e ) == 0 : 
             continue
@@ -6382,7 +6382,7 @@ def GTF_Parse_Attribute( attr ) :
         dict_data[ str_key ] = str_value
     return dict_data
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False ) :
+def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False, remove_chr_from_seqname = True ) :
     ''' 
     # 2021-05-17 16:02:58  
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
@@ -6392,6 +6392,8 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False ) :
     df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
     df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
     df = df.sort_values( [ 'seqname', 'start' ] ).reset_index( drop = True )
+    if remove_chr_from_seqname :
+        df[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df.seqname.values )
     if parse_attr :
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
@@ -6429,6 +6431,34 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
 
 # In[ ]:
 
+def GTF_Build_Mask( df_gtf, dict_seqname_to_len_seq, str_feature = 'exon', remove_chr_from_seqname = True ) :
+    ''' # 2021-08-04 10:54:23 
+    build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists)
+    
+    'df_gtf' : directory to gtf file or a dataframe containing gtf
+    'dict_seqname_to_len_seq' : dictionary containing sequence length information of the genome
+    '''
+    # remove 'chr' characters from seqnames in the 'dict_seqname_to_len_seq'
+    if remove_chr_from_seqname :
+        dict_seqname_to_len_seq = dict( ( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ], dict_seqname_to_len_seq[ seqname ] ) for seqname in dict_seqname_to_len_seq )
+    
+    ''' initialize bitarrys to zeros (the length bitarrays are same as the reference sequences) '''
+    dict_seqname_to_ba = dict( )
+    for seqname in dict_seqname_to_len_seq :
+        ba = bitarray( dict_seqname_to_len_seq[ seqname ] )
+        ba.setall( 0 )
+        dict_seqname_to_ba[ seqname ] = ba
+    
+    ''' read gtf and build mask '''
+    if isinstance( df_gtf, str ) :
+        df_gtf = GTF_Read( df_gtf )
+    df_gtf = PD_Select( df_gtf, feature = str_feature ) # select only specific features form the gtf
+    if remove_chr_from_seqname :
+        df_gtf[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df_gtf.seqname.values )
+    df_gtf.start -= 1 # 1-based coordinate -> 0-based coordinate
+    for seqname, start, end in df_gtf[ [ 'seqname', 'start', 'end' ] ].values : # 0-based coordinate
+        dict_seqname_to_ba[ seqname ][ start : end ] = 1
+    return dict_seqname_to_ba
 
 def PARSER_EMBL_Format( dir_file ) :
     ''' Parse EMBL format into DataFrame '''

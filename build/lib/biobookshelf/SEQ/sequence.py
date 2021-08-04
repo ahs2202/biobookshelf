@@ -164,34 +164,3 @@ def Calculate_Simple_Repeat_Proportion_in_a_read( seq, int_len_kmer = 4, int_kme
 
 
 # In[ ]:
-
-def Cluster_with_Kmer( dict_seq_count, int_min_n_overlap_kmer, len_kmer, float_min_proportion_read_to_select_kmer_representative ) :
-    """ # 2021-08-02 23:14:12 
-    cluster given sequences (given as a dictionary containing counts of unique sequences) using kmer of a given length
-    """
-    dict_cluster = dict( )
-    for seq in dict_seq_count :
-        int_seq_count = dict_seq_count[ seq ]
-        flag_assigned_to_cluster = False
-        set_kmer = set( SEQ.Generate_Kmer( seq, len_kmer ) )
-        for name_cluster in dict_cluster :
-            c = dict_cluster[ name_cluster ]
-            n_overlap_kmer = len( c[ 'set_kmer' ].intersection( set_kmer ) )
-            if int_min_n_overlap_kmer <= n_overlap_kmer :
-                c[ 'seq_count' ][ seq ] = int_seq_count
-                c[ 'n_seq' ] += int_seq_count
-                n_seq = c[ 'n_seq' ]
-                counter_kmer = COUNTER( list( set_kmer ) * int_seq_count, c[ 'counter_kmer' ] ) # update kmer count
-                c[ 'counter_kmer' ] = counter_kmer
-                c[ 'set_kmer' ] = set( kmer for kmer in counter_kmer if counter_kmer[ kmer ] / n_seq >= float_min_proportion_read_to_select_kmer_representative )
-                flag_assigned_to_cluster = True
-                break
-        if not flag_assigned_to_cluster :
-            c = dict( )
-            c[ 'set_kmer' ] = set_kmer
-            c[ 'n_seq' ] = int_seq_count
-            c[ 'seq_count' ] = dict( )
-            c[ 'seq_count' ][ seq ] = int_seq_count
-            c[ 'counter_kmer' ] = COUNTER( list( set_kmer ) * int_seq_count ) 
-            dict_cluster[ UUID( ) ] = c
-    return dict_cluster

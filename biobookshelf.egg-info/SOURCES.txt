@@ -11,6 +11,8 @@ biobookshelf.egg-info/dependency_links.txt
 biobookshelf.egg-info/entry_points.txt
 biobookshelf.egg-info/requires.txt
 biobookshelf.egg-info/top_level.txt
+biobookshelf/INT/__init__.py
+biobookshelf/INT/integer.py
 biobookshelf/L/__init__.py
 biobookshelf/L/l_functions.py
 biobookshelf/L/__pycache__/__init__.cpython-38.pyc
@@ -43,6 +45,8 @@ biobookshelf/RNA/__init__.py
 biobookshelf/RNA/rnaseq.py
 biobookshelf/RNA/__pycache__/__init__.cpython-38.pyc
 biobookshelf/RNA/__pycache__/rnaseq.cpython-38.pyc
+biobookshelf/SEQ/__init__.py
+biobookshelf/SEQ/sequence.py
 biobookshelf/STR/__init__.py
 biobookshelf/STR/string.py
 biobookshelf/STR/__pycache__/__init__.cpython-38.pyc
