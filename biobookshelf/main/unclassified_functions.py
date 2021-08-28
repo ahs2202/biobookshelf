@@ -107,6 +107,7 @@ import regex # regular expression modules for searching substrings in a string
 
 # modules for calculating Pearson correlations 
 import scipy
+import scipy.io
 from scipy.stats import fisher_exact # usage : For GESA p_value, stats.fisher_exact([[80, 2000], [80, 200]])
 from scipy.stats import mstats # import module for masked arrays
 from scipy import stats
@@ -503,11 +504,11 @@ def DICTIONARY_convert_a_dict_into_key_and_value_lists( a_dict ) :
 # In[ ]:
 
 
-def DICTIONARY_Build_from_arr( arr, order_index_entry = True ) :
+def DICTIONARY_Build_from_arr( arr, order_index_entry = True, index_start = 0 ) :
     if order_index_entry :
-        return dict( ( index, entry ) for entry, index in zip( arr, np.arange( len( arr ) ) ) ) 
+        return dict( ( index, entry ) for entry, index in zip( arr, np.arange( index_start, len( arr ) + index_start ) ) ) 
     else :
-        return dict( ( entry, index ) for entry, index in zip( arr, np.arange( len( arr ) ) ) ) 
+        return dict( ( entry, index ) for entry, index in zip( arr, np.arange( index_start, len( arr ) + index_start ) ) ) 
 
 
 # In[ ]:
@@ -6365,6 +6366,21 @@ def chromosome_collections(df, y_positions, height,  **kwargs):
 
 # In[ ]:
 
+def ANNDATA_From_DF( df ) :
+    ''' # 2021-08-20 02:33:09 
+    convert dataframe to anndata '''
+    return sc.AnnData( X = df, obs = pd.DataFrame( df.index.values ).rename( columns = { 0 : 'obs' } ).set_index( 'obs' ), var = pd.DataFrame( df.columns.values ).rename( columns = { 0 : 'var' } ).set_index( 'var' ) )
+
+DF_To_AnnData = ANNDATA_From_DF
+
+def ANNDATA_Combine_Var( * l_ad ) :
+    """ # 2021-08-20 03:36:06 
+    Combine ANNDATA objects in 'var' axis
+    """
+    ad = l_ad[ 0 ].T.concatenate( * list( ad.T for ad in l_ad[ 1 : ] ) ).T
+    ad.obs.columns = list( c.split( '-', 1 )[ 0 ] for c in ad.obs.columns )
+    ad.var.index = list( i.rsplit( '-', 1 )[ 0 ] for i in ad.var.index )
+    return ad
 
 def GTF_Parse_Attribute( attr ) :
     """
@@ -6382,26 +6398,60 @@ def GTF_Parse_Attribute( attr ) :
         dict_data[ str_key ] = str_value
     return dict_data
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False, remove_chr_from_seqname = True ) :
+def GFF3_Parse_Attribute( attr ) :
+    """
+    # 2021-08-16 16:35:15 
+    Parse attribute string of GFF3 formated gene annotation file
+    """
+    return dict( e.split( '=', 1 ) for e in attr.split( ';' ) if '=' in e )
+
+def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True ) :
     ''' 
     # 2021-05-17 16:02:58  
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
     'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
+    'flag_gtf_format' : set this flag to true if the attributes are in GTF format. If it is in GFF3 format, set this flag to False
     '''
-    df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
-    df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
+    try :
+        df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
+        df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
+    except :
+        # return empty GTF when an error occurs during reading a GTF file
+        print( 'error reading GTF file. Might be an empty GTF file, returning empty dataframe' ) 
+        df = pd.DataFrame( [ [ '' ] * 9 ], columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] )
+        df = df.iloc[ : 0 ]
+        return df
     df = df.sort_values( [ 'seqname', 'start' ] ).reset_index( drop = True )
     if remove_chr_from_seqname :
         df[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df.seqname.values )
     if parse_attr :
-        return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
+        return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) if flag_gtf_format else list( GFF3_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
 
-def GTF_Write( df_gtf, dir_file ) :
-    ''' # 2021-07-22 22:54:30 
-    write gtf file as an unzipped tsv file '''
+def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_gff3 = False ) :
+    ''' # 2021-08-24 21:02:08 
+    write gtf file as an unzipped tsv file
+    'flag_update_attribute' : ignore the 'attribute' column present in the given dataframe 'df_gtf', and compose a new column based on all the non-essential columns of the dataframe.
+    'flag_filetype_is_gff3' : a flag indicating the filetype of the output file. According to the output filetype, columns containing attributes will be encoded into the values of the attribute column before writing the file.
+    '''
+    if flag_update_attribute :
+        l_col_essential = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
+
+        l_col_attribute = list( col for col in df_gtf.columns.values if col not in l_col_essential ) # all non-essential columns will be considered as the columns 
+
+        l_attribute_new = list( )
+        for arr in df_gtf[ l_col_attribute ].values :
+            str_attribute = '' # initialize
+            for name, val in zip( l_col_attribute, arr ) :
+                if isinstance( val, float ) and np.isnan( val ) :
+                    continue
+                str_attribute += f'{name}={val};' if flag_filetype_is_gff3 else f'{name} "{val}"; ' # encode attributes according to the gff3 file format
+            str_attribute = str_attribute.strip( )
+            l_attribute_new.append( str_attribute )
+        df_gtf[ 'attribute' ] = l_attribute_new # update attributes
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
+    
 
 def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
     """ # 2021-08-01 17:12:10 
@@ -6431,13 +6481,36 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
 
 # In[ ]:
 
-def GTF_Build_Mask( df_gtf, dict_seqname_to_len_seq, str_feature = 'exon', remove_chr_from_seqname = True ) :
-    ''' # 2021-08-04 10:54:23 
-    build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists)
+def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon', remove_chr_from_seqname = True, dir_folder_output = None ) :
+    ''' # 2021-08-04 15:06:44 
+    build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists).
+    if 'dir_folder_output' is given, save the generated mask to the given folder (an empty directory is recommended)
+    if 'dir_folder_output' is given but 'df_gtf' is not given, load the previously generated mask from the 'dir_folder_output'
     
-    'df_gtf' : directory to gtf file or a dataframe containing gtf
     'dict_seqname_to_len_seq' : dictionary containing sequence length information of the genome
+    'df_gtf' : directory to gtf file or a dataframe containing gtf. If none is given, load previously generated masks from 'dir_folder_output'
+    'dir_folder_output' : directory to save or load masks
     '''
+    # retrieve the absolute path of the 'dir_folder_output'
+    if dir_folder_output is not None :
+        dir_folder_output = os.path.abspath( dir_folder_output )
+        dir_folder_output += '/'
+    if df_gtf is None :
+        if dir_folder_output is None :
+            print( 'required inputs were not given' )
+            return -1 
+        else :
+            ''' load mask from the 'dir_folder_output' '''
+            dict_seqname_to_ba = dict( )
+            for seqname, dir_file in GLOB_Retrive_Strings_in_Wildcards( f"{dir_folder_output}*.bin" ).values :
+                ba = bitarray( )
+                with open( dir_file, 'rb' ) as file :
+                    ba.fromfile( file )
+                dict_seqname_to_ba[ seqname ] = ba[ : dict_seqname_to_len_seq[ seqname ] ] # drop additional '0' added to the end of the binary array
+            return dict_seqname_to_ba
+    # create output folder if it does not exist
+    if not os.path.exists( dir_folder_output ) :
+        os.makedirs( dir_folder_output, exist_ok = True )
     # remove 'chr' characters from seqnames in the 'dict_seqname_to_len_seq'
     if remove_chr_from_seqname :
         dict_seqname_to_len_seq = dict( ( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ], dict_seqname_to_len_seq[ seqname ] ) for seqname in dict_seqname_to_len_seq )
@@ -6457,7 +6530,15 @@ def GTF_Build_Mask( df_gtf, dict_seqname_to_len_seq, str_feature = 'exon', remov
         df_gtf[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df_gtf.seqname.values )
     df_gtf.start -= 1 # 1-based coordinate -> 0-based coordinate
     for seqname, start, end in df_gtf[ [ 'seqname', 'start', 'end' ] ].values : # 0-based coordinate
+        # only consider sequences in 'dict_seqname_to_len_seq'
+        if seqname not in dict_seqname_to_ba : 
+            continue
         dict_seqname_to_ba[ seqname ][ start : end ] = 1
+    ''' save masks as files '''
+    if dir_folder_output is not None :
+        for seqname in dict_seqname_to_ba :
+            with open( f'{dir_folder_output}{seqname}.bin', 'wb' ) as file : 
+                dict_seqname_to_ba[ seqname ].tofile( file )
     return dict_seqname_to_ba
 
 def PARSER_EMBL_Format( dir_file ) :
@@ -6563,8 +6644,7 @@ def OS_CPU_and_Memory_Usage( print_summary = True, return_summary_for_each_user 
 
 # In[1]:
 
-
-def OS_PIPELINE_Muitple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = None, title = '', excute_cmd_line = False, wait_n_seconds_between_splited_jobs = 5, split = True, l_cmd_line_initialize = [ 'sleep 1', 'echo "Bookshelves PIPELINE Started"', 'date' ], l_server = None, server_replace_home_dir = False, shellscript_use_relative_path = False, dict_id_server_to_dir_home = { 'node210' : '/node210data/', "node01" : '/node01data/', "node200" : '/home/' } ) : # 2020-11-21 16:14:22 
+def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = None, title = '', excute_cmd_line = False, wait_n_seconds_between_splited_jobs = 5, split = True, l_cmd_line_initialize = [ 'sleep 1', 'echo "Bookshelves PIPELINE Started"', 'date' ], l_server = None, server_replace_home_dir = False, shellscript_use_relative_path = False, dict_id_server_to_dir_home = { 'node210' : '/node210data/', "node01" : '/node01data/', "node200" : '/home/' } ) : # 2020-11-21 16:14:22 
     ''' # 2021-01-07 16:34:06 
     (Usage of 'split' argument is deprecated!) For a give list of cmd lines, execute 'n_lines_at_a_time' number of lines at one cycle, wait until all lines are completed, and start another cycle. 
     if cmd lines are not executed, write a shell script file at the directory given by dir_data if given.
@@ -6630,6 +6710,7 @@ def OS_PIPELINE_Muitple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = Non
             else : os.rename( f'{dir_data}{name_file}__splitted_1.sh', f'{dir_data}{name_file}.sh' )
     return f'{title}__Muitple_Running_{len( arr_cmd_line_for_a_server )}_lines_{str_time_stamp}' # return a filename to help to identify shellscripts written by the function
 
+OS_PIPELINE_Muitple_Running = OS_PIPELINE_Multiple_Running
 
 # In[ ]:
 
@@ -6912,7 +6993,7 @@ def NGS_SEQ_Generate_Kmer( seq, window_size ) :
 def NGS_SEQ_Reverse_Complement( seq ) :
     ''' # 2021-02-04 11:47:19 
     Return reverse complement of 'seq' '''
-    dict_dna_complement = { "A" : 'T', "T" : 'A', "C" : 'G', "G" : 'C', "N" : 'N', "-" : '-' }
+    dict_dna_complement = { "A" : 'T', "T" : 'A', "C" : 'G', "G" : 'C', "N" : 'N', "-" : '-', 'V' : 'B', 'B' : 'V', 'D' : 'H', 'H' : 'D', 'U' : 'A' }
     return ''.join( list( dict_dna_complement[ base ] for base in seq ) )[ : : -1 ]
 
 
@@ -7046,6 +7127,25 @@ def NGS_SEQ_Calculate_Simple_Repeat_Proportion_in_a_read( seq, int_len_kmer = 4,
 
 # In[ ]:
 
+def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False ) :
+    ''' # 2021-08-04 17:30:23 
+    return l_seq and int_total_aligned_length for given cigartuples (returned by pysam cigartuples) and 'pos_start' (0-based coordinates, assuming pos_start is 0-based coordinate)
+    'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is also 1-based coordinate (pysam returns 0-based coordinate)
+    '''
+    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
+    for operation, length in cigartuples :
+        if operation in { 0, 2, 7, 8 } : # 'MD=X'
+            int_aligned_length += length
+        elif operation == 3 : # 'N' if splice junction appears, split the region and make a record
+            l_seg.append( ( start, ( start + int_aligned_length - 1 ) if return_1_based_coordinate else ( start + int_aligned_length ) ) ) # set the end position
+            start = start + int_aligned_length + length # set the next start position
+            int_total_aligned_length += int_aligned_length # update total aligned length
+            int_aligned_length = 0
+    if int_aligned_length > 0 : 
+        l_seg.append( ( start, ( start + int_aligned_length - 1 ) if return_1_based_coordinate else ( start + int_aligned_length ) ) )
+        int_total_aligned_length += int_aligned_length
+    return l_seg, int_total_aligned_length
+
 
 def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
     ''' for a file-like object of file of 'dir_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
@@ -7098,23 +7198,28 @@ def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False
 
 
 def FASTA_Write( dir_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False ) :
-    '''  # 2021-07-12 22:21:01 
-    write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq '''
+    '''  # 2021-08-10 21:17:55 
+    write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq 
+    write gzipped fasta file if 'dir_fasta' ends with '.gz'
+    '''
+    bool_flag_file_gzipped = dir_fasta.rsplit( '.', 1 )[ 1 ] == 'gz' 
     if os.path.exists( dir_fasta ) and not overwrite_existing_file : 
         print( 'the file already exists' )
         return -1
+    newfile = gzip.open( dir_fasta, 'wb' ) if bool_flag_file_gzipped else open( dir_fasta, 'w' )
     if dict_fasta is not None : # if dict_fasta was given.
-        with open( dir_fasta, 'w' ) as file : 
-            for name in dict_fasta :
-                file.write( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( dict_fasta[ name ], 60, insert_characters = '\n' ) ) )
+        for name in dict_fasta :
+            str_record = ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( dict_fasta[ name ], 60, insert_characters = '\n' ) )
+            newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
     else : # if l_id and l_seq were given.
         if type( l_id ) is str and type( l_seq ) is str : # if only one sequence and sequence name were given
-            with open( dir_fasta, 'w' ) as file : 
-                file.write( ">{}\n{}\n".format( l_id, STR.Insert_characters_every_n_characters( l_seq, 60, insert_characters = '\n' ) ) )
+            str_record = ">{}\n{}\n".format( l_id, STR.Insert_characters_every_n_characters( l_seq, 60, insert_characters = '\n' ) )
+            newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
         else : # if list of sequences and sequence names were given
-            with open( dir_fasta, 'w' ) as file : 
-                for name, seq in zip( l_id, l_seq ) :
-                    file.write( ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( seq, 60, insert_characters = '\n' ) ) )
+            for name, seq in zip( l_id, l_seq ) :
+                str_record = ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( seq, 60, insert_characters = '\n' ) )
+                newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
+    newfile.close( )
 
 
 # In[ ]:
@@ -7492,13 +7597,17 @@ def FASTQ_Iterate( dir_file, return_only_at_index = None ) :
             if return_only_at_index is not None : yield record[ return_only_at_index ]
             else : yield record
                     
-def FASTQ_Read( dir_file, return_only_at_index = None, return_generator = False ) : # 2020-08-18 22:31:31 
-    ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
-    'return_generator' : if True, return a generator that return a tuple of 4 length (representing a record with sequencing quality) or a value at the index given by "return_only_at_index".  '''
+                    
+def FASTQ_Read( dir_file, return_only_at_index = None, flag_add_qname = True ) : # 2020-08-18 22:31:31 
+    ''' # 2021-08-25 07:06:50 
+    read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
+    'flag_add_qname' : add a column containing qname in the bam file (space-split read name without '@' character at the start of the read name)
+    '''
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
     bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
     l_seq = list( )
     l_l_values = list( )
+    ''' read fastq file '''
     file = gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file )
     while True :
         record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
@@ -7506,7 +7615,13 @@ def FASTQ_Read( dir_file, return_only_at_index = None, return_generator = False 
         if return_only_at_index is not None : l_seq.append( record[ return_only_at_index ] )
         else : l_l_values.append( [ record[ 0 ], record[ 1 ], record[ 3 ] ] )  
     file.close( )
-    return l_seq if return_only_at_index is not None else pd.DataFrame( l_l_values, columns = [ 'readname', 'seq', 'quality' ] )
+    if return_only_at_index is not None :
+        return l_seq 
+    else :
+        df_fq = pd.DataFrame( l_l_values, columns = [ 'readname', 'seq', 'quality' ] )
+        if flag_add_qname :
+            df_fq[ 'qname' ] = list( e.split( ' ', 1 )[ 0 ][ 1 : ] for e in df_fq.readname.values ) # retrieve qname
+        return df_fq
 
 def FASTQ_Read_Generator( dir_file, return_only_at_index = None ) : # 2020-08-18 22:31:31 
     ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)

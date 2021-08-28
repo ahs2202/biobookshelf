@@ -107,6 +107,24 @@ def Trim_PolyA( seq, from_3_prime_end = True, return_length_of_polyA = False, st
 
 # In[ ]:
 
+def Detect_PolyT_Length( seq_after_softclipping, int_len_window_internal_polyT = 30, int_len_sliding_window_internal_polyT = 10, float_min_T_fraction = 0.8 ) :
+    ''' # 2021-08-24 00:59:00 
+    Detect polyT length of sequencing reads from an internal polyA priming event using a sliding window of a given length.
+    '''
+    ba = bitarray( len( seq_after_softclipping ) )
+    ba.setall( 0 )
+
+    for index, base in enumerate( seq_after_softclipping ) :
+        ba[ index ] = base == 'T'
+
+    int_len_internal_polyT = 0
+    if ba[ : int_len_sliding_window_internal_polyT ].count( ) / int_len_sliding_window_internal_polyT >= float_min_T_fraction :
+        int_len_internal_polyT = int_len_sliding_window_internal_polyT
+        for index in range( 1, int_len_window_internal_polyT - int_len_sliding_window_internal_polyT + 1 ) :
+            if ba[ index : index + int_len_sliding_window_internal_polyT ].count( ) / int_len_sliding_window_internal_polyT < float_min_T_fraction :
+                break
+            int_len_internal_polyT += 1
+    return int_len_internal_polyT
 
 dict_NGS_encoding_seq_to_int = { '' : 0,  'A' : 1 , 'C' : 2 , 'G' : 3 , 'T' : 4  }
 def Encode_to_integer( seq, reverse_order_during_encoding = True ) :
