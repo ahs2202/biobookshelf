@@ -37,3 +37,32 @@ def Generate_Base_and_Qual( r ) :
                 pos_ref += 1
                 pos_read += 1
                 
+                
+def Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False, flag_pos_start_0_based_coord = True, flag_return_splice_junction = False ) :
+    ''' # 2021-09-07 10:17:55 
+    return l_seq and int_total_aligned_length for given cigartuples (returned by pysam cigartuples) and 'pos_start' (0-based coordinates, assuming pos_start is 0-based coordinate)
+    'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is 0-based coordinate (pysam returns 0-based coordinate)
+    'flag_return_splice_junction' : additionally return list of splice junction tuples
+    '''
+    if return_1_based_coordinate and flag_pos_start_0_based_coord : # 0-based > 1-based
+        start -= 1
+    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
+    for operation, length in cigartuples :
+        if operation in { 0, 2, 7, 8 } : # 'MD=X'
+            int_aligned_length += length
+        elif operation == 3 : # 'N' if splice junction appears, split the region and make a record
+            l_seg.append( ( start, ( start + int_aligned_length - 1 ) if return_1_based_coordinate else ( start + int_aligned_length ) ) ) # set the end position
+            start = start + int_aligned_length + length # set the next start position
+            int_total_aligned_length += int_aligned_length # update total aligned length
+            int_aligned_length = 0
+    if int_aligned_length > 0 : 
+        l_seg.append( ( start, ( start + int_aligned_length - 1 ) if return_1_based_coordinate else ( start + int_aligned_length ) ) )
+        int_total_aligned_length += int_aligned_length
+    if flag_return_splice_junction :
+        # collect splice junction tuples from l_seg
+        l_sj = [ ]
+        for i in range( len( l_seg ) - 1 ) :
+            l_sj.append( ( l_seg[ i ][ 1 ], l_seg[ i + 1 ][ 0 ] ) )
+        return l_seg, int_total_aligned_length, l_sj
+    else :
+        return l_seg, int_total_aligned_length

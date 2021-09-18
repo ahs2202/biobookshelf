@@ -1387,14 +1387,35 @@ def PANDAS_DATAFRAME_number_unique_entries( df ) :
 # In[ ]:
 
 
-def DF_Build_Index_Using_Dictionary( df, l_col_for_index ) : # 2020-08-06 17:12:59 
-    ''' return a dictionary with key = index or multi-index for a given 'l_col_for_index' and value = list of integer index for df.values (not df.index.values)
-    Using Python dictionary and numpy array can be upto ~2000 times faster than using pandas.DataFrame.loc[ ] method for accessing multi-indexed rows. '''
+def DF_Build_Index_Using_Dictionary( df, l_col_for_index, str_delimiter = None, function_transform = None ) : # 2020-08-06 17:12:59 
+    ''' # 2021-09-07 19:34:16 
+    return a dictionary with key = index or multi-index (when list of columns is givne through the 'l_col_for_index' argument) for a given 'l_col_for_index' and value = list of integer index for df.values (not df.index.values)
+    Using Python dictionary and numpy array can be upto ~2000 times faster than using pandas.DataFrame.loc[ ] method for accessing multi-indexed rows. 
+    
+    'l_col_for_index' : (1) a string that is equal to the name of the column to be indexed or (2) a list of names of columns for composing a multi-index. 
+    'str_delimiter' : when given, values in the SINGLE column referred to by the 'l_col_for_index' argument (should be a string and not a list) will be split using the character(s) of 'str_delimiter', and indexed separately. When the value of a row contains multiple unique entries as determined by 'str_delimiter', the row will be indexed multiple times with different keys
+    'function_transform' : a function for transforming values for building the dictionary-based index a using single column with non-None 'str_delimiter' value (default: None)
+    '''
     dict_index = dict( )
     if isinstance( l_col_for_index, str ) : # when only single col_name was given for index
-        for int_index, index in enumerate( df[ l_col_for_index ].values ) :
-            if index in dict_index : dict_index[ index ].append( int_index )
-            else : dict_index[ index ] = [ int_index ]
+        if str_delimiter is None : # when each value of the column will be used to index a row
+            for int_index, index in enumerate( df[ l_col_for_index ].values ) :
+                index = index if function_transform is None else function_transform( index )
+                if index in dict_index : dict_index[ index ].append( int_index )
+                else : dict_index[ index ] = [ int_index ]
+        elif isinstance( str_delimiter, str ) : # when rows will be indexed by unique entries contained in each value (as determined by 'str_delimiter' characters) of the given column
+            for int_index, val in enumerate( df[ l_col_for_index ].values ) :
+                flag_val_is_nan = isinstance( val, float ) # check whether the current value is np.nan value
+                if flag_val_is_nan or str_delimiter not in val :
+                    index = val if flag_val_is_nan or function_transform is None else function_transform( val )
+                    if index in dict_index : dict_index[ index ].append( int_index )
+                    else : dict_index[ index ] = [ int_index ]
+                else :
+                    for index in val.split( str_delimiter ) :
+                        index = index if function_transform is None else function_transform( index )
+                        if index in dict_index : dict_index[ index ].append( int_index )
+                        else : dict_index[ index ] = [ int_index ]
+            
     else : # when a list of col_names was given for index
         for int_index, arr_index in enumerate( df[ l_col_for_index ].values ) :
             t_index = tuple( arr_index )
@@ -5154,7 +5175,7 @@ def ELBOW_Find( l, sort_array = True, return_index_of_an_elbow_point = False ) :
 
 
 def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
-    """ # 2021-05-29 14:34:38 
+    """ # 2021-08-30 13:20:50 
     split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
     By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
     
@@ -5175,16 +5196,23 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
             # randomly distribute distinct tuples into 'n_threads' number of lists
             dict_index = DF_Build_Index_Using_Dictionary( arr, col_split_load ) # retrieve index according to the tuple contained by 'col_split_load'
             l_t = list( dict_index )
+            n_t = len( l_t ) # retrieve number of tuples
+            if n_t < n_threads : # if the given number of thread is larger than the existing number of tuples, set the number of tuples as the number of threads
+                n_threads = n_t
             np.random.shuffle( l_t )
             l_l_t = list( l_t[ i : : n_threads ] for i in range( n_threads ) )
 
+            arr_df = arr.values
+            l_col = arr.columns.values
+
             for index_chunk in range( n_threads ) :
-                dict_select = dict( )
-                for arr_subset, name_col in zip( np.array( l_l_t[ index_chunk ], dtype = object ).reshape( len( col_split_load ), len( l_l_t[ index_chunk ] ) ), col_split_load ) :
-                    dict_select[ name_col ] = arr_subset
-                
+                l_t_for_the_chunk = l_l_t[ index_chunk ]
+                # retrieve integer indices of the original array for composing array of the curreht chunk
+                l_index = [ ]
+                for t in l_t_for_the_chunk :
+                    l_index.extend( dict_index[ t ] )
                 dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-                PD_Select( arr, ** dict_select ).to_csv( dir_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
+                pd.DataFrame( arr_df[ np.sort( l_index ) ], columns = l_col ).to_csv( dir_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
                 l_dir_file.append( dir_file_temp )
         else :
             print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
@@ -6453,13 +6481,14 @@ def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
     
 
-def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
+def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ], drop_duplicated_intervals = False ) :
     """ # 2021-08-01 17:12:10 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
     'dir_file_gtf' : directory to the gtf file or dataframe iteslf
     'feature' : list of features in the gtf to retrieve intervals from the gtf file
     'value' : list of columne names (including GTF attributes) to include as a list of values for each interval in the returned interval tree.
+    'drop_duplicated_intervals' : drop duplicated intervals
     """
     # read GTF file
     if isinstance( dir_file_gtf, ( str ) ) : # if 'dir_file_gtf' is a string object, used the value to read a GTF file.
@@ -6469,14 +6498,16 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         
     df_gtf = PD_Select( df_gtf, feature = feature ) # retrieve gtf records of given list of features
     df_gtf.dropna( subset = value, inplace = True ) # value should be valid
-    
+    # remove duplicated intervals
+    if drop_duplicated_intervals :
+        df_gtf.drop_duplicates( subset = [ 'seqname', 'start', 'end' ], inplace = True )
     dict_it = dict( )
     for arr_interval, arr_value in zip( df_gtf[ [ 'seqname', 'start', 'end' ] ].values, df_gtf[ value ].values ) :
         seqname, start, end = arr_interval
         if seqname not in dict_it :
             dict_it[ seqname ] = intervaltree.IntervalTree( )
         # add the interval with a given list of value
-        dict_it[ seqname ].addi( start, end + 1, arr_value ) # use 0-based coordinate like 1-based coordinate system
+        dict_it[ seqname ].addi( start, end + 1, tuple( arr_value ) ) # use 0-based coordinate like 1-based coordinate system
     return dict_it
 
 # In[ ]:
@@ -7127,11 +7158,14 @@ def NGS_SEQ_Calculate_Simple_Repeat_Proportion_in_a_read( seq, int_len_kmer = 4,
 
 # In[ ]:
 
-def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False ) :
-    ''' # 2021-08-04 17:30:23 
+def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False, flag_pos_start_0_based_coord = True, flag_return_splice_junction = False ) :
+    ''' # 2021-09-07 10:17:55 
     return l_seq and int_total_aligned_length for given cigartuples (returned by pysam cigartuples) and 'pos_start' (0-based coordinates, assuming pos_start is 0-based coordinate)
-    'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is also 1-based coordinate (pysam returns 0-based coordinate)
+    'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is 0-based coordinate (pysam returns 0-based coordinate)
+    'flag_return_splice_junction' : additionally return list of splice junction tuples
     '''
+    if return_1_based_coordinate and flag_pos_start_0_based_coord : # 0-based > 1-based
+        start -= 1
     l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
     for operation, length in cigartuples :
         if operation in { 0, 2, 7, 8 } : # 'MD=X'
@@ -7144,7 +7178,14 @@ def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_
     if int_aligned_length > 0 : 
         l_seg.append( ( start, ( start + int_aligned_length - 1 ) if return_1_based_coordinate else ( start + int_aligned_length ) ) )
         int_total_aligned_length += int_aligned_length
-    return l_seg, int_total_aligned_length
+    if flag_return_splice_junction :
+        # collect splice junction tuples from l_seg
+        l_sj = [ ]
+        for i in range( len( l_seg ) - 1 ) :
+            l_sj.append( ( l_seg[ i ][ 1 ], l_seg[ i + 1 ][ 0 ] ) )
+        return l_seg, int_total_aligned_length, l_sj
+    else :
+        return l_seg, int_total_aligned_length
 
 
 def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
@@ -7193,7 +7234,40 @@ def FASTA_Read( dir_fasta, print_message = False, remove_space_in_header = False
         return df
     else : return dict_header_to_seq
 
+def FASTA_Assembly_Stats( dict_fasta = None, arr_length = None, flag_arr_length_is_sorted = False ) :
+    ''' # 2021-09-15 21:52:44 
+    return assembly stats for the given fasta file (fasta file containing assembed contigs)  '''
+    if dict_fasta is not None : 
+        dict_fasta = FASTA_Read( dict_fasta ) if isinstance( dict_fasta, ( str ) ) else dict_fasta # read fasta file if path (string) is given, or use given dictionary as a 'dict_fasta'
+        int_n_records = len( dict_fasta )
+        arr_length = np.zeros( int_n_records )
+        for index, header in enumerate( dict_fasta ) :
+            arr_length[ index ] = len( dict_fasta[ header ] )
+        flag_arr_length_is_sorted = False # sort retrieve array of sequence lengths
+        
+    elif arr_length is not None :
+        pass
+    else :
+        print( 'required inputs is not given' )
+        return - 1
+    
+    if not flag_arr_length_is_sorted :
+        arr_length.sort( ) # sort sequences
+        arr_length = arr_length[ : : -1 ] # reverse the order so that largest contigs are at the front
 
+    arr_length_percentage = arr_length / arr_length.sum( ) * 100    
+    arr_length_percentage_cumulative = np.zeros( len( arr_length ) )
+    arr_length_percentage_cumulative[ 0 ] = arr_length_percentage[ 0 ]
+    for index, percentage in enumerate( arr_length_percentage[ 1 : ], 1 ) :
+        arr_length_percentage_cumulative[ index ] = arr_length_percentage_cumulative[ index - 1 ] + percentage # calculate cumulative length
+    l_values = [ arr_length.sum( ), arr_length[ 0 ] ] # retrive total_length and length of the longest contig
+    for int_thres_percentage in np.arange( 10, 100, 10 ) :
+        mask = arr_length_percentage_cumulative < int_thres_percentage # mask for contigs below thres_percentage when cumulated percentage is calculated by using larger contigs first.
+        l_values.extend( [ arr_length[ np.where( np.diff( mask ) )[ 0 ][ 0 ] ], mask.sum( ) ] ) # calculate assembly-stats
+    l_values.extend( [ arr_length.min( ), len( mask ) ] ) # append values for N100
+    s_assembly_stats = pd.Series( l_values, index = [ 'total_length', 'longest', 'N10', 'N10n', 'N20', 'N20n', 'N30', 'N30n', 'N40', 'N40n', 'N50', 'N50n', 'N60', 'N60n', 'N70', 'N70n', 'N80', 'N80n', 'N90', 'N90n', 'N100', 'N100n' ] ).astype( int )
+    return s_assembly_stats
+    
 # In[ ]:
 
 

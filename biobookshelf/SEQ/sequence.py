@@ -1,3 +1,4 @@
+from biobookshelf.main import *
 import pandas as pd
 import numpy as np
 
@@ -191,7 +192,7 @@ def Cluster_with_Kmer( dict_seq_count, int_min_n_overlap_kmer, len_kmer, float_m
     for seq in dict_seq_count :
         int_seq_count = dict_seq_count[ seq ]
         flag_assigned_to_cluster = False
-        set_kmer = set( SEQ.Generate_Kmer( seq, len_kmer ) )
+        set_kmer = set( Generate_Kmer( seq, len_kmer ) )
         for name_cluster in dict_cluster :
             c = dict_cluster[ name_cluster ]
             n_overlap_kmer = len( c[ 'set_kmer' ].intersection( set_kmer ) )
@@ -213,3 +214,27 @@ def Cluster_with_Kmer( dict_seq_count, int_min_n_overlap_kmer, len_kmer, float_m
             c[ 'counter_kmer' ] = COUNTER( list( set_kmer ) * int_seq_count ) 
             dict_cluster[ UUID( ) ] = c
     return dict_cluster
+
+def Iterate_Kmer( seq, window_size, flag_return_start_and_end_positions = False, flag_generate_kmer_for_reverse_complement_too = False ) :
+    """ 
+    # 2021-09-18 11:00:58 
+    return an interator generating Kmers from the sequence with the given window_size  
+    
+    returns
+    ------------
+    when 'flag_return_start_and_end_positions' = True, 
+    returns kmer, pos_start, pos_end, flag_reverse_completed
+    
+    when 'flag_return_start_and_end_positions' = False,
+    returns kmer, flag_reverse_completed
+    """
+    for i in range( 0, len( seq ) - window_size + 1, 1 ) :
+        kmer = seq[ i : i + window_size ] 
+        yield ( kmer, i, i + window_size, False ) if flag_return_start_and_end_positions else ( kmer, False )
+    ''' if 'flag_generate_kmer_for_reverse_complement_too' is True, iterate reverse complement of the given sequence, too '''
+    if flag_generate_kmer_for_reverse_complement_too :
+        seq_rc = Reverse_Complement( seq )
+        len_seq = len( seq )
+        for i in range( 0, len_seq - window_size + 1, 1 ) :
+            kmer = seq_rc[ i : i + window_size ] 
+            yield ( kmer, len_seq - window_size - i, len_seq - i, True ) if flag_return_start_and_end_positions else ( kmer, True )

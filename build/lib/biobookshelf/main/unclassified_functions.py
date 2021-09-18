@@ -6405,7 +6405,7 @@ def GFF3_Parse_Attribute( attr ) :
     """
     return dict( e.split( '=', 1 ) for e in attr.split( ';' ) if '=' in e )
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False, flag_gtf_format = True, remove_chr_from_seqname = True ) :
+def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True ) :
     ''' 
     # 2021-05-17 16:02:58  
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
@@ -6429,10 +6429,29 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = False, flag_gtf_fo
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) if flag_gtf_format else list( GFF3_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
 
-def GTF_Write( df_gtf, dir_file ) :
-    ''' # 2021-07-22 22:54:30 
-    write gtf file as an unzipped tsv file '''
+def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_gff3 = False ) :
+    ''' # 2021-08-24 21:02:08 
+    write gtf file as an unzipped tsv file
+    'flag_update_attribute' : ignore the 'attribute' column present in the given dataframe 'df_gtf', and compose a new column based on all the non-essential columns of the dataframe.
+    'flag_filetype_is_gff3' : a flag indicating the filetype of the output file. According to the output filetype, columns containing attributes will be encoded into the values of the attribute column before writing the file.
+    '''
+    if flag_update_attribute :
+        l_col_essential = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
+
+        l_col_attribute = list( col for col in df_gtf.columns.values if col not in l_col_essential ) # all non-essential columns will be considered as the columns 
+
+        l_attribute_new = list( )
+        for arr in df_gtf[ l_col_attribute ].values :
+            str_attribute = '' # initialize
+            for name, val in zip( l_col_attribute, arr ) :
+                if isinstance( val, float ) and np.isnan( val ) :
+                    continue
+                str_attribute += f'{name}={val};' if flag_filetype_is_gff3 else f'{name} "{val}"; ' # encode attributes according to the gff3 file format
+            str_attribute = str_attribute.strip( )
+            l_attribute_new.append( str_attribute )
+        df_gtf[ 'attribute' ] = l_attribute_new # update attributes
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
+    
 
 def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ] ) :
     """ # 2021-08-01 17:12:10 
@@ -6489,6 +6508,9 @@ def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon'
                     ba.fromfile( file )
                 dict_seqname_to_ba[ seqname ] = ba[ : dict_seqname_to_len_seq[ seqname ] ] # drop additional '0' added to the end of the binary array
             return dict_seqname_to_ba
+    # create output folder if it does not exist
+    if not os.path.exists( dir_folder_output ) :
+        os.makedirs( dir_folder_output, exist_ok = True )
     # remove 'chr' characters from seqnames in the 'dict_seqname_to_len_seq'
     if remove_chr_from_seqname :
         dict_seqname_to_len_seq = dict( ( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ], dict_seqname_to_len_seq[ seqname ] ) for seqname in dict_seqname_to_len_seq )
@@ -6971,7 +6993,7 @@ def NGS_SEQ_Generate_Kmer( seq, window_size ) :
 def NGS_SEQ_Reverse_Complement( seq ) :
     ''' # 2021-02-04 11:47:19 
     Return reverse complement of 'seq' '''
-    dict_dna_complement = { "A" : 'T', "T" : 'A', "C" : 'G', "G" : 'C', "N" : 'N', "-" : '-' }
+    dict_dna_complement = { "A" : 'T', "T" : 'A', "C" : 'G', "G" : 'C', "N" : 'N', "-" : '-', 'V' : 'B', 'B' : 'V', 'D' : 'H', 'H' : 'D', 'U' : 'A' }
     return ''.join( list( dict_dna_complement[ base ] for base in seq ) )[ : : -1 ]
 
 
@@ -7575,13 +7597,17 @@ def FASTQ_Iterate( dir_file, return_only_at_index = None ) :
             if return_only_at_index is not None : yield record[ return_only_at_index ]
             else : yield record
                     
-def FASTQ_Read( dir_file, return_only_at_index = None, return_generator = False ) : # 2020-08-18 22:31:31 
-    ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
-    'return_generator' : if True, return a generator that return a tuple of 4 length (representing a record with sequencing quality) or a value at the index given by "return_only_at_index".  '''
+                    
+def FASTQ_Read( dir_file, return_only_at_index = None, flag_add_qname = True ) : # 2020-08-18 22:31:31 
+    ''' # 2021-08-25 07:06:50 
+    read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
+    'flag_add_qname' : add a column containing qname in the bam file (space-split read name without '@' character at the start of the read name)
+    '''
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
     bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
     l_seq = list( )
     l_l_values = list( )
+    ''' read fastq file '''
     file = gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file )
     while True :
         record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
@@ -7589,7 +7615,13 @@ def FASTQ_Read( dir_file, return_only_at_index = None, return_generator = False 
         if return_only_at_index is not None : l_seq.append( record[ return_only_at_index ] )
         else : l_l_values.append( [ record[ 0 ], record[ 1 ], record[ 3 ] ] )  
     file.close( )
-    return l_seq if return_only_at_index is not None else pd.DataFrame( l_l_values, columns = [ 'readname', 'seq', 'quality' ] )
+    if return_only_at_index is not None :
+        return l_seq 
+    else :
+        df_fq = pd.DataFrame( l_l_values, columns = [ 'readname', 'seq', 'quality' ] )
+        if flag_add_qname :
+            df_fq[ 'qname' ] = list( e.split( ' ', 1 )[ 0 ][ 1 : ] for e in df_fq.readname.values ) # retrieve qname
+        return df_fq
 
 def FASTQ_Read_Generator( dir_file, return_only_at_index = None ) : # 2020-08-18 22:31:31 
     ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)

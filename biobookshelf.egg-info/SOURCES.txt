@@ -45,6 +45,8 @@ biobookshelf/RNA/__init__.py
 biobookshelf/RNA/rnaseq.py
 biobookshelf/RNA/__pycache__/__init__.cpython-38.pyc
 biobookshelf/RNA/__pycache__/rnaseq.cpython-38.pyc
+biobookshelf/SAM/__init__.py
+biobookshelf/SAM/sam_util.py
 biobookshelf/SEQ/__init__.py
 biobookshelf/SEQ/sequence.py
 biobookshelf/STR/__init__.py

@@ -100,7 +100,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         if flag_barcoding_was_used :
             ''' automatically set barcoding_kit '''
             if id_barcoding_kit is None :
-                id_barcoding_kit = "EXP-NBD104" if 'LSK' in id_lib_prep else id_lib_prep
+                id_barcoding_kit = "EXP-NBD104 EXP-NBD114" if 'LSK' in id_lib_prep else id_lib_prep
             run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
         else :
             run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
@@ -515,7 +515,7 @@ def Gene_10X_Adaptor( dir_file_bam, dir_file_gtf, thres_mapq = 60, float_error_r
     return df
 
 
-def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_fastq = None, dir_folder_output = 'default', n_threads = 10, flag_correct_reference = False ) :
+def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_fastq = None, dir_folder_output = 'default', n_threads = 10, flag_correct_reference = False, flag_perform_assembly = False ) :
     """
     # 2021-06-03 21:52:00 
     Correct plasmid sequence using nanopore sequencing 
@@ -534,13 +534,14 @@ def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_
         parser.add_argument( "-i", "--dir_file_fastq", help = "(Required) directory of a fastq file from a nanopore sequencing" )
         parser.add_argument( "-o", "--dir_folder_output", help = "(Default: subdirectory of the folder containing the given fastq file) directory of output folder", default = 'default' )
         parser.add_argument( "-t", "--threads", help = "(Default: 10) Number of threads to use in the current compute node.", default = '10' )
-#         parser.add_argument( "-D", "--flag_correct_reference", help = "(Default: False) correct reference using nanopore sequencing data", action = 'store_true' )
+        parser.add_argument( "-a", "--flag_perform_assembly", help = "(Default: False) Perform assembly using Flye", action = 'store_true' )
 
         args = parser.parse_args( )
         # [input] parse arguments from parse_args
         dir_file_fasta_ref = args.dir_file_fasta_ref
         dir_file_fastq = args.dir_file_fastq
         dir_folder_output = args.dir_folder_output
+        flag_perform_assembly = args.flag_perform_assembly
         # flag_correct_reference = args.flag_correct_reference
         n_threads = int( args.threads )
     
@@ -638,5 +639,11 @@ def Check_plasmid_with_nanopore_sequencing( dir_file_fasta_ref = None, dir_file_
         l_l.append( [ str_fasta_consensus[ sl ], str_fasta_ref[ sl ] ] )
     df_substitution = df_substitution.join( pd.DataFrame( l_l, columns = [ 'flanking_sequence_consensus', 'flanking_sequence_reference' ] ) )
     df_substitution.to_excel( f"{dir_folder_output}summary__substitution.xlsx" )
+    
+    if flag_perform_assembly : # perform assembly if the flag is on
+        pass
+        
+    
+    
     
     
