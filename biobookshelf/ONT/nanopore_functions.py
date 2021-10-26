@@ -86,7 +86,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
                 _, id_flowcell, id_lib_prep = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
             
             if id_flowcell is None or id_lib_prep is None :
-                l = glob.glob( f"{dir_folder_nanopore_sequencing_data}report_*" ) # retry
+                l = glob.glob( f"{dir_folder_nanopore_sequencing_data}report_*.md" ) # retry
                 if len( l ) > 0 : 
                     with open( l[ 0 ] ) as file :
                         l_line = file.read( ).strip( ).split( '\n' )
@@ -97,10 +97,13 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
 
         # run guppy basecaller and write output as a text file
         dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
+        if id_lib_prep == 'SQK-RBK110-96' : # change 'id_lib_prep' to guppy-compatible id
+            id_lib_prep = 'SQK-RBK096'
         if flag_barcoding_was_used :
             ''' automatically set barcoding_kit '''
             if id_barcoding_kit is None :
                 id_barcoding_kit = "EXP-NBD104 EXP-NBD114" if 'LSK' in id_lib_prep else id_lib_prep
+            print( ' '.join( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ] ) )  
             run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
         else :
             run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )

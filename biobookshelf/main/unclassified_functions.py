@@ -46,6 +46,10 @@ import traceback # printing traceback of exceptions
 import mmap # for random access of file
 from multiprocessing import Pool, get_context, set_start_method # for multiple processing  # with get_context("spawn").Pool() as pool:
 import multiprocessing 
+import multiprocessing as mp
+import ctypes
+import logging
+
 import heapq # merge sorting files.
 import contextlib # for use with heapq
 import shlex, subprocess # for running multiple shell commands in python
@@ -58,6 +62,7 @@ import urllib.request # to retrive html document from the internet
 from xml.parsers.expat import ExpatError
 import pkg_resources # for working with packages
 import argparse, getopt
+
 
 # python modules that requires independent anaconda install
 # import module for interactive plotting (with hover tool)
@@ -5175,7 +5180,7 @@ def ELBOW_Find( l, sort_array = True, return_index_of_an_elbow_point = False ) :
 
 
 def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
-    """ # 2021-08-30 13:20:50 
+    """ # 2021-09-24 20:47:34 
     split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
     By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
     
@@ -5218,6 +5223,9 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
             print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
             return -1
     else :
+        # if number of entries is larger than the number of threads, reduce the n_threads
+        if len( arr ) < n_threads :
+            n_threads = len( arr )
         if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
             for index_chunk in range( n_threads ) :
                 dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
@@ -6433,9 +6441,9 @@ def GFF3_Parse_Attribute( attr ) :
     """
     return dict( e.split( '=', 1 ) for e in attr.split( ';' ) if '=' in e )
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True ) :
+def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True, flag_verbose = False ) :
     ''' 
-    # 2021-05-17 16:02:58  
+    # 2021-10-09 23:56:06 
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
     'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
@@ -6446,7 +6454,8 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_for
         df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
     except :
         # return empty GTF when an error occurs during reading a GTF file
-        print( 'error reading GTF file. Might be an empty GTF file, returning empty dataframe' ) 
+        if flag_verbose :
+            print( 'error reading GTF file. Might be an empty GTF file, returning empty dataframe' ) 
         df = pd.DataFrame( [ [ '' ] * 9 ], columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] )
         df = df.iloc[ : 0 ]
         return df
@@ -6497,7 +6506,9 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         df_gtf = dir_file_gtf
         
     df_gtf = PD_Select( df_gtf, feature = feature ) # retrieve gtf records of given list of features
-    df_gtf.dropna( subset = value, inplace = True ) # value should be valid
+    if len( df_gtf ) == 0 : # return an empty dictionary if df_gtf is an empty dataframe
+        return dict( )
+    df_gtf.dropna( subset = [ value ] if isinstance( value, str ) else value, inplace = True ) # value should be valid
     # remove duplicated intervals
     if drop_duplicated_intervals :
         df_gtf.drop_duplicates( subset = [ 'seqname', 'start', 'end' ], inplace = True )
@@ -6507,13 +6518,13 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         if seqname not in dict_it :
             dict_it[ seqname ] = intervaltree.IntervalTree( )
         # add the interval with a given list of value
-        dict_it[ seqname ].addi( start, end + 1, tuple( arr_value ) ) # use 0-based coordinate like 1-based coordinate system
+        dict_it[ seqname ].addi( start, end + 1, tuple( arr_value ) if isinstance( arr_value, np.ndarray ) else arr_value ) # use 0-based coordinate like 1-based coordinate system
     return dict_it
 
 # In[ ]:
 
 def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon', remove_chr_from_seqname = True, dir_folder_output = None ) :
-    ''' # 2021-08-04 15:06:44 
+    ''' # 2021-10-10 01:27:23 
     build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists).
     if 'dir_folder_output' is given, save the generated mask to the given folder (an empty directory is recommended)
     if 'dir_folder_output' is given but 'df_gtf' is not given, load the previously generated mask from the 'dir_folder_output'
@@ -6556,6 +6567,14 @@ def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon'
     ''' read gtf and build mask '''
     if isinstance( df_gtf, str ) :
         df_gtf = GTF_Read( df_gtf )
+    # handle an empty GTF file
+    if len( df_gtf ) == 0 :
+        ''' save empty masks as files '''
+        if dir_folder_output is not None :
+            for seqname in dict_seqname_to_ba :
+                with open( f'{dir_folder_output}{seqname}.bin', 'wb' ) as file : 
+                    dict_seqname_to_ba[ seqname ].tofile( file )
+        return dict_seqname_to_ba
     df_gtf = PD_Select( df_gtf, feature = str_feature ) # select only specific features form the gtf
     if remove_chr_from_seqname :
         df_gtf[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df_gtf.seqname.values )
@@ -6688,6 +6707,9 @@ def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = No
     server_replace_home_dir: if set to True, replace '/__current_server_home_dir__/' string with home directory of each server (useful for jobs requiring high file IO, such as RNA-Seq index or HMM database) 
     shellscript_use_relative_path : use relative path of child bash shell scripts when multiple shellscripts are run together. Should be set to True when running shellscripts in a docker environment.
     '''
+    if len( arr_cmd_line ) == 0 :
+        print( 'number of lines to be excuted is zero, exiting.' ) 
+        return -1
     try : arr_cmd_line.dtype # preprocess the format of arr_cmd_line. 1) make sure arr_cmd_line is np.array datatype, and 2) dtype of the np.array is Object
     except : arr_cmd_line = np.array( arr_cmd_line, dtype = str ).astype( object )
     str_time_stamp = TIME_GET_timestamp( ) # get time stamp of current time to uniquely name the shellscript
