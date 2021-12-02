@@ -2,9 +2,9 @@
 from biobookshelf.main import *
 import biobookshelf.PKG as PKG
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18 ) :
     """
-    # 2021-06-01 21:52:00 
+    # 2021-11-10 16:26:32 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
     Automatically detect 'id_flowcell' and 'id_lib_prep' from the metadata saved in the folder (they can be manually set through arguments)
     
@@ -13,6 +13,8 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
     'id_flowcell' : manually set 'id_flowcell' for guppy_bascaller run.
     'id_lib_prep' : manually set 'id_lib_prep' for guppy_bascaller run.
     'id_barcoding_kit' : manually set 'id_barcoding_kit' for guppy_bascaller run.
+    'flag_use_cpu' : use CPU
+    'int_n_threads' : number of CPU threads to use 
     """
 
     
@@ -25,6 +27,8 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         parser.add_argument( "-F", "--id_flowcell", help = "(optional) explicitly define the flowcell type used in sequencing. e.g. FLO-MIN106" )
         parser.add_argument( "-L", "--id_lib_prep", help = "(optional) explicitly define the library sequencing kit used in sequencing. e.g. SQK-LSK109" )
         parser.add_argument( "-B", "--id_barcoding_kit", help = "(optional) explicitly define the library barcoding kit used in sequencing. e.g. EXP-NBD104" )
+        parser.add_argument( "-C", "--flag_use_cpu", help = "(optional) use CPU only (use when GPU is not available)", action = 'store_true' )
+        parser.add_argument( "-t", "--int_n_threads", help = "(default: 18) number of CPU threads to use", default = '18' )
         args = parser.parse_args( )
 
         # [input] parse arguments from parse_args
@@ -34,6 +38,8 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         id_flowcell = args.id_flowcell
         id_lib_prep = args.id_lib_prep
         id_barcoding_kit = args.id_barcoding_kit
+        flag_use_cpu = args.flag_use_cpu
+        int_n_threads = int( args.int_n_threads )
         
     
     ''' [parse arguments] '''
@@ -94,22 +100,29 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
                 else :
                     print( "[Guppy_Run_and_Combine_Output] appropriate 'id_flowcell' and/or 'id_lib_prep' were not found, exiting" )
                     return -1
-
-        # run guppy basecaller and write output as a text file
+        ''' run guppy basecaller and write output as a text file '''
         dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
-        if id_lib_prep == 'SQK-RBK110-96' : # change 'id_lib_prep' to guppy-compatible id
-            id_lib_prep = 'SQK-RBK096'
-        if flag_barcoding_was_used :
-            ''' automatically set barcoding_kit '''
-            if id_barcoding_kit is None :
-                id_barcoding_kit = "EXP-NBD104 EXP-NBD114" if 'LSK' in id_lib_prep else id_lib_prep
-            print( ' '.join( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ] ) )  
-            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
-        else :
-            run_guppy = subprocess.run( [ 'guppy_basecaller', '--device', 'auto', '--cpu_threads_per_caller', '18', "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
-        with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
-            file.write( run_guppy.stdout.decode( ) )
-        # combine fastq.gz output files of guppy_basecaller output
+        if not os.path.exists( dir_folder_guppy_output ) :
+            # compose guppy basecaller arguments
+            l_args = [ 'guppy_basecaller' ]
+            if not flag_use_cpu : # use GPU if it exists
+                l_args += [ '--device', 'auto' ]
+            l_args += [ '--cpu_threads_per_caller', str( int_n_threads ) ]
+
+            if id_lib_prep == 'SQK-RBK110-96' : # change 'id_lib_prep' to guppy-compatible id
+                id_lib_prep = 'SQK-RBK096'
+            if flag_barcoding_was_used :
+                ''' automatically set barcoding_kit '''
+                if id_barcoding_kit is None :
+                    id_barcoding_kit = "EXP-NBD104 EXP-NBD114" if 'LSK' in id_lib_prep else id_lib_prep
+                print( ' '.join( l_args + [ "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ] ) )  
+                run_guppy = subprocess.run( l_args + [ "--flowcell", id_flowcell, "--kit", id_lib_prep, "--barcode_kits", id_barcoding_kit, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
+            else :
+                run_guppy = subprocess.run( l_args + [ "--flowcell", id_flowcell, "--kit", id_lib_prep, "--compress_fastq", "--input_path", dir_folder_fast5, "--save_path", dir_folder_guppy_output ], capture_output = True )
+            with open( dir_folder_nanopore_sequencing_data + 'guppy_basecaller.out', 'w' ) as file :
+                file.write( run_guppy.stdout.decode( ) )
+        
+        ''' combine fastq.gz output files of guppy_basecaller output '''
         if flag_barcoding_was_used :
             for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/' ) :
                 name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path

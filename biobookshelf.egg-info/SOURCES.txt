@@ -13,6 +13,8 @@ biobookshelf.egg-info/requires.txt
 biobookshelf.egg-info/top_level.txt
 biobookshelf/INT/__init__.py
 biobookshelf/INT/integer.py
+biobookshelf/IT/__init__.py
+biobookshelf/IT/interval_tree_utils.py
 biobookshelf/L/__init__.py
 biobookshelf/L/l_functions.py
 biobookshelf/L/__pycache__/__init__.cpython-38.pyc
@@ -21,6 +23,8 @@ biobookshelf/MAP/__init__.py
 biobookshelf/MAP/mapping.py
 biobookshelf/MAP/__pycache__/__init__.cpython-38.pyc
 biobookshelf/MAP/__pycache__/mapping.cpython-38.pyc
+biobookshelf/MP/__init__.py
+biobookshelf/MP/multiprocessing_utils.py
 biobookshelf/ONT/__init__.py
 biobookshelf/ONT/check_plasmid_with_nanopore_sequencing.py
 biobookshelf/ONT/nanopore_functions.py
@@ -47,6 +51,8 @@ biobookshelf/RNA/__pycache__/__init__.cpython-38.pyc
 biobookshelf/RNA/__pycache__/rnaseq.cpython-38.pyc
 biobookshelf/SAM/__init__.py
 biobookshelf/SAM/sam_util.py
+biobookshelf/SC/__init__.py
+biobookshelf/SC/single_cell.py
 biobookshelf/SEQ/__init__.py
 biobookshelf/SEQ/sequence.py
 biobookshelf/STR/__init__.py

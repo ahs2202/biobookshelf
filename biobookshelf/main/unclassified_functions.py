@@ -1,41 +1,21 @@
 import biobookshelf.STR as STR
 import biobookshelf.MAP as MAP
 
-# basic python packages
+# OS interaction
 import sys # to measure the size of an object
 import os # Import library to interact with operating system
+
+# process
 import subprocess # for running commands 
 from subprocess import Popen, PIPE # for reading stdout
-import glob # for getting file names
+from multiprocessing import Pool, get_context, set_start_method # for multiple processing  # with get_context("spawn").Pool() as pool:
+import multiprocessing 
+import multiprocessing as mp
+import ctypes
+import logging
+
+# basic python
 import inspect # module to access code content of during function call
-import datetime # to retrive current time
-import gzip # to handle gzip file
-import base64 # for converting binary to text data (web application)
-from io import StringIO # for converting a string to a file-like stream
-import json # to read and write JSON file
-import shutil # for copying file
-import uuid # for universal identifier (same length with md5 hash) uuid.uuid4().hex
-import gc # for explicit garbage collection
-import time # for sleep function
-from cycler import cycler # for cycling matplotlib color palette
-from mpl_toolkits.mplot3d import Axes3D # module for 3D plotting
-import numpy as np
-import pandas as pd # read tab delimited file
-import csv # for saving dataframe without extra "" quotations
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors # for normalization
-from matplotlib import cm # to map scalar values to color using colormap
-from matplotlib.collections import BrokenBarHCollection # for chromosome plotting
-import math
-import re # older version of regular expression module
-# module for generating pairs for iteration
-from itertools import combinations
-import itertools
-# import module for displaying Dataframe
-# for adjusting jupyter notebook cell width
-from IPython.core.display import display, HTML
-# import module for copying object
 from copy import deepcopy # deepcopy
 from copy import copy # shallow_copy
 import collections # count elements # usage : dict( collections.Counter( b))
@@ -44,22 +24,62 @@ import ast# usage : ast.literal_eval( string) # to convert string representation
 import pickle # module for saving dictionary and dataframe (very fast when saving as binary!)
 import traceback # printing traceback of exceptions
 import mmap # for random access of file
-from multiprocessing import Pool, get_context, set_start_method # for multiple processing  # with get_context("spawn").Pool() as pool:
-import multiprocessing 
-import multiprocessing as mp
-import ctypes
-import logging
-
+from itertools import combinations
+import itertools
+import math
+import uuid # for universal identifier (same length with md5 hash) uuid.uuid4().hex
+import gc # for explicit garbage collection
+import time # for sleep function
+from cycler import cycler # for cycling matplotlib color palette
+import re # older version of regular expression module
 import heapq # merge sorting files.
 import contextlib # for use with heapq
 import shlex, subprocess # for running multiple shell commands in python
+
+# files
+import glob # for getting file names
+
+# time
+import datetime # to retrive current time
+import time # for sleep function
+
+# I/O
+import Bio.bgzf 
+import gzip # to handle gzip file
+import shutil # for copying file
+import base64 # for converting binary to text data (web application)
+from io import StringIO # for converting a string to a file-like stream
+import json # to read and write JSON file
+from xml.parsers.expat import ExpatError
+import xmltodict # read xml as an ordered dictionary
+
+# basic data science packages
+import numpy as np
+import pandas as pd # read tab delimited file
+import csv # for saving dataframe without extra "" quotations
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors # for normalization
+from matplotlib import cm # to map scalar values to color using colormap
+from matplotlib.collections import BrokenBarHCollection # for chromosome plotting
+from mpl_toolkits.mplot3d import Axes3D # module for 3D plotting
 ## defining short cut for modules
 np_str = np.core.defchararray
-import importlib # for reloading custom modules after modifications
+
+# for adjusting jupyter notebook cell width
+from IPython.core.display import display, HTML
+
+
+
+
+
+# network
 import requests # for retriving HTML documents
 from ftplib import FTP # for interacting with ftp server
 import urllib.request # to retrive html document from the internet
-from xml.parsers.expat import ExpatError
+
+# packages
+import importlib # for reloading custom modules after modifications
 import pkg_resources # for working with packages
 import argparse, getopt
 
@@ -78,7 +98,7 @@ from bokeh.io import reset_output
 
 import pysam # to read SAM and BAM file
 
-import xmltodict # read xml as an ordered dictionary
+
 # HTML
 from bs4 import BeautifulSoup # for parsing HTML
 
@@ -227,9 +247,10 @@ def GLOBALS_Find_object( query = None, case_specific = False ) : # 20190903
 # In[ ]:
 
 
-def TIME_GET_timestamp( ) :
+def TIME_GET_timestamp( flag_human_readable = False ) :
     '''  Get timestamp of current time in "%Y%m%d_%H%M" format  '''
-    return datetime.datetime.now( ).strftime("%Y%m%d_%H%M")
+    cur_time = datetime.datetime.now( ) # retrieve current time
+    return cur_time.strftime( "%Y/%m/%d %H:%M" ) if flag_human_readable else cur_time.strftime("%Y%m%d_%H%M")
 
 
 # In[ ]:
@@ -545,8 +566,25 @@ def DICTIONARY_Find_Min( dict_value ) :
             value_min = value
     return key_min, value_min
 
-
-# In[ ]:
+def DICTIONARY_Find_keys_with_max_value( dict_value ) : 
+    ''' # 2021-11-24 20:44:07 
+    find a list of key values with the maximum value in a given dictionary, and return 'l_key_max', 'value_max' '''
+    value_max = None # initialize max value
+    l_key_max = [ ] # list of key with max_values
+    if len( dict_value ) != 0 : # if the dictionary is not empty
+        for key in dict_value :
+            value = dict_value[ key ]
+            if value_max is None :
+                value_max = value
+                l_key_max.append( key )
+            elif value_max > value :
+                continue
+            elif value_max < value :
+                l_key_max = [ key ]
+                value_max = value
+            elif value_max == value : # if the another key contains the current max value, add the key to the list of keys with max values
+                l_key_max.append( key )
+    return l_key_max, value_max
 
 
 def DICTIONARY_Merge_Min( * l_dict ) :
@@ -1391,6 +1429,15 @@ def PANDAS_DATAFRAME_number_unique_entries( df ) :
 
 # In[ ]:
 
+def DF_from_Anndata( adata ) :
+    """ # 2021-11-17 21:23:10 
+    convert Anndata (both in sparse format and dense format) to DataFrame in respective format (either sparse or dense format) """
+    if isinstance( adata.X, scipy.sparse.csr.csr_matrix ) :
+        df = pd.DataFrame.sparse.from_spmatrix( adata.X, index = adata.obs.index.values, columns = adata.var.index.values )
+    else :
+        df = adata.to_df( )
+    return df
+
 
 def DF_Build_Index_Using_Dictionary( df, l_col_for_index, str_delimiter = None, function_transform = None ) : # 2020-08-06 17:12:59 
     ''' # 2021-09-07 19:34:16 
@@ -1595,13 +1642,15 @@ def PD_Subset( df, subset = None, axis = 0, index = None, columns = None, preser
 # In[ ]:
 
 
-def PD_Search( df, query_AND_operation = True, is_negative_query = False, ignore_case = True, ** dict_search ) :
-    ''' to search index, put 'index' as the name of column in the 'dict_search' argument. To search values in a series, put 'values' as the name of column in the 'dict_search' argument
+def PD_Search( df, query_AND_operation = True, is_negative_query = False, ignore_case = True, verbose = True, ** dict_search ) :
+    ''' # 2021-11-10 01:56:43 
+    to search index, put 'index' as the name of column in the 'dict_search' argument. To search values in a series, put 'values' as the name of column in the 'dict_search' argument
     To retrive entries matched with all queries, set 'query_AND_operation' to True (perform AND operation during searching), while set 'query_AND_operation' to False to retrive all entries 
     containing at least one of the given queries. Search with multiple columns are always performed with AND operation (will be improved) '''
     for col, queries in dict_search.items( ) :
         if type( df ) is pd.DataFrame and col not in list( df.columns.values ) + [ 'index', 'columns', 'col' ] : # print out an error message when invalid column name was given for a dataframe
-            print( "'{}' does not exist in columns of a given DataFrame".format( col ) )
+            if verbose :
+                print( "'{}' does not exist in columns of a given DataFrame".format( col ) )
             continue
         if col == 'index' : # retrive data to be searched
             data = df.index.values
@@ -1651,6 +1700,15 @@ def PD_Column_Add_Suffix( df, suffix = '', inplace = False ) :
         df.columns = df.columns.values.astype( object ) + suffix
     return df
 
+def PD_Binary_Flag_Select( df, name_col_binary_flag, int_bit_flag_position, flag_select = True ) :
+    ''' 
+    'flag_select' : if True, select rows containing the binary flags at the given position 'int_bit_flag_position' 
+    '''
+    # handle empty dataframe
+    if len( df ) == 0 :
+        return df
+    int_bit_flag = 1 << int_bit_flag_position
+    return df[ list( ( f & int_bit_flag ) > 0 if flag_select else ( f & int_bit_flag ) == 0 for f in df[ name_col_binary_flag ].values ) ]
 
 # In[ ]:
 
@@ -6489,9 +6547,8 @@ def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_
         df_gtf[ 'attribute' ] = l_attribute_new # update attributes
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
     
-
 def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ], drop_duplicated_intervals = False ) :
-    """ # 2021-08-01 17:12:10 
+    """ # 2021-11-23 14:25:17 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
     'dir_file_gtf' : directory to the gtf file or dataframe iteslf
@@ -6504,26 +6561,42 @@ def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name'
         df_gtf = GTF_Read( dir_file_gtf, parse_attr = True )
     else : # assumes 'dir_file_gtf' is a dataframe containing GTF records if it is not a string object
         df_gtf = dir_file_gtf
-        
-    df_gtf = PD_Select( df_gtf, feature = feature ) # retrieve gtf records of given list of features
+    # retrieve gtf records of given list of features if valid query is given
+    if feature is not None :
+        df_gtf = PD_Select( df_gtf, feature = feature ) 
     if len( df_gtf ) == 0 : # return an empty dictionary if df_gtf is an empty dataframe
         return dict( )
     df_gtf.dropna( subset = [ value ] if isinstance( value, str ) else value, inplace = True ) # value should be valid
     # remove duplicated intervals
     if drop_duplicated_intervals :
         df_gtf.drop_duplicates( subset = [ 'seqname', 'start', 'end' ], inplace = True )
+    # ignore 'null' intervals
+    df_gtf = df_gtf[ df_gtf.end > df_gtf.start ]
     dict_it = dict( )
     for arr_interval, arr_value in zip( df_gtf[ [ 'seqname', 'start', 'end' ] ].values, df_gtf[ value ].values ) :
         seqname, start, end = arr_interval
         if seqname not in dict_it :
             dict_it[ seqname ] = intervaltree.IntervalTree( )
         # add the interval with a given list of value
-        dict_it[ seqname ].addi( start, end + 1, tuple( arr_value ) if isinstance( arr_value, np.ndarray ) else arr_value ) # use 0-based coordinate like 1-based coordinate system
+        dict_it[ seqname ].addi( start - 1, end, tuple( arr_value ) if isinstance( arr_value, np.ndarray ) else arr_value ) # 1-based coordinate system to 1-based coordinate
     return dict_it
+
+def GTF_Interval_Tree_Combine( * l_dict_it ) :
+    ''' # 2021-10-29 09:44:16 
+    combine a list of dictionary containing interval trees (key = contig name, value = interval tree) into a single dictionary of interval trees
+    '''
+    # initialize dictionary of interval trees that will contain combined dict_it
+    dict_it_combined = dict( )
+    for dict_it in l_dict_it :
+        for key in dict_it :
+            if key not in dict_it_combined :
+                dict_it_combined[ key ] = intervaltree.IntervalTree( ) # initialize an empty interval tree for each key
+            dict_it_combined[ key ].update( dict_it[ key ] ) # combine interval trees of each key into a single interval tree
+    return dict_it_combined
 
 # In[ ]:
 
-def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon', remove_chr_from_seqname = True, dir_folder_output = None ) :
+def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, remove_chr_from_seqname = True, dir_folder_output = None ) :
     ''' # 2021-10-10 01:27:23 
     build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists).
     if 'dir_folder_output' is given, save the generated mask to the given folder (an empty directory is recommended)
@@ -6575,7 +6648,8 @@ def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = 'exon'
                 with open( f'{dir_folder_output}{seqname}.bin', 'wb' ) as file : 
                     dict_seqname_to_ba[ seqname ].tofile( file )
         return dict_seqname_to_ba
-    df_gtf = PD_Select( df_gtf, feature = str_feature ) # select only specific features form the gtf
+    if str_feature is not None : # select only specific features form the gtf if query is given 
+        df_gtf = PD_Select( df_gtf, feature = str_feature ) 
     if remove_chr_from_seqname :
         df_gtf[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df_gtf.seqname.values )
     df_gtf.start -= 1 # 1-based coordinate -> 0-based coordinate
@@ -6812,41 +6886,64 @@ def OS_Memory( ) :
             
     return dict_mem
 
-def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False ) : # 2020-07-20 11:47:29 
-    ''' # 2021-05-04 01:13:38 
+def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False, flag_bgzip_output = True, int_byte_chuck = 100000 ) : # 2020-07-20 11:47:29 
+    ''' # 2021-10-28 10:58:38 
     combine contents of files in l_dir_file and write at dir_newfile. if header is given, append header (string type with \n at the end) at the front of the file. if 'remove_n_lines' > 0, remove n lines from each files.
-    gzipped files are also supported. However, when input files and output files have mixed gzipped status, it will cause a TypeError 
+    gzipped files are also supported. However, when input files have mixed gzipped status (i.e. first file is gzipped, while second file is a plain text file), it will cause a TypeError.
+    Mixed Bgzip and gzipped statues are allowed.
     
     'flag_use_header_from_first_file' : copy header from the first file to the new file
+    'flag_bgzip_output' : a flag indicating whether the output should be written using bgzip module (Biopython's bgzf module). When the output file's file extension is '.bgz', the output file will be block-gzipped file regardless of the 'flag_bgzip_output' flag's status.
+    'int_byte_chuck' : the size of the chuck to be read/write when the input file and output file has different datatype (input file = binary file, output file = plain text, or vice versa)
     '''
-    if os.path.exists( dir_newfile ) and not overwrite_existing_file : print( "[OS_FILE_Combine_Files_in_order][ERROR] output file already exists" )
-    elif len( l_dir_file ) == 0 : print( "[OS_FILE_Combine_Files_in_order][ERROR] given list of files is empty" )
-    elif len( l_dir_file ) == 1 : # if the list of input files contains only a single file, copy the file to the given directory
-        dir_file = l_dir_file[ 0 ]
-        if delete_input_files : # if 'delete_input_files' is set to True, simply rename the file
-            os.rename( dir_file, dir_newfile )
+    # check the validity of inputs
+    if os.path.exists( dir_newfile ) and not overwrite_existing_file : 
+        print( "[OS_FILE_Combine_Files_in_order][ERROR] output file already exists" )
+        return -1 
+    if len( l_dir_file ) == 0 : 
+        print( "[OS_FILE_Combine_Files_in_order][ERROR] given list of files is empty" )
+        return -1
+    
+    # set flags of input/output filetypes
+    str_output_file_extension = dir_newfile.rsplit( '.', 1 )[ 1 ] # retrieve the file extension of the output files
+    bool_flag_gzipped_output = str_output_file_extension in [ 'gz', 'bgz' ] # set boolean flag for gzipped output file
+    bool_flag_bgzipped_output = str_output_file_extension == 'bgz' or flag_bgzip_output # set boolean flag for block-gzipped output file # if 'flag_bgzip_output' is True, write a block-gzipped file even though the output file extension is '.gz'
+    bool_flag_gzipped_input = l_dir_file[ 0 ].rsplit( '.', 1 )[ 1 ] in [ 'gz', 'bgz' ] # set boolean flag for gzipped input file
+
+    ''' open an output file '''
+    if bool_flag_gzipped_output :
+        if bool_flag_bgzipped_output :
+            newfile = Bio.bgzf.BgzfWriter( dir_newfile, 'wb' ) # open bgzip file
         else :
-            shutil.copyfile( dir_file, dir_newfile )
-    else : # if at least one input file is given (l_dir_file) and given directory of a newfile already exist (or overwriting is allowed)
-        bool_flag_gzipped_output = dir_newfile[ - 3 : ] == '.gz' # set boolean flag for gzipped output file
-        newfile = gzip.open( dir_newfile, 'wb' ) if bool_flag_gzipped_output else open( dir_newfile, 'w' ) # open a file that will contained combined contents
-        if flag_use_header_from_first_file : # if a flag indicating copying header from the first file to the new file is set, open the first file and read the header line
-            dir_file = l_dir_file[ 0 ]
-            bool_flag_gzipped_input = dir_file[ - 3 : ] == '.gz' # set boolean flag for gzipped input file
-            with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
-                header = file.readline( )
-        if header : 
-            header = header.decode( ) if not isinstance( header, ( str ) ) else header # convert header byte string to string if header is not a string type
-            newfile.write( ( header.encode( ) if bool_flag_gzipped_output else header ) ) # write a header line to the output file 
-        for dir_file in l_dir_file :
-            bool_flag_gzipped_input = dir_file[ - 3 : ] == '.gz' # set boolean flag for gzipped input file
-            with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
-                if remove_n_lines : 
-                    for index in range( remove_n_lines ) : file.readline( )
+            newfile = gzip.open( dir_newfile, 'wb' ) # open simple gzip file
+    else :
+        newfile = open( dir_newfile, 'w' ) # open plain text file
+
+    ''' write a header to the output file '''
+    if flag_use_header_from_first_file : # if a flag indicating copying header from the first file to the new file is set, open the first file and read the header line
+        dir_file = l_dir_file[ 0 ]
+        with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
+            header = file.readline( )
+    if header : 
+        header = header.decode( ) if not isinstance( header, ( str ) ) else header # convert header byte string to string if header is not a string type
+        newfile.write( ( header.encode( ) if bool_flag_gzipped_output else header ) ) # write a header line to the output file 
+
+    ''' copy input files to the output file '''
+    for dir_file in l_dir_file :
+        with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
+            if remove_n_lines : 
+                for index in range( remove_n_lines ) : file.readline( )
+            if not( bool_flag_gzipped_output ^ bool_flag_gzipped_input ) : # if output & input are both binary or plain text (should be same datatype), simply copy byte to byte
                 shutil.copyfileobj( file, newfile )
-        newfile.close( )
-        if delete_input_files :
-            for dir_file in l_dir_file : os.remove( dir_file )
+            else : # if input is binary while output is plain text or vice versa 
+                while True :
+                    content = file.read( int_byte_chuck )
+                    if len( content ) == 0 : # if all content has been read, terminate transferring procedure
+                        break
+                    newfile.write( content.encode( ) if bool_flag_gzipped_output else content.decode(  ) )
+    newfile.close( )
+    if delete_input_files :
+        for dir_file in l_dir_file : os.remove( dir_file )
 
 
 # ## Function Specific to a Project
