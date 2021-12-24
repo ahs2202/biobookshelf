@@ -180,16 +180,6 @@ def Jupyter_Notebook_Extension__Build_Snippet( str_code, str_name, indentation =
 known_reference_genes = [ 60, 203068, 11315, 59, 2597, 6161, 1915, 3251, 5430, 7846 ] # List_Gene__2__List_Gene_ID( ['ACTB', 'TUBB', 'PARK7', 'ACTA2', 'GAPDH', 'RPL32', 'EF1A', 'HPRT', 'POLR2A', 'TUBA1A' ] )
 known_reference_genes_including_predicted = [ 60, 203068, 11315, 59, 2597, 6161, 1915, 3251, 5430, 7846, 25912, 27243, 56851, 2821, 5690, 5692, 7879, 7905, 6634,  7415, 51699 ]
 
-""" AWS functions """
-
-def S3_ls( dir_s3url_folder ) :
-    """ # 2021-12-09 21:47:34 
-    perform ls operation (list files or folders in the given AWS S3 URL directory) using the properly configured AWS-CLI and return a dataframe containing the list of folders and files 
-    """
-    l_l = list( line.split( ) for line in OS_Run( [ "aws", "s3", "ls", dir_s3url_folder ], return_output = True )[ 'stdout' ].strip( ).split( '\n' ) )
-    df_ls = pd.read_csv( StringIO( '\n'.join( list( '\t'.join( [ '', '', '', l[ 1 ] ] if len( l ) == 2 else l ) for l in l_l ) ) ), sep = '\t', header = None )
-    df_ls.columns = [ 'date', 'time', 'size', 'file_name' ]
-    return df_ls
 
 # ### Useful Functions in applications 
 
@@ -5241,33 +5231,6 @@ def ELBOW_Find( l, sort_array = True, return_index_of_an_elbow_point = False ) :
     
     return index_elbow_point if return_index_of_an_elbow_point else l[ index_elbow_point ] # return the index or the value of an elbow point
 
-# ### Functions for parsing
-
-def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = set( [ 'nan' ] ) ) :
-    ''' # 2021-12-24 23:06:22 
-    parse a given line 'str_line'
-    
-    'str_line' : a plain string representing a line 
-    'l_type' : (required) list of types [int, str, float, bool] or other functions that can be applied to the string representation of each entry in the line
-    '''
-    l_val = str_line.strip( ).split( delimiter ) # retrieve values (in string)
-    l_val_converted = [ ]
-    for val, f_for_converting_type in zip( l_val, l_type ) :
-        if len( val ) == 0 : # if a value is an empty string, interpret it as a np.nan value
-            val_converted = np.nan
-        else :
-            if f_for_converting_type == str : # if current dtype is string
-                if val in set_str_representing_nan : # if current value belongs to a set of string values representing np.nan values, interpret it as a np.nan value
-                    val_converted = np.nan
-                else :
-                    val_converted = val
-            else : # if current dtype is other than string type
-                try : 
-                    val_converted = f_for_converting_type( val )
-                except : # if an error occurs while converting type, interpret the value as np.nan
-                    val_converted = np.nan
-        l_val_converted.append( val_converted )
-    return l_val_converted # return parsed values
 
 # ### Functions using Multiprocessing librarys
 
@@ -6584,7 +6547,7 @@ def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_
         df_gtf[ 'attribute' ] = l_attribute_new # update attributes
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
     
-def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = 'gene_name', drop_duplicated_intervals = False ) :
+def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = [ 'gene_name' ], drop_duplicated_intervals = False ) :
     """ # 2021-11-23 14:25:17 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
@@ -8460,7 +8423,7 @@ def DSSP_Read_mkdssp_Result( dir_file ) : # 2020-07-06 17:09:09
     
     dict_amino_acid_to_MaxASA__Tien_et_al__2013__emp__ = { 'A': 121.0, 'R': 265.0, 'N': 187.0, 'D': 187.0, 'C': 148.0, 'E': 214.0, 'Q': 214.0, 'G': 97.0, 'H': 216.0, 'I': 195.0, 'L': 191.0, 'K': 230.0, 'M': 203.0, 'F': 228.0, 'P': 154.0, 'S': 143.0, 'T': 163.0, 'W': 264.0, 'Y': 255.0, 'V': 165.0 }
     dict_amino_acid_to_maxasa = dict_amino_acid_to_MaxASA__Tien_et_al__2013__emp__ # use MaxASA__Tien_et_al__2013__emp__ data for calculating relative accessible area
-    df[ 'relative_surface_accessibility' ] = list( min( 1, max( 0, record[ 'accessibility' ] / dict_amino_acid_to_maxasa[ record[ 'amino_acid' ] ] ) ) for record in df.to_dict( orient = 'records' ) ) # calculate relative surface area
+    df[ 'relative_surface_accessibility' ] = list( min( 1, max( 0, record[ 'accessibility' ] / dict_amino_acid_to_maxasa[ record[ 'amino_acid' ] ] ) ) for record in df.to_dict( orient = 'record' ) ) # calculate relative surface area
     return df
 
 
