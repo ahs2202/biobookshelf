@@ -1448,6 +1448,44 @@ def DF_from_Anndata( adata ) :
         df = adata.to_df( )
     return df
 
+def DF_Deduplicate_without_loading_in_memory( dir_file_dataframe, dir_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t' ) :
+    """
+    # 2021-12-25 15:14:24 
+
+    similar to pandas.DataFrame.drop_duplicates, except that the dataframe will not be loaded into the memory. duplicates are identified and redundant records will be dropped with keep = 'first' setting
+    
+    'dir_file_dataframe' directory of the dataframe to remove duplicates
+    'dir_file_dataframe_deduplicated' : an output file directory containing unique records
+    'l_col_for_identifying_duplicates' : list of column names (should be all string types) if 'flag_header_is_present' is True else list of column indices (should be all integer types)
+    
+    """
+    
+    ''' open an output file '''
+    newfile = gzip.open( dir_file_dataframe_deduplicated, 'wb' )
+    with gzip.open( dir_file_dataframe, 'rb' ) as file :
+        ''' retrieve list of indices of columns for identifying redundant records '''
+        if flag_header_is_present :
+            # read header
+            line = file.readline( )
+            newfile.write( line )  # write header
+            l_col = line.decode( ).strip( ).split( str_delimiter ) # parse header
+            l_int_index_col_for_identifying_duplicates = list( l_col.index( col ) for col in l_col_for_identifying_duplicates ) # retrieve indices of the columns that should be accessed
+        else :
+            # if header is not present, 'l_col_for_identifying_duplicates' will be used as list of indices of columns for extracting values by which a unique record will be identified
+            l_int_index_col_for_identifying_duplicates = l_col_for_identifying_duplicates
+            
+        ''' check whether each record is redundant and write only unique record to the output file '''
+        set_t_val = set( ) # a set that will record the occurrence of a unique set of values
+        while True :
+            line = file.readline( ) # read line
+            if len( line ) == 0 :
+                break
+            l_val = line.decode( ).strip( ).split( str_delimiter ) # parse the current line
+            t_val = tuple( l_val[ int_index ] for int_index in l_int_index_col_for_identifying_duplicates ) # retrieve a tuple of values containined in the line
+            if t_val not in set_t_val :
+                newfile.write( line )  # write line if the line contain a unqiue set of values
+                set_t_val.add( t_val ) # add a unique set of values to the set
+    newfile.close( )
 
 def DF_Build_Index_Using_Dictionary( df, l_col_for_index, str_delimiter = None, function_transform = None ) : # 2020-08-06 17:12:59 
     ''' # 2021-09-07 19:34:16 
@@ -1917,9 +1955,96 @@ def GET_dataframe_Gene_Symbol_from_Gene_ID( df ) :
         return - 1
 
 
-# ##### Functions for Pandas DataFrame containing Linear Data 
+# ##### Functions for Pandas DataFrame 
 
-# In[ ]:
+def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sorting, delimiter = '\t', key_function_for_sorting = None, l_type = None, int_num_lines_for_a_chunk = 1000000, flag_header_line_exists = True ) :
+    """ # 2021-12-26 17:34:17 
+    Sort a large dataframe without loading in memory using a single-thread.
+    currently, input and output files should be gzipped (plain text files will be supported soon)
+    
+    'dir_file' : input 
+    'flag_header_line_exists' : flag indicating the input file contains a header line.
+    'key_function_for_sorting' : returnining a key for each line from a file for sorting lines
+    'l_col_for_sorting' : a list of column names that will be used for sorting. 'flag_header_line_exists' is False, it will be interpreted as a list of column indices for sorting
+    'l_type' : a list of functions for converting types of each value in the line. If not given, a string datatype will be used for all columns. example: [ int, str, float ]. Used for parsing each line in the input file.
+    
+   
+    """
+    ''' handle input '''
+    l_col_for_sorting = [ l_col_for_sorting ] if isinstance( l_col_for_sorting, ( str, int ) ) else l_col_for_sorting # make 'l_col_for_sorting' as a list of string or integer if just a single string or a single integer has been given
+
+    int_index_chunk = 0 # index of each chunk
+    with gzip.open( dir_file, 'rb' ) as file :
+
+        if flag_header_line_exists :
+            header_line = file.readline( ) # read header
+            ''' parse header '''
+            l_header = header_line.decode( ).strip( ).split( delimiter ) # parse header
+            ''' retrieve list of integer indices of columns for sorting '''
+            if key_function_for_sorting is None :
+                l_int_index_col_for_sorting = list( l_header.index( col ) for col in l_col_for_sorting )
+        elif key_function_for_sorting is None :
+            # if header line does not exist and 'key_function_for_sorting' was not given, 'l_col_for_sorting' will be interpreted as a list of integer indices of the columns for sorting
+            l_int_index_col_for_sorting = l_col_for_sorting
+
+        ''' if 'key_function_for_sorting' is not given, define 'key_function_for_sorting' function '''
+        if key_function_for_sorting is None :
+            def key_function_for_sorting( str_line ) :
+                str_line = str_line.decode( ).strip( )
+                l_val = str_line.split( delimiter ) if l_type is None else Parse_Line( str_line, l_type, delimiter ) # 'l_type' is given, parse data according to each column's datatype
+                return tuple( list( l_val[ int_index_col ] for int_index_col in l_int_index_col_for_sorting ) )
+
+        l_dir_file_chunk = [ ] # collect list of chunk files
+        ''' initialize a chunk '''
+        int_n_count_lines = 0
+        l_line = [ ]
+        flag_all_line_parsed = False
+        while True :
+            line = file.readline( )
+            if len( line ) == 0 :
+                flag_all_line_parsed = True
+            else :
+                int_n_count_lines += 1
+                l_line.append( line )    
+
+            if int_n_count_lines >= int_num_lines_for_a_chunk or flag_all_line_parsed :
+                ''' sort lines 'in_memory' and save it as a file '''
+                # sort line using 'key_function_for_sorting'
+                l_line.sort( key = key_function_for_sorting )
+                dir_file_chunk = f"{dir_file_sorted}.chunk_{int_index_chunk}.tsv.gz"
+                with gzip.open( dir_file_chunk, 'wb' ) as newfile :
+                    newfile.write( b''.join( l_line ) )
+                l_dir_file_chunk.append( dir_file_chunk ) 
+
+                ''' initialize the next chunk '''
+                int_index_chunk += 1
+                int_n_count_lines = 0
+                l_line = [ ]
+
+                ''' exit if all lines were parsed from the input file '''
+                if flag_all_line_parsed :
+                    break
+
+    """ merge-sort individually sorted files into a single sorted output file """
+    def __parse_line__( dir_file ) :
+        ''' Generator of each line for a gzipped file '''
+        with gzip.open( dir_file, "rb" ) as file : 
+            while True : 
+                line = file.readline( )
+                if len( line ) == 0 : 
+                    break
+                yield line # return a line
+
+    l_files = [ __parse_line__( dir_file ) for dir_file in l_dir_file_chunk ]
+    with gzip.open( dir_file_sorted, 'wb' ) as merged_file :
+        ''' write a header if header line exists '''
+        if flag_header_line_exists :
+            merged_file.write( header_line )
+        merged_file.writelines( heapq.merge( * l_files, key = key_function_for_sorting ) )
+    
+    """ remove temporary files (individually sorted files) """
+    for dir_file_chunk in l_dir_file_chunk :
+        os.remove( dir_file_chunk )
 
 
 def DF_Tabular_2_Linear_with_filter( df, thres_lower = None, thres_higher = None ) :

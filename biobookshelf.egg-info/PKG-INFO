@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: biobookshelf
-Version: 0.1.24
+Version: 0.1.26
 Summary: a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python
 Home-page: https://github.com/ahs2202/biobookshelf
 Author: Hyunsu An
