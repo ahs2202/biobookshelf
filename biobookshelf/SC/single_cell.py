@@ -76,11 +76,149 @@ def MTX_10X_Write( df_mtx, df_feature, dir_folder_output_mtx_10x ) :
         os.remove( dir_file_mtx_output )
     OS_Run( [ 'gzip', f"{dir_folder_output_mtx_10x}matrix.mtx" ] ) # gzip the mtx file
     
+def MTX_10X_Filter( dir_folder_mtx_10x_input, dir_folder_mtx_10x_output, min_counts = None, min_features = None, min_cells = None, verbose = False ) :
+    ''' # 2022-01-08 20:25:37 hyunsu-an
+    read 10x count matrix and filter matrix based on several thresholds
+    'dir_folder_mtx_10x_input' : a folder containing files for the input 10x count matrix
+    'dir_folder_mtx_10x_output' : a folder containing files for the input 10x count matrix
+
+    Only the threshold arguments for either cells ( 'min_counts', 'min_features' ) or features ( 'min_cells' ) can be given at a time.
+
+    'min_counts' : the minimum number of total counts for a cell to be included in the output matrix
+    'min_features' : the minimum number of features for a cell to be included in the output matrix
+    'min_cells' : the minimum number of cells for a feature to be included in the output matrix
+    '''
+
+    ''' handle inputs '''
+    if dir_folder_mtx_10x_input[ -1 ] != '/' :
+        dir_folder_mtx_10x_input += '/'
+    if dir_folder_mtx_10x_output[ -1 ] != '/' :
+        dir_folder_mtx_10x_output += '/'
+    if not ( ( ( min_counts is not None ) or ( min_features is not None ) ) ^ ( min_cells is not None ) ) : # check whether a any threshold is given, or thresholds for both cells and features were given (thresdholds for either cells or features can be given at a time)
+        if verbose :
+            print( '[MTX_10X_Filter] (error) no threshold is given or more thresholds for both cells and features are given. (Thresdholds for either cells or features can be given at a time.)' )
+        return -1
+    #     pass
+
+    # define input file directories
+    dir_file_input_bc = f'{dir_folder_mtx_10x_input}barcodes.tsv.gz'
+    dir_file_input_feature = f'{dir_folder_mtx_10x_input}features.tsv.gz'
+    dir_file_input_mtx = f'{dir_folder_mtx_10x_input}matrix.mtx.gz'
+
+    # check whether all required files are present
+    if sum( list( not os.path.exists( dir_folder ) for dir_folder in [ dir_file_input_bc, dir_file_input_feature, dir_file_input_mtx ] ) ) :
+        if verbose :
+            print( f'required file(s) is not present at {dir_folder_mtx_10x}' )
+
+    ''' read barcode and feature information '''
+    df_bc = pd.read_csv( dir_file_input_bc, sep = '\t', header = None )
+    df_bc.columns = [ 'barcode' ]
+    df_feature = pd.read_csv( dir_file_input_feature, sep = '\t', header = None )
+    df_feature.columns = [ 'id_feature', 'feature', '10X_type' ]
+
+    ''' survey the metrics '''
+    dict_id_column_to_count = dict( )
+    dict_id_column_to_n_features = dict( )
+    dict_id_row_to_n_cells = dict( )
+
+    with gzip.open( dir_file_input_mtx, 'rb' ) as file :
+        while True :
+            line = file.readline( ).decode( ) # binary > uncompressed string
+            if len( line ) == 0 :
+                break
+            ''' skip comments '''
+            if line[ 0 ] == '%' :
+                continue
+            ''' parse a record, and update metrics '''
+            id_row, id_column, int_value = tuple( int( e ) for e in line.strip( ).split( ) ) # parse a record of a matrix-market format file
+            ''' 1-based > 0-based coordinates '''
+            id_row -= 1
+            id_column -= 1
+            ''' update umi count for each cell '''
+            if id_column not in dict_id_column_to_count :
+                dict_id_column_to_count[ id_column ] = 0
+            dict_id_column_to_count[ id_column ] += int_value
+            ''' update n_features for each cell '''
+            if id_column not in dict_id_column_to_n_features :
+                dict_id_column_to_n_features[ id_column ] = 0
+            dict_id_column_to_n_features[ id_column ] += 1
+            ''' update n_cells for each feature '''
+            if id_row not in dict_id_row_to_n_cells :
+                dict_id_row_to_n_cells[ id_row ] = 0
+            dict_id_row_to_n_cells[ id_row ] += 1
+
+
+    ''' filter row or column that do not satisfy the given thresholds '''
+    if min_counts is not None :
+        dict_id_column_to_count = dict( ( k, dict_id_column_to_count[ k ] ) for k in dict_id_column_to_count if dict_id_column_to_count[ k ] >= min_counts ) 
+    if min_features is not None :
+        dict_id_column_to_n_features = dict( ( k, dict_id_column_to_n_features[ k ] ) for k in dict_id_column_to_n_features if dict_id_column_to_n_features[ k ] >= min_features )
+    if min_cells is not None :
+        dict_id_row_to_n_cells = dict( ( k, dict_id_row_to_n_cells[ k ] ) for k in dict_id_row_to_n_cells if dict_id_row_to_n_cells[ k ] >= min_cells )
+
+    ''' retrieve id_row and id_column that satisfy the given thresholds '''    
+    set_id_column = set( dict_id_column_to_count ).intersection( set( dict_id_column_to_n_features ) )
+    set_id_row = set( dict_id_row_to_n_cells )
+
+    ''' report the number of cells or features that will be filtered out '''
+    if verbose :
+        int_n_bc_filtered = len( df_bc ) - len( set_id_column )
+        if int_n_bc_filtered > 0 :
+            print( f"{int_n_bc_filtered}/{len( df_bc )} barcodes will be filtered out" )
+        int_n_feature_filtered = len( df_feature ) - len( set_id_row )
+        if int_n_feature_filtered > 0 :
+            print( f"{int_n_feature_filtered}/{len( df_feature )} features will be filtered out" )
+
+    """ retrieve a mapping between previous id_column to current id_column """
+    df_bc = df_bc.loc[ set_id_column ]
+    df_bc.index.name = 'id_column_previous'
+    df_bc.reset_index( drop = False, inplace = True )
+    df_bc[ 'id_column_current' ] = np.arange( len( df_bc ) )
+    dict_id_column_previous_to_id_column_current = df_bc.set_index( 'id_column_previous' ).id_column_current.to_dict( ) 
+    """ retrieve a mapping between previous id_row to current id_row """
+    df_feature = df_feature.loc[ set_id_row ]
+    df_feature.index.name = 'id_row_previous'
+    df_feature.reset_index( drop = False, inplace = True )
+    df_feature[ 'id_row_current' ] = np.arange( len( df_feature ) )
+    dict_id_row_previous_to_id_row_current = df_feature.set_index( 'id_row_previous' ).id_row_current.to_dict( ) 
+
+
+    """ write a combined matrix.mtx.gz """
+    # create an output folder
+    os.makedirs( dir_folder_mtx_10x_output, exist_ok = True ) 
+    # retrieve the total number of entries
+    int_total_n_entries = pd.Series( dict( ( k, dict_id_column_to_n_features[ k ] ) for k in dict_id_column_to_n_features if k in set_id_column ) ).sum( ) # the total number of records after filtering can be retrieved by calculating the sum of values of the 'dict_id_column_to_n_features'
+    # directly write matrix.mtx.gz file without using an external dependency
+    with gzip.open( f"{dir_folder_mtx_10x_output}matrix.mtx.gz", 'wb' ) as newfile :
+        newfile.write( ( f"%%MatrixMarket matrix coordinate integer general\n%\n{len( dict_id_row_previous_to_id_row_current )} {len( dict_id_column_previous_to_id_column_current )} {int_total_n_entries}\n" ).encode( ) ) # write matrix file header
+        with gzip.open( dir_file_input_mtx, 'rb' ) as file : # retrieve a list of features
+            while True :
+                line = file.readline( ).decode( )
+                if len( line ) == 0 :
+                    break
+                ''' skip comments '''
+                if line[ 0 ] == '%' :
+                    continue
+                id_row, id_column, int_value = tuple( map( int, line.strip( ).split( ) ) ) # parse each entry of the current matrix 
+                ''' 1-based > 0-based coordinates '''
+                id_row -= 1
+                id_column -= 1
+                ''' write a record to the new matrix file only when both id_row and id_column belongs to filtered id_rows and id_columns '''
+                if id_row in dict_id_row_previous_to_id_row_current and id_column in dict_id_column_previous_to_id_column_current :
+                    newfile.write( ( ' '.join( tuple( map( str, [ dict_id_row_previous_to_id_row_current[ id_row ] + 1, dict_id_column_previous_to_id_column_current[ id_column ] + 1, int_value ] ) ) ) + '\n' ).encode( ) ) # map id_row and id_column of the previous matrix to those of the filtered matrix (new matrix) # 0-based > 1-based coordinates
+
+    ''' save barcode file '''
+    df_bc.to_csv( f"{dir_folder_mtx_10x_output}barcodes.tsv.gz", columns = [ 'barcode' ], sep = '\t', index = False, header = False ) 
+
+    ''' save feature file '''
+    df_feature[ [ 'id_feature', 'feature', '10X_type' ] ].to_csv( f"{dir_folder_mtx_10x_output}features.tsv.gz", sep = '\t', index = False, header = False ) # save as a file
+    
 def MTX_10X_Combine( dir_folder_output_mtx_10x, * l_dir_folder_input_mtx_10x ) :
     '''
     # 2021-12-18 13:13:03 
     Combine 10X count matrix files from the given list of folders and write combined output files to the given output folder 'dir_folder_output_mtx_10x'
     If there are no shared cells between matrix files, a low-memory mode will be used. The output files will be simply combined since no count summing operation is needed. Only feature matrix will be loaded and updated in the memory.
+    'id_feature' should be unique across all features
     '''
     
     # create an output folder

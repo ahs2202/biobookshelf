@@ -152,6 +152,9 @@ import upsetplot
 # oligo analysis
 import seqfold
 
+# for searching files recursively
+import pathlib
+
 def Wide( int_percent_html_code_cell_width = 95 ) :
     """ 
     # 20210224
@@ -708,7 +711,8 @@ def UTIL_PANDAS_Search_Columns( df, query ) :
 
 
 def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_dir_match = None, return_dataframe = True, retrieve_file_size = False, retrieve_last_modified_time = False, time_offset_in_seconds = 3600 * 9 ) : # 2020-11-16 18:20:52 
-    """ retrieve strings in '*' wildcards in list of matched directories for the given string containing '*' wildcards. return strings in wildcards as a nested lists. Consecutive wildcards should not be used ('**' should not be used in the given string)
+    """ # 2022-01-09 23:25:48 
+    retrieve strings in '*' wildcards in list of matched directories for the given string containing '*' wildcards. return strings in wildcards as a nested lists. Consecutive wildcards should not be used ('**' should not be used in the given string)
     'retrieve_file_size': if 'return_dataframe' is True, return file sizes in bytes by using os.stat( dir_match ).st_size
     'retrieve_last_modified_time': return the last modified time with pandas datetime datatype
     'time_offset_in_seconds': offset in seconds to Coordinated Universal Time (UTC) """
@@ -726,7 +730,9 @@ def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_dir_match = None, return_data
     if return_dataframe : # return dataframe containing strings in wildcards and matched directory
         df = pd.DataFrame( l_l_str_in_wildcard, columns = list( 'wildcard_' + str( index ) for index in range( str_glob.count( '*' ) ) ) )
         df[ 'dir' ] = l_dir_match
-        if retrieve_file_size : df[ 'size_in_bytes' ] = list( os.stat( dir_match ).st_size for dir_match in l_dir_match )
+        if retrieve_file_size : 
+            df[ 'size_in_bytes' ] = list( os.stat( dir_match ).st_size for dir_match in l_dir_match )
+            df[ 'size_in_gigabytes' ] = df[ 'size_in_bytes' ] / 2 ** 30
         if retrieve_last_modified_time : 
             df[ 'time_last_modified' ] = list( datetime.datetime.utcfromtimestamp( os.path.getmtime( dir_file ) + time_offset_in_seconds ).strftime( '%Y-%m-%d %H:%M:%S' ) for dir_file in df.dir.values )
             df.time_last_modified = pd.to_datetime( df.time_last_modified ) # convert to datetime datatype
@@ -5387,7 +5393,10 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
     'str_line' : a plain string representing a line 
     'l_type' : (required) list of types [int, str, float, bool] or other functions that can be applied to the string representation of each entry in the line
     '''
-    l_val = str_line.strip( ).split( delimiter ) # retrieve values (in string)
+    ''' remove newline character at the end of the line '''
+    if str_line[ -1 ] == '\n' :
+        str_line = str_line[ : -1 ]
+    l_val = str_line.split( delimiter ) # retrieve values (in string)
     l_val_converted = [ ]
     for val, f_for_converting_type in zip( l_val, l_type ) :
         if len( val ) == 0 : # if a value is an empty string, interpret it as a np.nan value
@@ -8473,24 +8482,71 @@ def BLAST_Parse_BTOP_String( str_btop, query_seq = None, subject_seq = None ) : 
 # In[ ]:
 
 
-def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None, ** dict_Select ) : # 2020-11-15 17:21:00 
-    """ Read BLASTp tabular output with following columns [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
+def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None, dir_file_output = None, float_transfer_pidenta = None, float_transfer_evalueb = None, ** dict_Select ) : # 2020-11-15 17:21:00 
+    """ # 2022-01-10 17:35:10 
+    Read BLASTp tabular output with following columns [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
     Subset BLASTp output with 'dict_Select' using PD_Select function before BTOP string parsing.
-    For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence. """
+    For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence.
+    
+    'dir_file_output' : (default: None) if given, write the output as a file and does not load an entire dataframe in the memory ('dict_Select' column will be ignored).
+    'dict_Select' : dictionary of keyworded arguments for selecting records
+    """
     if dict_qaccver_to_seq is None and dict_saccver_to_seq is None : return -1 # For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence. 
     bool_flag_use_query_seq = dict_qaccver_to_seq is not None # set a flag for using query_seq
-    try : 
-        df_blastp = pd.read_csv( dir_file, sep = '\t', header = None )
-    except pd.errors.EmptyDataError :
-        print( "{dir_file} file contains empty blast output".format( dir_file = dir_file ) ); return -1 
-    df_blastp.columns = [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
-    df_blastp = PD_Select( df_blastp, ** dict_Select ) # retrieve search result of multiple-sequence-aligned sequences
-    l_l_value = list( ) # build aligned query and subject sequences for blastp search results
-    for qaccver, qstart, qend, saccver, sstart, send, btop in df_blastp[ [ 'qaccver', 'qstart', 'qend', 'saccver', 'sstart', 'send', 'btop' ] ].values :
-        query_seq_aligned, subject_seq_aligned = BLAST_Parse_BTOP_String( btop, query_seq = dict_qaccver_to_seq[ qaccver ][ qstart - 1 : qend ] ) if bool_flag_use_query_seq else BLAST_Parse_BTOP_String( btop, subject_seq = dict_saccver_to_seq[ saccver ][ sstart - 1 : send ] ) # parse BTOP string according to the given type of sequence
-        l_l_value.append( [ query_seq_aligned, subject_seq_aligned ] )
-    df_blastp = df_blastp.reset_index( drop = True ).join( pd.DataFrame( l_l_value, columns = [ 'query_seq_aligned', 'subject_seq_aligned' ] ) )
-    return df_blastp
+    
+    if dir_file_output is None :
+        '''
+        if an output file directory is not given, read an entire dataframe and return an output dataframe
+        '''
+        try : 
+            df_blastp = pd.read_csv( dir_file, sep = '\t', header = None )
+        except pd.errors.EmptyDataError :
+            print( f"{dir_file} file contains empty blast output" ); return -1 
+        df_blastp.columns = [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
+        df_blastp = PD_Select( df_blastp, ** dict_Select ) # retrieve search result of multiple-sequence-aligned sequences
+        ''' filter records based on thresholds '''
+        dict_threshold = dict( )
+        dict_threshold[ 'pidenta' ] = float_transfer_pidenta
+        dict_threshold[ 'evalueb' ] = float_transfer_evalueb
+        df_blastp = PD_Threshold( df_blastp, ** dict_threshold )
+        l_l_value = list( ) # build aligned query and subject sequences for blastp search results
+        for qaccver, qstart, qend, saccver, sstart, send, btop in df_blastp[ [ 'qaccver', 'qstart', 'qend', 'saccver', 'sstart', 'send', 'btop' ] ].values :
+            query_seq_aligned, subject_seq_aligned = BLAST_Parse_BTOP_String( btop, query_seq = dict_qaccver_to_seq[ qaccver ][ qstart - 1 : qend ] ) if bool_flag_use_query_seq else BLAST_Parse_BTOP_String( btop, subject_seq = dict_saccver_to_seq[ saccver ][ sstart - 1 : send ] ) # parse BTOP string according to the given type of sequence
+            l_l_value.append( [ query_seq_aligned, subject_seq_aligned ] )
+        df_blastp = df_blastp.reset_index( drop = True ).join( pd.DataFrame( l_l_value, columns = [ 'query_seq_aligned', 'subject_seq_aligned' ] ) )
+        return df_blastp
+    else :
+        # retrieve a flag indicating whether the input file has been gzipped
+        flag_is_input_file_gzipped = dir_file.rsplit( '.', 1 )[ 1 ] == 'gz'
+        try : 
+            file = gzip.open( dir_file, 'rb' ) if flag_is_input_file_gzipped else open( dir_file, 'r' )
+        except :
+            print( f"[Error] error while opening the file {dir_file}" ); return -1 
+        '''
+        open an output file
+        '''
+        newfile = gzip.open( dir_file_output, 'wb' )
+        ''' set header '''
+        l_name_col = [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
+        l_index_col_for_retrieving_aligned_seq = list( l_name_col.index( name_col ) for name_col in [ 'qaccver', 'qstart', 'qend', 'saccver', 'sstart', 'send', 'btop' ] ) # retrieve indices of the columns of interest
+        index_col_pident = l_name_col.index( 'pident' )
+        index_col_evalue = l_name_col.index( 'evalue' )
+        ''' write a new header '''
+        newfile.write( ( '\t'.join( l_name_col + [ 'query_seq_aligned', 'subject_seq_aligned' ] ) + '\n' ).encode( ) ) # write a new header line
+        while True :
+            line = file.readline( ).decode( ) if flag_is_input_file_gzipped else file.readline( )
+            if len( line ) == 0 :
+                break
+            l_value = Parse_Line( line, delimiter = '\t', l_type = [ str, str, float, int, int, int, int, int, int, int, float, float, str ] ) # parse values as string values
+            ''' filter records based on thresholds '''
+            if float_transfer_pidenta is not None and l_value[ index_col_pident ] < float_transfer_pidenta :
+                continue
+            if float_transfer_evalueb is not None and l_value[ index_col_evalue ] > float_transfer_evalueb :
+                continue
+            qaccver, qstart, qend, saccver, sstart, send, btop = tuple( l_value[ i ] for i in l_index_col_for_retrieving_aligned_seq ) # retrieve values for retrieving aligned sequence 
+            query_seq_aligned, subject_seq_aligned = BLAST_Parse_BTOP_String( btop, query_seq = dict_qaccver_to_seq[ qaccver ][ qstart - 1 : qend ] ) if bool_flag_use_query_seq else BLAST_Parse_BTOP_String( btop, subject_seq = dict_saccver_to_seq[ saccver ][ sstart - 1 : send ] ) # parse BTOP string according to the given type of sequence
+            newfile.write( ( '\t'.join( [ line[ : -1 ], query_seq_aligned, subject_seq_aligned ] ) + '\n' ).encode( ) ) # write a new record
+        newfile.close( )
 
 
 # ## Functions for CIF format structure files

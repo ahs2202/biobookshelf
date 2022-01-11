@@ -99,18 +99,18 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
                     _, id_flowcell, id_lib_prep = list( e.replace( '",', '' ) for e in list( line.split( '"exp_script_name":' )[ 1 ].split( ':' ) for line in l_line if '"exp_script_name":' in line )[ 0 ] ) # retrieve flowcell type and library preperation method using summary file inside the directory
                 else :
                     print( "[Guppy_Run_and_Combine_Output] appropriate 'id_flowcell' and/or 'id_lib_prep' were not found, exiting" )
-                    return -1
+                    return -1 
         ''' run guppy basecaller and write output as a text file '''
         dir_folder_guppy_output = f"{dir_folder_nanopore_sequencing_data}guppy_out/"
         if not os.path.exists( dir_folder_guppy_output ) :
             # compose guppy basecaller arguments
-            l_args = [ 'guppy_basecaller' ]
+            l_args = [ 'guppy_basecaller' ] 
             if not flag_use_cpu : # use GPU if it exists
                 l_args += [ '--device', 'auto' ]
             l_args += [ '--cpu_threads_per_caller', str( int_n_threads ) ]
 
-            if id_lib_prep == 'SQK-RBK110-96' : # change 'id_lib_prep' to guppy-compatible id
-                id_lib_prep = 'SQK-RBK096'
+            if id_lib_prep == 'SQK-RBK096' : # change 'id_lib_prep' to guppy-compatible id
+                id_lib_prep = 'SQK-RBK110-96'
             if flag_barcoding_was_used :
                 ''' automatically set barcoding_kit '''
                 if id_barcoding_kit is None :
@@ -124,10 +124,10 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         
         ''' combine fastq.gz output files of guppy_basecaller output '''
         if flag_barcoding_was_used :
-            for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/' ) :
+            for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/*/' ) :
                 name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
                 dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
-                OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_barcode + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+                OS_FILE_Combine_Files_in_order( glob.glob( f"{dir_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
                 l_dir_file_fastq_gz.append( dir_file_fastq_gz )
         else :
             dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
