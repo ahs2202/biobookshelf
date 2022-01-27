@@ -268,6 +268,21 @@ def TIME_GET_timestamp( flag_human_readable = False ) :
 
 # In[ ]:
 
+##### For exporting data
+
+def Round_Float( df, l_col_scientific_notations = [ ], l_col_typical_notation = [ ], n_significant_digits_scientific_notation = 3, n_significant_digits_typical_notation = 3, inplace = False ) :
+    ''' round float with a given number of significant digits and convert floating point numbers to strings '''
+    if not inplace :
+        df = deepcopy( df )
+    str_format_scientific_notation = "{:." + str( int( n_significant_digits_scientific_notation ) ) + "e}"
+    str_format_typical_notation = '{:.' + str( int( n_significant_digits_typical_notation ) ) + 'f}'
+    for col in l_col_scientific_notations :
+        df[ col ] = list( '' if np.isnan( value ) else str_format_scientific_notation.format( value ) for value in df[ col ].values )
+    for col in l_col_typical_notation :
+        df[ col ] = list( '' if np.isnan( value ) else str_format_typical_notation.format( value ) for value in df[ col ].values )
+    return df
+
+
 
 ############################ define objects that are required for some optimized methods #################################
 arr_halfs = np.ones( 2 ) / 2
@@ -322,7 +337,6 @@ def INTEGER_Spread( n_values ) : # 2020-08-07 01:34:56
 
 
 # In[ ]:
-
 
 def INT_Get_Ranges_from_List_of_Integers( l, flag_sorted = True ) :
     '''  # 2020-12-12 21:16:28 
@@ -7603,30 +7617,49 @@ def FASTA_Assembly_Stats( dict_fasta = None, arr_length = None, flag_arr_length_
 # In[ ]:
 
 
-def FASTA_Write( dir_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False ) :
-    '''  # 2021-08-10 21:17:55 
+def FASTA_Write( dir_file_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False, int_num_characters_for_each_line = 60 ) :
+    '''  # 2022-01-12 17:16:43 (improved performance when writing very large fasta file, such as human genome sequence)
+    'int_num_characters_for_each_line' : insert the newline character for every 'int_num_characters_for_each_line' number of characters.
     write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq 
-    write gzipped fasta file if 'dir_fasta' ends with '.gz'
+    write gzipped fasta file if 'dir_file_fasta' ends with '.gz'
     '''
-    bool_flag_file_gzipped = dir_fasta.rsplit( '.', 1 )[ 1 ] == 'gz' 
-    if os.path.exists( dir_fasta ) and not overwrite_existing_file : 
+    
+    ''' if 'dict_fasta' was given, compose 'dict_fasta' from the lists of 'l_id' and 'l_seq'. '''
+    if dict_fasta is None : 
+        dict_fasta = dict( )
+        if isinstance( l_id, str ) : # when a single pair of sequence and id were given
+            dict_fasta[ l_id ] = l_seq
+        else : # when a lists of sequences and ids were given
+            for str_id, str_seq in zip( l_id, l_seq ) :
+                dict_fasta[ str_id ] = str_seq
+    
+    ''' open file '''
+    # detect gzipped status of the output file
+    flag_file_gzipped = dir_file_fasta.rsplit( '.', 1 )[ 1 ] == 'gz' 
+    if os.path.exists( dir_file_fasta ) and not overwrite_existing_file : 
         print( 'the file already exists' )
         return -1
-    newfile = gzip.open( dir_fasta, 'wb' ) if bool_flag_file_gzipped else open( dir_fasta, 'w' )
-    if dict_fasta is not None : # if dict_fasta was given.
-        for name in dict_fasta :
-            str_record = ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( dict_fasta[ name ], 60, insert_characters = '\n' ) )
-            newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
-    else : # if l_id and l_seq were given.
-        if type( l_id ) is str and type( l_seq ) is str : # if only one sequence and sequence name were given
-            str_record = ">{}\n{}\n".format( l_id, STR.Insert_characters_every_n_characters( l_seq, 60, insert_characters = '\n' ) )
-            newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
-        else : # if list of sequences and sequence names were given
-            for name, seq in zip( l_id, l_seq ) :
-                str_record = ">{}\n{}\n".format( name, STR.Insert_characters_every_n_characters( seq, 60, insert_characters = '\n' ) )
-                newfile.write( str_record.encode( ) if bool_flag_file_gzipped else str_record )
-    newfile.close( )
-
+    with gzip.open( dir_file_fasta, 'wb' ) if flag_file_gzipped else open( dir_file_fasta, 'w' ) as newfile :
+        for str_id in dict_fasta :
+            seq = dict_fasta[ str_id ]
+            len_seq = len( seq )
+            
+            ''' write a header line '''
+            line_header = '>' + str_id + '\n'
+            newfile.write( line_header.encode( ) if flag_file_gzipped else line_header )
+            
+            pos_seq = 0
+            while True :
+                if ( len_seq - pos_seq ) > int_num_characters_for_each_line :
+                    line = seq[ pos_seq : pos_seq + int_num_characters_for_each_line ] + '\n'
+                    newfile.write( line.encode( ) if flag_file_gzipped else line )
+                    pos_seq += int_num_characters_for_each_line
+                else :
+                    ''' if less than 'int_num_characters_for_each_line' number of character remains, write all remaining characters and exit the loop '''
+                    line = seq[ pos_seq : len_seq ] + '\n'
+                    newfile.write( line.encode( ) if flag_file_gzipped else line )
+                    pos_seq += len_seq - pos_seq
+                    break
 
 # In[ ]:
 
@@ -8483,7 +8516,7 @@ def BLAST_Parse_BTOP_String( str_btop, query_seq = None, subject_seq = None ) : 
 
 
 def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None, dir_file_output = None, float_transfer_pidenta = None, float_transfer_evalueb = None, ** dict_Select ) : # 2020-11-15 17:21:00 
-    """ # 2022-01-10 17:35:10 
+    """ # 2022-01-17 22:18:45 
     Read BLASTp tabular output with following columns [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
     Subset BLASTp output with 'dict_Select' using PD_Select function before BTOP string parsing.
     For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence.
@@ -8506,8 +8539,10 @@ def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None
         df_blastp = PD_Select( df_blastp, ** dict_Select ) # retrieve search result of multiple-sequence-aligned sequences
         ''' filter records based on thresholds '''
         dict_threshold = dict( )
-        dict_threshold[ 'pidenta' ] = float_transfer_pidenta
-        dict_threshold[ 'evalueb' ] = float_transfer_evalueb
+        if float_transfer_pidenta is not None :
+            dict_threshold[ 'pidenta' ] = float_transfer_pidenta
+        if float_transfer_evalueb is not None :
+            dict_threshold[ 'evalueb' ] = float_transfer_evalueb
         df_blastp = PD_Threshold( df_blastp, ** dict_threshold )
         l_l_value = list( ) # build aligned query and subject sequences for blastp search results
         for qaccver, qstart, qend, saccver, sstart, send, btop in df_blastp[ [ 'qaccver', 'qstart', 'qend', 'saccver', 'sstart', 'send', 'btop' ] ].values :
@@ -8547,6 +8582,7 @@ def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None
             query_seq_aligned, subject_seq_aligned = BLAST_Parse_BTOP_String( btop, query_seq = dict_qaccver_to_seq[ qaccver ][ qstart - 1 : qend ] ) if bool_flag_use_query_seq else BLAST_Parse_BTOP_String( btop, subject_seq = dict_saccver_to_seq[ saccver ][ sstart - 1 : send ] ) # parse BTOP string according to the given type of sequence
             newfile.write( ( '\t'.join( [ line[ : -1 ], query_seq_aligned, subject_seq_aligned ] ) + '\n' ).encode( ) ) # write a new record
         newfile.close( )
+
 
 
 # ## Functions for CIF format structure files

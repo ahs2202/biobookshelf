@@ -27,3 +27,4 @@ primer3-py>=0.6.1
 biopython>=1.79
 edlib>=1.3.9
 h5py>=2.1.0
+psutil>=5.7.0

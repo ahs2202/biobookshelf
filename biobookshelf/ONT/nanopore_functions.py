@@ -67,7 +67,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
             
             
     """ run Guppy basecaller for each nanopore sequencing data folder """
-    l_dir_file_fastq_gz = [ ] # list of output fastq files
+    set_dir_file_fastq_gz = set( ) # a set of output fastq files
     for dir_folder_nanopore_sequencing_data in l_dir_folder_nanopore_sequencing_data : 
         # [input] parse arguments
         dir_folder_nanopore_sequencing_data = os.path.abspath( dir_folder_nanopore_sequencing_data )
@@ -128,22 +128,22 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
                 name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
                 dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
                 OS_FILE_Combine_Files_in_order( glob.glob( f"{dir_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
-                l_dir_file_fastq_gz.append( dir_file_fastq_gz )
+                set_dir_file_fastq_gz.add( dir_file_fastq_gz )
         else :
             dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
             OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_guppy_output + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
-            l_dir_file_fastq_gz.append( dir_file_fastq_gz )
-            
+            set_dir_file_fastq_gz.add( dir_file_fastq_gz )
+
     ''' copy and combine output fastq files to the output directory '''
     if dir_folder_output_fastq is not None : # if output folder of fastq files was given
         # group 'dir_file_fastq_gz' based on 'name_file'
+        
         dict_name_file_to_dir = dict( )
-        for d in l_dir_file_fastq_gz :
+        for d in set_dir_file_fastq_gz :
             name_file = d.rsplit( '/', 1 )[ 1 ] 
             if name_file not in dict_name_file_to_dir :
                 dict_name_file_to_dir[ name_file ] = [ ]
             dict_name_file_to_dir[ name_file ].append( d )
-
         for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
             OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{dir_folder_output_fastq}{name_file}" )
 

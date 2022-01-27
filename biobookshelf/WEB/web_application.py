@@ -13,12 +13,13 @@ def Round_Float( df, l_col_scientific_notations, l_col_typical_notation, n_signi
         df[ col ] = list( '' if np.isnan( value ) else str_format_typical_notation.format( value ) for value in df[ col ].values )
     return df
 
-def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, dir_folder_temp = '/tmp/' ) :
-    """ # 2021-07-19 17:38:40 
+def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, dir_folder_temp = '/tmp/', flag_delete_temp_folder = True ) :
+    """ # 2022-01-24 13:08:12 
     'df_to_be_indexed' : dataframe to be exported to base64 encoded file and indexed with values in 'l_col_index'
     'l_col_index' : list of columns for indexing 'df_to_be_indexed'
     'dir_prefix_output' : directory prefix for an indexed base64 encoded file and a base64 encoded index file
     'dir_folder_temp' : directory where a temporary folder will be created and removed
+    'flag_delete_temp_folder' : flag indicating whether the temporary folder should be removed 
     """
 
     # retrieve dir_folder_wd
@@ -57,12 +58,13 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, d
     l_l = [ ]
     flag_multiindex = len( l_col_index ) > 1 # retrieve flag indicating whether a multi-index was used.
     for int_index, size_in_bytes in df_file_base64[ [ 'wildcard_0', 'size_in_bytes' ] ].values :
-        l_l.append( ( list( l_index[ int_index ] ) if flag_multiindex else [ l_index[ int_index ] ] ) + [ int_byte_accumulated, int_byte_accumulated + size_in_bytes ] ) # index_byte uses 0-based coordinates
+        l_l.append( list( l_index[ int_index ] ) + [ int_byte_accumulated, int_byte_accumulated + size_in_bytes ] ) # index_byte uses 0-based coordinates
         int_byte_accumulated += size_in_bytes # update accumulated number of bytes
     df_index_byte = pd.DataFrame( l_l, columns = l_col_index + [ 'index_byte_start', 'index_byte_end' ] )
 
     df_index_byte.T.to_csv( f"{dir_folder_temp}index.tsv.gz", sep = '\t', index = True, header = False )
     Base64_Encode( f"{dir_folder_temp}index.tsv.gz", f"{dir_prefix_output}.index.tsv.gz.base64.txt" ) # convert binary file into text using base64 encoding
 
-    # remove temporary folder
-    shutil.rmtree( dir_folder_temp )
+    if flag_delete_temp_folder :
+        # remove temporary folder
+        shutil.rmtree( dir_folder_temp )
