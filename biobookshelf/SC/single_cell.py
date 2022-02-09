@@ -215,7 +215,7 @@ def MTX_10X_Filter( dir_folder_mtx_10x_input, dir_folder_mtx_10x_output, min_cou
     
 def MTX_10X_Combine( dir_folder_output_mtx_10x, * l_dir_folder_input_mtx_10x ) :
     '''
-    # 2021-12-18 13:13:03 
+    # 2022-02-07 17:44:28 
     Combine 10X count matrix files from the given list of folders and write combined output files to the given output folder 'dir_folder_output_mtx_10x'
     If there are no shared cells between matrix files, a low-memory mode will be used. The output files will be simply combined since no count summing operation is needed. Only feature matrix will be loaded and updated in the memory.
     'id_feature' should be unique across all features
@@ -242,12 +242,10 @@ def MTX_10X_Combine( dir_folder_output_mtx_10x, * l_dir_folder_input_mtx_10x ) :
 
         ''' collect a set of unique features and a list of id_feature for each 10X matrix '''
         # assumes id_feature is unique for all features across 10X matrices
-        dict_dir_folder_mtx_10x_to_arr_id_feature = dict( ) # collect a list of id_feature for each matrix folder
         set_t_feature = set( ) # update a set of feature tuples
         for dir_folder_mtx_10x in l_dir_folder_input_mtx_10x :
             arr_feature = pd.read_csv( f'{dir_folder_mtx_10x}features.tsv.gz', sep = '\t', header = None ).values # retrieve a list of features
             set_t_feature.update( list( map( tuple, arr_feature ) ) ) # update a set of feature tuples
-            dict_dir_folder_mtx_10x_to_arr_id_feature[ dir_folder_mtx_10x ] = arr_feature[ :, 0 ] # retrieve a list of id_feature
 
         """ write a combined features.tsv.gz """
         l_t_feature = list( set_t_feature ) # convert set to list
@@ -272,6 +270,7 @@ def MTX_10X_Combine( dir_folder_output_mtx_10x, * l_dir_folder_input_mtx_10x ) :
         with gzip.open( f"{dir_folder_output_mtx_10x}matrix.mtx.gz", 'wb' ) as newfile :
             newfile.write( ( f"%%MatrixMarket matrix coordinate integer general\n%\n{len( l_t_feature )} {len( set_barcode )} {int_total_n_entries}\n" ).encode( ) ) # write matrix file header
             for dir_folder_mtx_10x in l_dir_folder_input_mtx_10x :
+                arr_id_feature = pd.read_csv( f'{dir_folder_mtx_10x}features.tsv.gz', sep = '\t', header = None ).values[ :, 0 ] # retrieve a list of id_feature for the current dataset
                 with gzip.open( f'{dir_folder_mtx_10x}matrix.mtx.gz', 'rb' ) as file : # retrieve a list of features
                     file.readline( ), file.readline( ), file.readline( ) # read three header lines
                     while True :
@@ -279,7 +278,7 @@ def MTX_10X_Combine( dir_folder_output_mtx_10x, * l_dir_folder_input_mtx_10x ) :
                         if len( line ) == 0 :
                             break
                         index_row, index_col, int_value = tuple( map( int, line.strip( ).split( ) ) ) # parse each entry of the current matrix 
-                        newfile.write( ( ' '.join( tuple( map( str, [ dict_id_feature_to_index_feature[ dict_dir_folder_mtx_10x_to_arr_id_feature[ dir_folder_mtx_10x ][ index_row - 1 ] ], index_col + int_total_n_barcodes_of_previously_written_matrices, int_value ] ) ) ) + '\n' ).encode( ) ) # translate indices of the current matrix to that of the combined matrix
+                        newfile.write( ( ' '.join( tuple( map( str, [ dict_id_feature_to_index_feature[ arr_id_feature[ index_row - 1 ] ], index_col + int_total_n_barcodes_of_previously_written_matrices, int_value ] ) ) ) + '\n' ).encode( ) ) # translate indices of the current matrix to that of the combined matrix
                 int_total_n_barcodes_of_previously_written_matrices += dict_dir_folder_mtx_10x_to_int_n_barcodes[ dir_folder_mtx_10x ] # update the total number of barcodes of matrices that were completely written to the combined output matrix file
     else :
         ''' normal operation mode perfoming count merging operations '''

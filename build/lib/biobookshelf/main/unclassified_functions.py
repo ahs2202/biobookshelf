@@ -268,6 +268,21 @@ def TIME_GET_timestamp( flag_human_readable = False ) :
 
 # In[ ]:
 
+##### For exporting data
+
+def Round_Float( df, l_col_scientific_notations = [ ], l_col_typical_notation = [ ], n_significant_digits_scientific_notation = 3, n_significant_digits_typical_notation = 3, inplace = False ) :
+    ''' round float with a given number of significant digits and convert floating point numbers to strings '''
+    if not inplace :
+        df = deepcopy( df )
+    str_format_scientific_notation = "{:." + str( int( n_significant_digits_scientific_notation ) ) + "e}"
+    str_format_typical_notation = '{:.' + str( int( n_significant_digits_typical_notation ) ) + 'f}'
+    for col in l_col_scientific_notations :
+        df[ col ] = list( '' if np.isnan( value ) else str_format_scientific_notation.format( value ) for value in df[ col ].values )
+    for col in l_col_typical_notation :
+        df[ col ] = list( '' if np.isnan( value ) else str_format_typical_notation.format( value ) for value in df[ col ].values )
+    return df
+
+
 
 ############################ define objects that are required for some optimized methods #################################
 arr_halfs = np.ones( 2 ) / 2
@@ -322,7 +337,6 @@ def INTEGER_Spread( n_values ) : # 2020-08-07 01:34:56
 
 
 # In[ ]:
-
 
 def INT_Get_Ranges_from_List_of_Integers( l, flag_sorted = True ) :
     '''  # 2020-12-12 21:16:28 

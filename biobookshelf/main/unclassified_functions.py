@@ -6696,13 +6696,14 @@ def GFF3_Parse_Attribute( attr ) :
     """
     return dict( e.split( '=', 1 ) for e in attr.split( ';' ) if '=' in e )
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True, flag_verbose = False ) :
+def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True, flag_verbose = False, ** dict_filter_gtf ) :
     ''' 
-    # 2021-10-09 23:56:06 
+    # 2022-02-08 08:55:37 
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
     'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
     'flag_gtf_format' : set this flag to true if the attributes are in GTF format. If it is in GFF3 format, set this flag to False
+    'dict_filter_gtf' : keyworded arguments for 'PD_Select', which will be used to filter df_gtf before parsing attributes
     '''
     try :
         df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
@@ -6717,6 +6718,9 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_for
     df = df.sort_values( [ 'seqname', 'start' ] ).reset_index( drop = True )
     if remove_chr_from_seqname :
         df[ 'seqname' ] = list( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ] for seqname in df.seqname.values )
+    if len( dict_filter_gtf ) > 0 :
+        df = PD_Select( df, ** dict_filter_gtf ) 
+        df.reset_index( drop = True, inplace = True )
     if parse_attr :
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) if flag_gtf_format else list( GFF3_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
@@ -7480,9 +7484,9 @@ def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_
     'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is 0-based coordinate (pysam returns 0-based coordinate)
     'flag_return_splice_junction' : additionally return list of splice junction tuples
     '''
+    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
     if return_1_based_coordinate and flag_pos_start_0_based_coord : # 0-based > 1-based
         start -= 1
-    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
     for operation, length in cigartuples :
         if operation in { 0, 2, 7, 8 } : # 'MD=X'
             int_aligned_length += length

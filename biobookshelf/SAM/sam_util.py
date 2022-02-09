@@ -76,15 +76,15 @@ def Generate_Base_and_Qual( r ) :
                 
                 
 def Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False, flag_pos_start_0_based_coord = True, flag_return_splice_junction = False, flag_is_cigartuples_from_mappy = False ) :
-    ''' # 2021-09-07 10:17:55 
+    ''' # 2022-01-28 01:51:16 
     return l_seq and int_total_aligned_length for given cigartuples (returned by pysam cigartuples) and 'pos_start' (0-based coordinates, assuming pos_start is 0-based coordinate)
     'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is 0-based coordinate (pysam returns 0-based coordinate)
     'flag_return_splice_junction' : additionally return list of splice junction tuples
     'flag_is_cigartuples_from_mappy' : if cigartuples are from mappy.Alignment, set this flag to True
     '''
+    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
     if return_1_based_coordinate and flag_pos_start_0_based_coord : # 0-based > 1-based
         start -= 1
-    l_seg, start, int_aligned_length, int_total_aligned_length = list( ), pos_start, 0, 0
     for operation, length in cigartuples :
         if flag_is_cigartuples_from_mappy : # if flag_is_cigartuples_from_mappy, swap the two values
             temp = operation
