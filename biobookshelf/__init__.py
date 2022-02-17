@@ -1,5 +1,5 @@
 # Version of biobookshelf package
-__version__ = "0.1.29"
+__version__ = "0.1.30"
 
 # import modules
 
