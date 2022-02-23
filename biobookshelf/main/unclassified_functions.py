@@ -1459,6 +1459,20 @@ def PANDAS_DATAFRAME_number_unique_entries( df ) :
 
 # In[ ]:
 
+
+def DF_Explore_Class( df, duplicate_filter = 2 ) :
+    """ # 2022-02-23 19:43:05 
+    Explore classes in the dataframe
+    'duplicate_filter' : only display class labels that are present in 'duplicate_filter' number of times (or larger)
+    """
+    for col in df.columns.values :
+        if isinstance( df[ col ].values[ 0 ], str ) : # only display when string data is stored
+            s = LIST_COUNT( df[ col ].values, duplicate_filter = duplicate_filter ) # filter classes based on the number of their appearances
+            if len( s ) > 0 :
+                print( "👉", col )
+                display( s )
+                
+
 def DF_from_Anndata( adata ) :
     """ # 2021-11-17 21:23:10 
     convert Anndata (both in sparse format and dense format) to DataFrame in respective format (either sparse or dense format) """
@@ -5435,7 +5449,7 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
 
 
 def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
-    """ # 2021-09-24 20:47:34 
+    """ # 2022-02-23 10:55:34 
     split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
     By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
     
@@ -5443,6 +5457,7 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
     'global_arguments' : a sort of environment variables (read only) given to each process as a list of additional arguments in addition to the directory of the input file. should be used to use local variables inside main( ) function if this function is called inside the main( ) function.
                          'global_arguments' will be passed to 'Function_PostProcessing', too.
     'col_split_load' : a name of column or a list of column names (or integer index of column or list of integer indices of columns if 'arr' is not a dataframe) for grouping given inputs when spliting the inputs into 'n_threads' number of dataframes. Each unique tuple in the column(s) will be present in only one of split dataframes.
+    'n_threads' : if 'n_threads' is 1, does not use multiprocessing module, but simply run the function with the given input. This behavior is for enabiling using functions running Multiprocessing in another function using Multiprocessing, since multiprocessing.Pool module does not allow nested pooling.
     """
     if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
         arr = np.array( arr )
@@ -5496,8 +5511,12 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
                 df.to_csv( dir_file_temp, sep = '\t', header = None, index = False )
                 l_dir_file.append( dir_file_temp )
 
-    with Pool( n_threads ) as p : 
-        l = p.starmap( Function, list( [ dir_file ] + list( global_arguments ) for dir_file in l_dir_file ) ) # use multiple process to run the given function
+    if n_threads > 1 :
+        with Pool( n_threads ) as p : 
+            l = p.starmap( Function, list( [ dir_file ] + list( global_arguments ) for dir_file in l_dir_file ) ) # use multiple process to run the given function
+    else :
+        ''' if n_threads == 1, does not use multiprocessing module '''
+        l = [ Function( l_dir_file[ 0 ], * list( global_arguments ) ) ]
         
     if Function_PostProcessing is not None :
         Function_PostProcessing( str_uuid, dir_temp, * global_arguments ) 
