@@ -1482,6 +1482,36 @@ def DF_from_Anndata( adata ) :
         df = adata.to_df( )
     return df
 
+def DF_Transform_without_loading_in_memory( dir_file_dataframe, dir_file_dataframe_transformed, function_transformation, flag_output_gzipped = True, chunksize = 10000, sep = '\t', index = False, header = 0, ** dict_arg_pd_read_csv ) :
+    """ # 2022-03-09 12:49:56 
+
+    Apply a given function to a dataframe, except that the entire dataframe will not be loaded into the memory. Instead, a chunk of the dataframe will be loaded.
+    
+    'dir_file_dataframe' directory of the dataframe to remove duplicates
+    'dir_file_dataframe_transformed' : an output file directory containing transformed records
+    'function_transformation' : a function for transforming dataframes
+    'dict_arg_pd_read_csv' : arguments for reading tabular data
+    
+    'chunksize',     'sep',     'header', 'dict_arg_pd_read_csv' : refer to pandas.read_csv
+    'index' : refer to pandas.to_csv
+
+    """
+    
+    # create the pandas dataframe iterator
+    iter_tabular_data = pd.read_csv( dir_file_dataframe, iterator = True, header = header, chunksize = chunksize, sep = sep, ** dict_arg_pd_read_csv ) # concatenate according to a filter to our result dataframe
+    
+    ''' open an output file '''
+    newfile = gzip.open( dir_file_dataframe_transformed, 'wb' ) if flag_output_gzipped else open( dir_file_dataframe_transformed, 'w' )
+    flag_header_was_written = False    
+    for df_chunk in iter_tabular_data :
+        df_chunk_transformed = function_transformation( df_chunk )
+        ''' if header is present in the input dataframe, write the header '''
+        if not flag_header_was_written and header is not None :
+            str_header = sep.join( df_chunk_transformed.columns.values ) + '\n'
+            newfile.write( str_header.encode( ) if flag_output_gzipped else str_header )
+            flag_header_was_written = True # set the flag indicating the header has been written
+        df_chunk_transformed.to_csv( newfile, sep = sep, header = None, index = index )
+
 def DF_Deduplicate_without_loading_in_memory( dir_file_dataframe, dir_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t' ) :
     """
     # 2021-12-25 15:14:24 

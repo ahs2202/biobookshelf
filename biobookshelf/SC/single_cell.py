@@ -604,11 +604,11 @@ def MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr( dir_folder_mtx_
         ''' calculated average log2 transformed normalized expr for each split mtx file '''
         Multiprocessing( l_dir_file_mtx_10x, __MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr__first_pass__, n_threads = int_num_threads, global_arguments = [ dir_folder_mtx_10x_input, int_target_sum ] )
 
-        l_name_dict = [ 'dict_id_row_to_deviation_from_mean_count', 'dict_id_row_to_deviation_from_mean_log_transformed_count', 'dict_id_row_to_normalized_count', 'dict_id_row_to_log_transformed_normalized_count' ]
+        l_name_dict_first_pass = [ 'dict_id_row_to_deviation_from_mean_count', 'dict_id_row_to_deviation_from_mean_log_transformed_count', 'dict_id_row_to_normalized_count', 'dict_id_row_to_log_transformed_normalized_count' ]
         
         ''' combine summarized results '''
         dict_dict = dict( )
-        for name_dict in l_name_dict :
+        for name_dict in l_name_dict_first_pass :
             dict_dict[ name_dict ] = __Combine_Dictionaries__( dir_folder_mtx_10x_input, name_dict )
             
         """ second pass """
@@ -619,45 +619,40 @@ def MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr( dir_folder_mtx_
         ''' calculated average log2 transformed normalized expr for each split mtx file '''
         Multiprocessing( l_dir_file_mtx_10x, __MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr__second_pass__, n_threads = int_num_threads, global_arguments = [ dir_folder_mtx_10x_input, int_target_sum ] )
 
-        l_name_dict = [ 'dict_id_row_to_deviation_from_mean_normalized_count', 'dict_id_row_to_deviation_from_mean_log_transformed_normalized_count' ]
+        l_name_dict_second_pass = [ 'dict_id_row_to_deviation_from_mean_normalized_count', 'dict_id_row_to_deviation_from_mean_log_transformed_normalized_count' ]
         
         ''' combine summarized results '''
-        dict_dict = dict( )
-        for name_dict in l_name_dict :
+        for name_dict in l_name_dict_second_pass :
             dict_dict[ name_dict ] = __Combine_Dictionaries__( dir_folder_mtx_10x_input, name_dict )
-
-#         ''' combine summarized results '''
-#         dict_dict = dict( )
-#         for name_dict in [ 'dict_id_column_to_count', 'dict_id_column_to_n_features', 'dict_id_row_to_n_cells', ] :
-#             l_dir_file = glob.glob( f"{dir_folder_mtx_10x_input}{name_dict}.*" )
-#             counter = collections.Counter( pd.read_csv( l_dir_file[ 0 ], sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( ) ) # initialize counter object with the dictionary from the first file
-#             for dir_file in l_dir_file[ 1 : ] :
-#                 counter = counter + collections.Counter( pd.read_csv( dir_file, sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( ) ) # update counter object using the dictionary from each file
-#             dict_dict[ name_dict ] = dict( counter )
-#             '''remove temporary files '''
-#             for dir_file in l_dir_file :
-#                 os.remove( dir_file )
-#         # retrieve the dictionaries to the the local scope
-#         dict_id_column_to_count = dict_dict[ 'dict_id_column_to_count' ]
-#         dict_id_column_to_n_features = dict_dict[ 'dict_id_column_to_n_features' ]
-#         dict_id_row_to_n_cells = dict_dict[ 'dict_id_row_to_n_cells' ]
-#         # save summarized metrics as files for later use
-#         pd.Series( dict_id_column_to_count ).to_csv( f'{dir_folder_mtx_10x_input}dict_id_column_to_count.tsv.gz', sep = '\t', header = None )
-#         pd.Series( dict_id_column_to_n_features ).to_csv( f'{dir_folder_mtx_10x_input}dict_id_column_to_n_features.tsv.gz', sep = '\t', header = None )
-#         pd.Series( dict_id_row_to_n_cells ).to_csv( f'{dir_folder_mtx_10x_input}dict_id_row_to_n_cells.tsv.gz', sep = '\t', header = None )
+            
+        ''' compose a dataframe containing the summary about the features '''
+        df_summary = pd.DataFrame( { 
+            'n_cells' : pd.Series( dict_id_row_to_n_cells ),
+            'variance_of_count' : pd.Series( dict_dict[ 'dict_id_row_to_deviation_from_mean_count' ] ) / ( int_num_cells - 1 ),
+            'variance_of_log_transformed_count' : pd.Series( dict_dict[ 'dict_id_row_to_deviation_from_mean_log_transformed_count' ] ) / ( int_num_cells - 1 ),
+            'variance_of_normalized_count' : pd.Series( dict_dict[ 'dict_id_row_to_deviation_from_mean_normalized_count' ] ) / ( int_num_cells - 1 ),
+            'variance_of_log_transformed_normalized_count' : pd.Series( dict_dict[ 'dict_id_row_to_deviation_from_mean_log_transformed_normalized_count' ] ) / ( int_num_cells - 1 ),
+            'mean_count' : pd.Series( dict_id_row_to_avg_count ),
+            'mean_log_transformed_count' : pd.Series( dict_id_row_to_avg_log_transformed_count ),
+            'mean_normalized_count' : pd.Series( dict_id_row_to_avg_normalized_count ),
+            'mean_log_transformed_normalized_count' : pd.Series( dict_id_row_to_avg_log_transformed_normalized_count ),
+        } )
+        # read a dataframe containing features
+        df_feature = pd.read_csv( dir_file_input_feature, sep = '\t', header = None )
+        df_feature.columns = [ 'id_feature', 'feature', '10X_type' ]
         
-#         # write the flag
-#         with open( dir_file_flag, 'w' ) as newfile :
-#             newfile.write( 'completed at ' + TIME_GET_timestamp( True ) )
-#     else :
-#         # if summarized counts are already available, load the metrics
-#         dict_id_column_to_count = pd.read_csv( f'{dir_folder_mtx_10x_input}dict_id_column_to_count.tsv.gz', sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( )
-#         dict_id_column_to_n_features = pd.read_csv( f'{dir_folder_mtx_10x_input}dict_id_column_to_n_features.tsv.gz', sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( )
-#         dict_id_row_to_n_cells = pd.read_csv( f'{dir_folder_mtx_10x_input}dict_id_row_to_n_cells.tsv.gz', sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( )
-#     # return summarized metrics
-#     return dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count
-    
-
+        df_summary = df_summary.join( df_feature, how = 'left' ) # add df_feature to the df_summary
+        df_summary.index.name = 'id_row' 
+        df_summary.reset_index( drop = False, inplace = True ) # retrieve id_row as a column
+        df_summary.to_csv( f'{dir_folder_mtx_10x_input}statistical_summary_of_features.int_target_sum__{int_target_sum}.tsv.gz', sep = '\t', index = False ) # save statistical summary as a text file
+        
+        # write the flag
+        with open( dir_file_flag, 'w' ) as newfile :
+            newfile.write( 'completed at ' + TIME_GET_timestamp( True ) )
+    else :
+        ''' if 'MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr' function has been already run on the current folder, read the previously saved result, and return the summary dataframe '''
+        df_summary = pd.read_csv( f'{dir_folder_mtx_10x_input}statistical_summary_of_features.int_target_sum__{int_target_sum}.tsv.gz', sep = '\t' ) # save statistical summary as a text file
+    return df_summary
 dict_id_column_previous_to_id_column_current, dict_id_row_previous_to_id_row_current = dict( ), dict( )
 def __MTX_10X_Filter__filter_mtx_10x__( dir_file_input, dir_folder_mtx_10x_output ) :
     """ # 2022-02-22 02:06:03 
