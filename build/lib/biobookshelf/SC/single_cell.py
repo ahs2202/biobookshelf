@@ -2,103 +2,6 @@ from biobookshelf.main import *
 import pandas as pd
 import numpy as np
 
-def CB_Parse_list_of_id_cell( l_id_cell, dropna = True ) :
-    ''' # 2022-03-25 16:35:23 
-    parse a given list of id_cells into a dataframe using 'SC.CB_detect_cell_barcode_from_id_cell' function
-    'dropna' : drop id_cells that does not contains cell barcodes 
-    '''
-    df = pd.DataFrame( list( [ e ] + list( SC.CB_detect_cell_barcode_from_id_cell( e ) ) for e in l_id_cell ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' )
-    return df
-def CB_Build_dict_id_sample_to_set_cb( l_id_cell ) :
-    ''' # 2022-03-28 22:24:30 
-    Build a set of cell barcode for each id_sample from the given list of id_cells 
-    '''
-    df = CB_Parse_list_of_id_cell( l_id_cell )
-    dict_id_sample_to_set_cb = dict( )
-    for cb, id_sample in df.values :
-        if id_sample not in dict_id_sample_to_set_cb :
-            dict_id_sample_to_set_cb[ id_sample ] = set( )
-        dict_id_sample_to_set_cb[ id_sample ].add( cb )
-    return dict_id_sample_to_set_cb
-def CB_Match_Batch( l_id_cell_1, l_id_cell_2, flag_calculate_proportion_using_l_id_cell_2 = True ) :
-    ''' # 2022-03-28 23:10:43 
-    Find matching batches between two given lists of id_cells by finding the batches sharing the largest number of cell barcodes
-    
-    'l_id_cell_1' : first list of id_cells 
-    'l_id_cell_2' : second list of id_cells
-    'flag_calculate_proportion_using_l_id_cell_2' : if True, finding matching batches using the shared proportion calculated using the cell barcodes from 'l_id_cell_2'. if False, proportion of the matching barcodes will be calculated using the cell barcodes from 'l_id_cell_1'
-    '''
-    # retrieve set of cell barcodes 
-    df_id_cell_1 = CB_Parse_list_of_id_cell( l_id_cell_1 )
-    df_id_cell_2 = CB_Parse_list_of_id_cell( l_id_cell_2 )
-    dict_id_sample_to_set_cb_1 = CB_Build_dict_id_sample_to_set_cb( l_id_cell_1 )
-    dict_id_sample_to_set_cb_2 = CB_Build_dict_id_sample_to_set_cb( l_id_cell_2 )
-
-    # Find matching id_samples of the two given list of id_cells
-    # calculate the proportion of matching cell barcodes between each pair of samples from the two given list of id_cells
-    l_l = [ ]
-    for id_sample_1 in dict_id_sample_to_set_cb_1 :
-        for id_sample_2 in dict_id_sample_to_set_cb_2 :
-            set_cb_1 = dict_id_sample_to_set_cb_1[ id_sample_1 ]
-            set_cb_2 = dict_id_sample_to_set_cb_2[ id_sample_2 ]
-            float_prop_matching_cb = len( set_cb_1.intersection( set_cb_2 ) ) / ( len( set_cb_2 ) if flag_calculate_proportion_using_l_id_cell_2 else len( set_cb_1 ) )
-            l_l.append( [ id_sample_1, id_sample_2, float_prop_matching_cb ] )
-    df = pd.DataFrame( l_l, columns = [ 'id_sample_1', 'id_sample_2', 'float_prop_matching_cb' ] ) # search result
-    df_sample_matched = df.sort_values( 'float_prop_matching_cb', ascending = False ).drop_duplicates( 'id_sample_2', keep = 'first' ).drop_duplicates( 'id_sample_1', keep = 'first' ) # retrieve the best matches between samples so that a unique mapping exists for every sample
-
-    # Find matching id_cells of given two list of id_cells
-    df_id_cell_1.reset_index( inplace = True, drop = False )
-    df_id_cell_2.reset_index( inplace = True, drop = False )
-    df_id_cell_1.rename( columns = { 'id_sample_from_id_cell' : 'id_sample_from_id_cell_1' }, inplace = True )
-    df_id_cell_2.rename( columns = { 'id_sample_from_id_cell' : 'id_sample_from_id_cell_2' }, inplace = True )
-    df_id_cell_1[ 'id_sample_from_id_cell_2' ] = df_id_cell_1.id_sample_from_id_cell_1.apply( MAP.Map( df_sample_matched.set_index( 'id_sample_1' ).id_sample_2.to_dict( ) ).a2b )
-    df_id_cell_1.dropna( subset = [ 'id_sample_from_id_cell_2' ], inplace = True ) # ignore cells without matching id_sample from the '2' batch
-    df_id_cell_1.set_index( [ 'CB', 'id_sample_from_id_cell_2' ], inplace = True )
-    df_id_cell_matched = df_id_cell_1.join( df_id_cell_2[ ~ pd.isnull( df_id_cell_2.id_sample_from_id_cell_2 ) ].set_index( [ 'CB', 'id_sample_from_id_cell_2' ] ), lsuffix = '_1', rsuffix = '_2' ) # match id_cells from two given list of id_cells
-    df_id_cell_matched.reset_index( drop = False, inplace = True )
-    df_id_cell_matched = df_id_cell_matched[ [ 'id_cell_1', 'id_cell_2', 'CB', 'id_sample_from_id_cell_1', 'id_sample_from_id_cell_2' ] ] # reorder columns
-    
-    return df_id_cell_matched
-def SCANPY_Detect_cell_barcode_from_cell_id( adata ) :
-    ''' # 2022-03-24 20:35:22 
-    Detect cell barcodes from id_cell (index of adata.obs), and add new two columns to the adata.obs [ 'CB', 'id_sample_from_id_cell' ]
-    '''
-    adata.obs = adata.obs.join( pd.DataFrame( list( [ e ] + list( SC.CB_detect_cell_barcode_from_id_cell( e ) ) for e in adata.obs.index.values ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' ) )
-def CB_detect_cell_barcode_from_id_cell( id_cell, int_number_atgc_in_cell_barcode = 16 ) :
-    ''' # 2022-02-21 00:03:34 
-    retrieve cell_barcode from id_cell 
-    'int_number_atgc_in_cell_barcode' : number of ATGC characters in the cell barcode
-    '''
-    int_count_atgc = 0
-    int_start_appearance_of_atgc = None
-    set_atgc = set( "ATGC" )
-    
-    def __retrieve_cell_barcode_and_id_channel_from_id_cell__( id_cell, int_start_appearance_of_atgc, int_number_atgc_in_cell_barcode ) :
-        ''' __retrieve_cell_barcode_and_id_channel_from_id_cell__ '''
-        int_cb_start = int_start_appearance_of_atgc
-        int_cb_end = int_start_appearance_of_atgc + int_number_atgc_in_cell_barcode
-        return [ id_cell[ int_cb_start : int_cb_end ], id_cell[ : int_cb_start ] + '|' + id_cell[ int_cb_end : ] ] # return cell_barcode, id_channel
-        
-    for index_c, c in enumerate( id_cell.upper( ) ) : # case-insensitive detection of cell-barcodes
-        if c in set_atgc :
-            if int_start_appearance_of_atgc is None:
-                int_start_appearance_of_atgc = index_c
-            int_count_atgc += 1
-        else :
-            ''' identify cell barcode and return the cell barcode '''
-            if int_start_appearance_of_atgc is not None:
-                if int_count_atgc == int_number_atgc_in_cell_barcode :
-                    return __retrieve_cell_barcode_and_id_channel_from_id_cell__( id_cell, int_start_appearance_of_atgc, int_number_atgc_in_cell_barcode )
-            # initialize the next search
-            int_count_atgc = 0 
-            int_start_appearance_of_atgc = None
-    ''' identify cell barcode and return the cell barcode '''
-    if int_start_appearance_of_atgc is not None:
-        if int_count_atgc == int_number_atgc_in_cell_barcode :
-            return __retrieve_cell_barcode_and_id_channel_from_id_cell__( id_cell, int_start_appearance_of_atgc, int_number_atgc_in_cell_barcode )
-    ''' return None when cell_barcode was not found '''
-    return [ None, None ]
-
 def MTX_10X_Read( dir_folder_mtx_10x, verbose = False ) :
     ''' # 2021-11-24 13:00:13 
     read 10x count matrix
@@ -205,17 +108,11 @@ def __function_for_adjusting_thresholds_for_filtering_empty_droplets__( dir_fold
         else :
             break
     return min_counts, min_features, min_cells
-def MTX_10X_Split( dir_folder_mtx_10x_output, int_max_num_entries_for_chunk = 10000000, flag_split_mtx = True ) :
+def MTX_10X_Split( dir_folder_mtx_10x_output, int_max_num_entries_for_chunk = 10000000 ) :
     ''' # 2022-02-22 00:41:20 
     split input mtx file into multiple files and write a flag file indicating the splitting has been completed. 
     return the list of split mtx files
-    
-    'flag_split_mtx' : if 'flag_split_mtx' is True, split input mtx file into multiple files. if False, does not split the input matrix, and just return the list containing a single path pointing to the input matrix. This flag exists for the compatibility with single-thread operations
     '''
-    # 'flag_split_mtx' : if False, does not split the input matrix, and just return the list containing a single path pointing to the input matrix
-    if not flag_split_mtx :
-        return [ f"{dir_folder_mtx_10x_output}matrix.mtx.gz" ]
-    
     dir_file_flag = f"{dir_folder_mtx_10x_output}matrix.mtx.gz.split.flag"
     if not os.path.exists( dir_file_flag ) : # check whether the flag exists
         index_mtx_10x = 0
@@ -488,7 +385,7 @@ def MTX_10X_Summarize_Counts( dir_folder_mtx_10x_input, verbose = False, int_num
                 print( f'required file(s) is not present at {dir_folder_mtx_10x}' )
 
         ''' split input mtx file into multiple files '''
-        l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx )
+        l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
 
         ''' summarize each split mtx file '''
         Multiprocessing( l_dir_file_mtx_10x, __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__, n_threads = int_num_threads, global_arguments = [ dir_folder_mtx_10x_input ] )
@@ -690,7 +587,7 @@ def MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr( dir_folder_mtx_
                 print( f'required file(s) is not present at {dir_folder_mtx_10x}' )
 
         ''' split input mtx file into multiple files '''
-        l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx )
+        l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
 
         ''' retrieve number of cells, features, and entries from the matrix file '''
         int_num_cells, int_num_features, int_num_entries = MTX_10X_Retrieve_number_of_rows_columns_and_entries( dir_folder_mtx_10x_input )
@@ -845,7 +742,7 @@ def MTX_10X_Filter( dir_folder_mtx_10x_input, dir_folder_mtx_10x_output, min_cou
     df_feature.columns = [ 'id_feature', 'feature', '10X_type' ]
 
     ''' split input mtx file into multiple files '''
-    l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx )
+    l_dir_file_mtx_10x = MTX_10X_Split( dir_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
     
     ''' summarizes counts '''
     dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count = MTX_10X_Summarize_Counts( dir_folder_mtx_10x_input, verbose = verbose, int_num_threads = int_num_threads, flag_split_mtx = flag_split_mtx, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
@@ -923,43 +820,3 @@ def MTX_10X_Filter( dir_folder_mtx_10x_input, dir_folder_mtx_10x_output, min_cou
     # write a flag indicating that the current output directory contains split mtx files
     with open( f"{dir_folder_mtx_10x_output}matrix.mtx.gz.split.flag", 'w' ) as file :
         file.write( 'completed' )
-def MTX_10X_Identify_Highly_Variable_Features( dir_folder_mtx_10x_input, int_target_sum = 10000, verbose = False, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000 ) :
-    ''' # 2022-03-16 17:18:44 
-    calculate variance from log-transformed normalized counts using 'MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr' and rank features based on how each feature is variable compared to other features with similar means.
-    Specifically, polynomial of degree 2 will be fitted to variance-mean relationship graph in order to captures the relationship between variance and mean. 
-    
-    'name_col_for_mean', 'name_col_for_variance' : name of columns of 'df_summary' returned by 'MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr' that will be used to infer highly variable features. By defaults, mean and variance of log-transformed normalized counts will be used.
-    '''
-    
-    # calculate variance and means and load the result
-    df_summary = MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr( dir_folder_mtx_10x_input, int_target_sum = int_target_sum, int_num_threads = int_num_threads, verbose = verbose, flag_split_mtx = flag_split_mtx )
-    
-    # calculate scores for identifying highly variable features for the selected set of count data types: [ 'log_transformed_normalized_count', 'log_transformed_count' ]
-    for name_type in [ 'log_transformed_normalized_count', 'log_transformed_count' ] :
-        name_col_for_mean, name_col_for_variance = f'mean_{name_type}', f'variance_of_{name_type}'
-        # retrieve the relationship between mean and variance
-        arr_mean = df_summary[ name_col_for_mean ].values
-        arr_var = df_summary[ name_col_for_variance ].values
-        mean_var_relationship_fit = np.polynomial.polynomial.Polynomial.fit( arr_mean, arr_var, 2 )
-
-        # calculate the deviation from the estimated variance from the mean
-        arr_ratio_of_variance_to_expected_variance_from_mean = np.zeros( len( df_summary ) )
-        arr_diff_of_variance_to_expected_variance_from_mean = np.zeros( len( df_summary ) )
-        for i in range( len( df_summary ) ) : # iterate list of means of the features
-            var, mean = arr_var[ i ], arr_mean[ i ] # retrieve var and mean
-            var_expected = mean_var_relationship_fit( mean ) # calculate expected variance from the mean
-            if var_expected == 0 : # handle the case when the current expected variance is zero 
-                arr_ratio_of_variance_to_expected_variance_from_mean[ i ] = 1
-                arr_diff_of_variance_to_expected_variance_from_mean[ i ] = 0
-            else :
-                arr_ratio_of_variance_to_expected_variance_from_mean[ i ] = var / var_expected
-                arr_diff_of_variance_to_expected_variance_from_mean[ i ] = var - var_expected
-
-        df_summary[ f'float_ratio_of_variance_to_expected_variance_from_mean_from_{name_type}' ] = arr_ratio_of_variance_to_expected_variance_from_mean
-        df_summary[ f'float_diff_of_variance_to_expected_variance_from_mean_{name_type}' ] = arr_diff_of_variance_to_expected_variance_from_mean
-
-        # calculate the product of the ratio and difference of variance to expected variance for scoring and sorting highly variable features
-        df_summary[ f'float_score_highly_variable_feature_from_{name_type}' ] = df_summary[ f'float_ratio_of_variance_to_expected_variance_from_mean_from_{name_type}' ] * df_summary[ f'float_diff_of_variance_to_expected_variance_from_mean_{name_type}' ]
-
-    df_summary[ 'float_score_highly_variable_feature' ] = list( np.prod( arr_val ) if sum( np.sign( arr_val ) < 0 ) == 0 else 0 for arr_val in df_summary[ [ 'float_score_highly_variable_feature_from_log_transformed_normalized_count', 'float_score_highly_variable_feature_from_log_transformed_count' ] ].values )
-    return df_summary

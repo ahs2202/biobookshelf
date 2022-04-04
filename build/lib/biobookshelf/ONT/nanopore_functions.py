@@ -2,7 +2,7 @@
 from biobookshelf.main import *
 import biobookshelf.PKG as PKG
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = True ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18 ) :
     """
     # 2021-11-10 16:26:32 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
@@ -107,8 +107,6 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
             l_args = [ 'guppy_basecaller' ] 
             if not flag_use_cpu : # use GPU if it exists
                 l_args += [ '--device', 'auto' ]
-            if flag_read_splitting :
-                l_args += [ '--do_read_splitting' ] 
             l_args += [ '--cpu_threads_per_caller', str( int_n_threads ) ]
 
             if id_lib_prep == 'SQK-RBK096' : # change 'id_lib_prep' to guppy-compatible id
