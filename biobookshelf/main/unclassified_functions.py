@@ -6843,7 +6843,23 @@ def GTF_Interval_Tree_Combine( * l_dict_it ) :
             dict_it_combined[ key ].update( dict_it[ key ] ) # combine interval trees of each key into a single interval tree
     return dict_it_combined
 
-# In[ ]:
+def GTF_Search_Overlap( df_gtf1, df_gtf2, col_name_indicating_overlap = 'flag_overlap', inplace = False ) :
+    ''' # 2022-04-16 23:19:32 
+    remove regions in df_gtf1 that overlap with regions in df_gtf2
+    '''
+    ''' read GTF file for 'df_gtf1' if 'df_gtf1' looks like a file path '''
+    if isinstance( df_gtf1, str ) and os.path.exists( df_gtf1 ) :
+        df_gtf1 = GTF_Read( df_gtf1 )
+
+    ''' copy the dataframe if 'inplace' is False '''
+    if not inplace :
+        df_gtf1 = deepcopy( df_gtf1 )
+
+    ''' build interval tree using 'df_gtf2' '''
+    dict_it_gtf2 = GTF_Interval_Tree( df_gtf2, feature = None, value = 'seqname' )
+    ''' find which region of df_gtf1 overlaps with regions of df_gtf2, and add search results as a column in df_gtf1 '''
+    df_gtf1[ col_name_indicating_overlap ] = list( seqname in dict_it_gtf2 and len( dict_it_gtf2[ seqname ][ start - 1 :  end ] ) > 0 for seqname, start, end in df_gtf1[ [ 'seqname', 'start', 'end' ] ].values )
+    return df_gtf1
 
 def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, remove_chr_from_seqname = True, dir_folder_output = None ) :
     ''' # 2021-10-10 01:27:23 
