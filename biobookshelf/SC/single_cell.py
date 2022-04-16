@@ -7,7 +7,7 @@ def CB_Parse_list_of_id_cell( l_id_cell, dropna = True ) :
     parse a given list of id_cells into a dataframe using 'SC.CB_detect_cell_barcode_from_id_cell' function
     'dropna' : drop id_cells that does not contains cell barcodes 
     '''
-    df = pd.DataFrame( list( [ e ] + list( SC.CB_detect_cell_barcode_from_id_cell( e ) ) for e in l_id_cell ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' )
+    df = pd.DataFrame( list( [ e ] + list( CB_detect_cell_barcode_from_id_cell( e ) ) for e in l_id_cell ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' )
     return df
 def CB_Build_dict_id_sample_to_set_cb( l_id_cell ) :
     ''' # 2022-03-28 22:24:30 
@@ -63,7 +63,7 @@ def SCANPY_Detect_cell_barcode_from_cell_id( adata ) :
     ''' # 2022-03-24 20:35:22 
     Detect cell barcodes from id_cell (index of adata.obs), and add new two columns to the adata.obs [ 'CB', 'id_sample_from_id_cell' ]
     '''
-    adata.obs = adata.obs.join( pd.DataFrame( list( [ e ] + list( SC.CB_detect_cell_barcode_from_id_cell( e ) ) for e in adata.obs.index.values ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' ) )
+    adata.obs = adata.obs.join( pd.DataFrame( list( [ e ] + list( CB_detect_cell_barcode_from_id_cell( e ) ) for e in adata.obs.index.values ), columns = [ 'id_cell', 'CB', 'id_sample_from_id_cell' ] ).set_index( 'id_cell' ) )
 def CB_detect_cell_barcode_from_id_cell( id_cell, int_number_atgc_in_cell_barcode = 16 ) :
     ''' # 2022-02-21 00:03:34 
     retrieve cell_barcode from id_cell 
@@ -98,6 +98,8 @@ def CB_detect_cell_barcode_from_id_cell( id_cell, int_number_atgc_in_cell_barcod
             return __retrieve_cell_barcode_and_id_channel_from_id_cell__( id_cell, int_start_appearance_of_atgc, int_number_atgc_in_cell_barcode )
     ''' return None when cell_barcode was not found '''
     return [ None, None ]
+
+
 
 def MTX_10X_Read( dir_folder_mtx_10x, verbose = False ) :
     ''' # 2021-11-24 13:00:13 

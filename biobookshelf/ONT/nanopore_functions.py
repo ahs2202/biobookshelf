@@ -2,7 +2,7 @@
 from biobookshelf.main import *
 import biobookshelf.PKG as PKG
 
-def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = True ) :
+def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, dir_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = False ) :
     """
     # 2021-11-10 16:26:32 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
@@ -28,6 +28,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         parser.add_argument( "-L", "--id_lib_prep", help = "(optional) explicitly define the library sequencing kit used in sequencing. e.g. SQK-LSK109" )
         parser.add_argument( "-B", "--id_barcoding_kit", help = "(optional) explicitly define the library barcoding kit used in sequencing. e.g. EXP-NBD104" )
         parser.add_argument( "-C", "--flag_use_cpu", help = "(optional) use CPU only (use when GPU is not available)", action = 'store_true' )
+        parser.add_argument( "-S", "--flag_read_splitting", help = "(optional) perform read splitting by using the Guppy 6's optional argument", action = 'store_true' )
         parser.add_argument( "-t", "--int_n_threads", help = "(default: 18) number of CPU threads to use", default = '18' )
         args = parser.parse_args( )
 
@@ -40,6 +41,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
         id_barcoding_kit = args.id_barcoding_kit
         flag_use_cpu = args.flag_use_cpu
         int_n_threads = int( args.int_n_threads )
+        flag_read_splitting = args.flag_read_splitting
         
     
     ''' [parse arguments] '''
@@ -129,13 +131,12 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
             for dir_folder_barcode in glob.glob( dir_folder_guppy_output + '*/*/' ) :
                 name_barcode = dir_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
                 dir_file_fastq_gz = f"{dir_folder_guppy_output}{name_barcode}.fastq.gz"
-                OS_FILE_Combine_Files_in_order( glob.glob( f"{dir_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+                OS_Run( [ 'cat' ] + list( glob.glob( f"{dir_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ) ), dir_file_stdout = dir_file_fastq_gz, stdout_binary = True ) # combine fastq files
                 set_dir_file_fastq_gz.add( dir_file_fastq_gz )
         else :
             dir_file_fastq_gz = f"{dir_folder_guppy_output}guppy_basecalled.fastq.gz"
-            OS_FILE_Combine_Files_in_order( glob.glob( dir_folder_guppy_output + '*fastq.gz' ), dir_file_fastq_gz, overwrite_existing_file = True )
+            OS_Run( [ 'cat' ] + list( glob.glob( dir_folder_guppy_output + '*fastq.gz' ) ), dir_file_stdout = dir_file_fastq_gz, stdout_binary = True ) # combine fastq files
             set_dir_file_fastq_gz.add( dir_file_fastq_gz )
-
     ''' copy and combine output fastq files to the output directory '''
     if dir_folder_output_fastq is not None : # if output folder of fastq files was given
         # group 'dir_file_fastq_gz' based on 'name_file'
@@ -147,7 +148,7 @@ def Guppy_Run_and_Combine_Output( dir_folder_nanopore_sequencing_data = None, fl
                 dict_name_file_to_dir[ name_file ] = [ ]
             dict_name_file_to_dir[ name_file ].append( d )
         for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
-            OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{dir_folder_output_fastq}{name_file}" )
+            OS_Run( [ 'cat' ] + dict_name_file_to_dir[ name_file ], dir_file_stdout = f"{dir_folder_output_fastq}{name_file}", stdout_binary = True ) # combine fastq files
 
         
 # def Minimap2_Align( dir_file_fastq, dir_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', dir_folder_minimap2_output = None, n_threads = 20 ) :

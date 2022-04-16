@@ -58,6 +58,8 @@ setup(
         "console_scripts": [
             "biobook-check_plasmid_with_nanopore_sequencing=biobookshelf.ONT.nanopore_functions:Check_plasmid_with_nanopore_sequencing",
             "biobook-run_guppy_and_combine_output=biobookshelf.ONT.nanopore_functions:Guppy_Run_and_Combine_Output",
+            'biobook-Server_Status=biobookshelf.CLI.unclassified_programs:Server_Status',
+            'biobook-Stop_a_job=biobookshelf.CLI.unclassified_programs:Stop_a_job',
         ]
     },
 )

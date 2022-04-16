@@ -11,6 +11,8 @@ biobookshelf.egg-info/dependency_links.txt
 biobookshelf.egg-info/entry_points.txt
 biobookshelf.egg-info/requires.txt
 biobookshelf.egg-info/top_level.txt
+biobookshelf/CLI/__init__.py
+biobookshelf/CLI/unclassified_programs.py
 biobookshelf/INT/__init__.py
 biobookshelf/INT/integer.py
 biobookshelf/IT/__init__.py

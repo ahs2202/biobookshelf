@@ -1466,12 +1466,11 @@ def DF_Explore_Class( df, duplicate_filter = 2 ) :
     'duplicate_filter' : only display class labels that are present in 'duplicate_filter' number of times (or larger)
     """
     for col in df.columns.values :
-        if isinstance( df[ col ].values[ 0 ], str ) : # only display when string data is stored
+        if isinstance( df[ col ].values[ 0 ], ( str, object ) ) : # only display when string data is stored
             s = LIST_COUNT( df[ col ].values, duplicate_filter = duplicate_filter ) # filter classes based on the number of their appearances
             if len( s ) > 0 :
-                print( "👉", col )
+                print( "\n👉", col )
                 display( s )
-                
 
 def DF_from_Anndata( adata ) :
     """ # 2021-11-17 21:23:10 
@@ -8944,3 +8943,32 @@ def Pearsonr( x, y, xm = None, ym = None, normxm = None, normym = None, xm_divid
         return r, prob, xm_divided_by_normxm, ym_divided_by_normym
     else :
         return r, prob
+    
+# functions related to the command line interface
+def Parse_Printed_Table( str_output ) :
+    ''' # 2022-04-05 19:55:37 
+    Parse printed table by identifying the position of columns and inferring datatypes using pandas module
+    '''
+    l_line = str_output.split( '\n' )
+    # survey the number of ' ' space characters in each line
+    int_max_characters_in_each_line = max( len( line ) for line in l_line ) # retrieve the maximum number of characters a line contains
+    arr_space_counter = np.zeros( int_max_characters_in_each_line, dtype = int )
+    for line in l_line :
+        for i, c in enumerate( line ) :
+            if c == ' ' :
+                arr_space_counter[ i ] += 1 
+
+    arr_pos_col_space = np.where( arr_space_counter == max( arr_space_counter ) )[ 0 ] # retrieve positions of the columns of ' ' space characters
+
+    arr_pos_of_columns_marking_the_boundary = [ - 1, arr_pos_col_space[ 0 ] ] + list( arr_pos_col_space[ 1 : ][ np.diff( arr_pos_col_space ) != 1 ] ) + [ int_max_characters_in_each_line + 1 ] # retrieve positions of the columns marking the boundaries
+
+    # collect values
+    l_l = [ ] 
+    for line in l_line :
+        l = [ ]
+        for i in range( len( arr_pos_of_columns_marking_the_boundary ) - 1 ) :
+            col_before, col_after = arr_pos_of_columns_marking_the_boundary[ i : i + 2 ]
+            l.append( line[ col_before + 1 : col_after ].strip( ) )
+        l_l.append( '\t'.join( l ) )
+    df = pd.read_csv( StringIO( '\n'.join( l_l ) ), sep = '\t' )
+    return df
