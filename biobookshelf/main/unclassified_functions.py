@@ -185,11 +185,11 @@ known_reference_genes_including_predicted = [ 60, 203068, 11315, 59, 2597, 6161,
 
 """ AWS functions """
 
-def S3_ls( dir_s3url_folder ) :
+def S3_ls( path_s3url_folder ) :
     """ # 2021-12-09 21:47:34 
     perform ls operation (list files or folders in the given AWS S3 URL directory) using the properly configured AWS-CLI and return a dataframe containing the list of folders and files 
     """
-    l_l = list( line.split( ) for line in OS_Run( [ "aws", "s3", "ls", dir_s3url_folder ], return_output = True )[ 'stdout' ].strip( ).split( '\n' ) )
+    l_l = list( line.split( ) for line in OS_Run( [ "aws", "s3", "ls", path_s3url_folder ], return_output = True )[ 'stdout' ].strip( ).split( '\n' ) )
     df_ls = pd.read_csv( StringIO( '\n'.join( list( '\t'.join( [ '', '', '', l[ 1 ] ] if len( l ) == 2 else l ) for l in l_l ) ) ), sep = '\t', header = None )
     df_ls.columns = [ 'date', 'time', 'size', 'file_name' ]
     return df_ls
@@ -199,12 +199,12 @@ def S3_ls( dir_s3url_folder ) :
 # In[ ]:
 
 
-def Program__Get_Absolute_Path_of_a_File( dir_file ) :
+def Program__Get_Absolute_Path_of_a_File( path_file ) :
     ''' return an absolute path of a directory of a file '''
-    if dir_file[ 0 ] == '/' : return dir_file # if dir_file is an absolute path, return dir_file without modification
+    if path_file[ 0 ] == '/' : return path_file # if path_file is an absolute path, return path_file without modification
     current_working_directory = os.getcwd( ) + '/'
-    if dir_file[ : 2 ] == './' : return current_working_directory + dir_file[ 2 : ]
-    else : return current_working_directory + dir_file
+    if path_file[ : 2 ] == './' : return current_working_directory + path_file[ 2 : ]
+    else : return current_working_directory + path_file
 
 
 # In[ ]:
@@ -613,6 +613,26 @@ def DICTIONARY_Find_keys_with_max_value( dict_value ) :
                 l_key_max.append( key )
     return l_key_max, value_max
 
+def DICTIONARY_Find_keys_with_min_value( dict_value ) : 
+    ''' # 2022-04-20 18:28:51 
+    find a list of key values with the minimum value in a given dictionary, and return 'l_key_min', 'value_min' '''
+    value_min = None # initialize min value
+    l_key_min = [ ] # list of key with min_values
+    if len( dict_value ) != 0 : # if the dictionary is not empty
+        for key in dict_value :
+            value = dict_value[ key ]
+            if value_min is None :
+                value_min = value
+                l_key_min.append( key )
+            elif value_min < value :
+                continue
+            elif value_min > value :
+                # update minimum value and the key of minimum values
+                l_key_min = [ key ]
+                value_min = value
+            elif value_min == value : # if the another key contains the current min value, add the key to the list of keys with min values
+                l_key_min.append( key )
+    return l_key_min, value_min
 
 def DICTIONARY_Merge_Min( * l_dict ) :
     ''' 
@@ -724,31 +744,31 @@ def UTIL_PANDAS_Search_Columns( df, query ) :
 # In[ ]:
 
 
-def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_dir_match = None, return_dataframe = True, retrieve_file_size = False, retrieve_last_modified_time = False, time_offset_in_seconds = 3600 * 9 ) : # 2020-11-16 18:20:52 
+def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_path_match = None, return_dataframe = True, retrieve_file_size = False, retrieve_last_modified_time = False, time_offset_in_seconds = 3600 * 9 ) : # 2020-11-16 18:20:52 
     """ # 2022-01-09 23:25:48 
     retrieve strings in '*' wildcards in list of matched directories for the given string containing '*' wildcards. return strings in wildcards as a nested lists. Consecutive wildcards should not be used ('**' should not be used in the given string)
-    'retrieve_file_size': if 'return_dataframe' is True, return file sizes in bytes by using os.stat( dir_match ).st_size
+    'retrieve_file_size': if 'return_dataframe' is True, return file sizes in bytes by using os.stat( path_match ).st_size
     'retrieve_last_modified_time': return the last modified time with pandas datetime datatype
     'time_offset_in_seconds': offset in seconds to Coordinated Universal Time (UTC) """
-    l_dir_match = glob.glob( str_glob ) if l_dir_match is None else l_dir_match # retrive matched directories using glob.glob if 'l_dir_match' is not given
+    l_path_match = glob.glob( str_glob ) if l_path_match is None else l_path_match # retrive matched directories using glob.glob if 'l_path_match' is not given
     l_intervening_str = str_glob.split( '*' ) # retrive intervening strings in a glob string containing '*' wildcards 
     l_l_str_in_wildcard = list( )
-    for dir_match in l_dir_match : # retrive strings in wildcards for each matched directory
-        dir_match_subset = dir_match.split( l_intervening_str[ 0 ], 1 )[ 1 ]
+    for path_match in l_path_match : # retrive strings in wildcards for each matched directory
+        path_match_subset = path_match.split( l_intervening_str[ 0 ], 1 )[ 1 ]
         l_str_in_wildcard = list( )
         for intervening_str in l_intervening_str[ 1 : ] : 
-            if len( intervening_str ) > 0 : str_in_wildcard, dir_match_subset = dir_match_subset.split( intervening_str, 1 )
-            else : str_in_wildcard, dir_match_subset = dir_match_subset, '' # for the wildcard at the end of the given string, put remaining string into 'str_in_wildcard' and empties 'dir_match_subset'
+            if len( intervening_str ) > 0 : str_in_wildcard, path_match_subset = path_match_subset.split( intervening_str, 1 )
+            else : str_in_wildcard, path_match_subset = path_match_subset, '' # for the wildcard at the end of the given string, put remaining string into 'str_in_wildcard' and empties 'path_match_subset'
             l_str_in_wildcard.append( str_in_wildcard )
         l_l_str_in_wildcard.append( l_str_in_wildcard )
     if return_dataframe : # return dataframe containing strings in wildcards and matched directory
         df = pd.DataFrame( l_l_str_in_wildcard, columns = list( 'wildcard_' + str( index ) for index in range( str_glob.count( '*' ) ) ) )
-        df[ 'dir' ] = l_dir_match
+        df[ 'dir' ] = l_path_match
         if retrieve_file_size : 
-            df[ 'size_in_bytes' ] = list( os.stat( dir_match ).st_size for dir_match in l_dir_match )
+            df[ 'size_in_bytes' ] = list( os.stat( path_match ).st_size for path_match in l_path_match )
             df[ 'size_in_gigabytes' ] = df[ 'size_in_bytes' ] / 2 ** 30
         if retrieve_last_modified_time : 
-            df[ 'time_last_modified' ] = list( datetime.datetime.utcfromtimestamp( os.path.getmtime( dir_file ) + time_offset_in_seconds ).strftime( '%Y-%m-%d %H:%M:%S' ) for dir_file in df.dir.values )
+            df[ 'time_last_modified' ] = list( datetime.datetime.utcfromtimestamp( os.path.getmtime( path_file ) + time_offset_in_seconds ).strftime( '%Y-%m-%d %H:%M:%S' ) for path_file in df.dir.values )
             df.time_last_modified = pd.to_datetime( df.time_last_modified ) # convert to datetime datatype
         return df
     else : return l_l_str_in_wildcard
@@ -761,13 +781,13 @@ def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_dir_match = None, return_data
 # In[ ]:
 
 
-def PICKLE_Write( dir_file, data_object ) :
+def PICKLE_Write( path_file, data_object ) :
     ''' write binary pickle file of a given data_object '''
-    with open( dir_file, 'wb' ) as handle :
+    with open( path_file, 'wb' ) as handle :
         pickle.dump( data_object, handle, protocol = pickle.HIGHEST_PROTOCOL )
-def PICKLE_Read( dir_file ) :
+def PICKLE_Read( path_file ) :
     ''' write binary pickle file of a given data_object '''
-    with open( dir_file, 'rb' ) as handle : 
+    with open( path_file, 'rb' ) as handle : 
         data_object = pickle.load( handle ) 
     return data_object
 
@@ -1481,13 +1501,13 @@ def DF_from_Anndata( adata ) :
         df = adata.to_df( )
     return df
 
-def DF_Transform_without_loading_in_memory( dir_file_dataframe, dir_file_dataframe_transformed, function_transformation, flag_output_gzipped = True, chunksize = 10000, sep = '\t', index = False, header = 0, ** dict_arg_pd_read_csv ) :
+def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataframe_transformed, function_transformation, flag_output_gzipped = True, chunksize = 10000, sep = '\t', index = False, header = 0, ** dict_arg_pd_read_csv ) :
     """ # 2022-03-09 12:49:56 
 
     Apply a given function to a dataframe, except that the entire dataframe will not be loaded into the memory. Instead, a chunk of the dataframe will be loaded.
     
-    'dir_file_dataframe' directory of the dataframe to remove duplicates
-    'dir_file_dataframe_transformed' : an output file directory containing transformed records
+    'path_file_dataframe' directory of the dataframe to remove duplicates
+    'path_file_dataframe_transformed' : an output file directory containing transformed records
     'function_transformation' : a function for transforming dataframes
     'dict_arg_pd_read_csv' : arguments for reading tabular data
     
@@ -1497,10 +1517,10 @@ def DF_Transform_without_loading_in_memory( dir_file_dataframe, dir_file_datafra
     """
     
     # create the pandas dataframe iterator
-    iter_tabular_data = pd.read_csv( dir_file_dataframe, iterator = True, header = header, chunksize = chunksize, sep = sep, ** dict_arg_pd_read_csv ) # concatenate according to a filter to our result dataframe
+    iter_tabular_data = pd.read_csv( path_file_dataframe, iterator = True, header = header, chunksize = chunksize, sep = sep, ** dict_arg_pd_read_csv ) # concatenate according to a filter to our result dataframe
     
     ''' open an output file '''
-    newfile = gzip.open( dir_file_dataframe_transformed, 'wb' ) if flag_output_gzipped else open( dir_file_dataframe_transformed, 'w' )
+    newfile = gzip.open( path_file_dataframe_transformed, 'wb' ) if flag_output_gzipped else open( path_file_dataframe_transformed, 'w' )
     flag_header_was_written = False    
     for df_chunk in iter_tabular_data :
         df_chunk_transformed = function_transformation( df_chunk )
@@ -1511,21 +1531,21 @@ def DF_Transform_without_loading_in_memory( dir_file_dataframe, dir_file_datafra
             flag_header_was_written = True # set the flag indicating the header has been written
         df_chunk_transformed.to_csv( newfile, sep = sep, header = None, index = index )
 
-def DF_Deduplicate_without_loading_in_memory( dir_file_dataframe, dir_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t' ) :
+def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t' ) :
     """
     # 2021-12-25 15:14:24 
 
     similar to pandas.DataFrame.drop_duplicates, except that the dataframe will not be loaded into the memory. duplicates are identified and redundant records will be dropped with keep = 'first' setting
     
-    'dir_file_dataframe' directory of the dataframe to remove duplicates
-    'dir_file_dataframe_deduplicated' : an output file directory containing unique records
+    'path_file_dataframe' directory of the dataframe to remove duplicates
+    'path_file_dataframe_deduplicated' : an output file directory containing unique records
     'l_col_for_identifying_duplicates' : list of column names (should be all string types) if 'flag_header_is_present' is True else list of column indices (should be all integer types)
     
     """
     
     ''' open an output file '''
-    newfile = gzip.open( dir_file_dataframe_deduplicated, 'wb' )
-    with gzip.open( dir_file_dataframe, 'rb' ) as file :
+    newfile = gzip.open( path_file_dataframe_deduplicated, 'wb' )
+    with gzip.open( path_file_dataframe, 'rb' ) as file :
         ''' retrieve list of indices of columns for identifying redundant records '''
         if flag_header_is_present :
             # read header
@@ -1550,13 +1570,13 @@ def DF_Deduplicate_without_loading_in_memory( dir_file_dataframe, dir_file_dataf
                 set_t_val.add( t_val ) # add a unique set of values to the set
     newfile.close( )
     
-def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sorting, delimiter = '\t', key_function_for_sorting = None, l_type = None, int_num_lines_for_a_chunk = 1000000, flag_header_line_exists = True ) :
+def DF_Sort_without_loading_in_memory( path_file, path_file_sorted, l_col_for_sorting, delimiter = '\t', key_function_for_sorting = None, l_type = None, int_num_lines_for_a_chunk = 1000000, flag_header_line_exists = True ) :
     """ # 2021-12-26 20:44:17 
     Sort a large dataframe without loading in memory using a single-thread.
     currently, input and output files should be gzipped (plain text files will be supported soon).
     
     
-    'dir_file' : input file. alternatively, a list of input files can be given. All the input files should be sorted. The files will be merged into a single sorted file. (assumes that all files have the same header line with column names in the same order)
+    'path_file' : input file. alternatively, a list of input files can be given. All the input files should be sorted. The files will be merged into a single sorted file. (assumes that all files have the same header line with column names in the same order)
     'flag_header_line_exists' : flag indicating the input file contains a header line.
     'key_function_for_sorting' : returnining a key for each line from a file for sorting lines
     'l_col_for_sorting' : a list of column names that will be used for sorting. 'flag_header_line_exists' is False, it will be interpreted as a list of column indices for sorting
@@ -1565,15 +1585,15 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
    
     """
     ''' handle input '''
-    flag_merge_multiple_input_files = not isinstance( dir_file, str ) # retrieve a flag indicating that multiple sorted files will be merged into a single sorted file
+    flag_merge_multiple_input_files = not isinstance( path_file, str ) # retrieve a flag indicating that multiple sorted files will be merged into a single sorted file
     l_col_for_sorting = [ l_col_for_sorting ] if isinstance( l_col_for_sorting, ( str, int ) ) else l_col_for_sorting # make 'l_col_for_sorting' as a list of string or integer if just a single string or a single integer has been given
     
     if flag_merge_multiple_input_files :
-        l_dir_file_chunk = dir_file
-        dir_file = l_dir_file_chunk[ 0 ] # use the first file to parse header and retrieve 'key_function_for_sorting'
+        l_path_file_chunk = path_file
+        path_file = l_path_file_chunk[ 0 ] # use the first file to parse header and retrieve 'key_function_for_sorting'
 
     int_index_chunk = 0 # index of each chunk
-    with gzip.open( dir_file, 'rb' ) as file :
+    with gzip.open( path_file, 'rb' ) as file :
         """ retrieve the header line and compose a function for sorting lines if 'key_function_for_sorting' is not given """
         if flag_header_line_exists :
             header_line = file.readline( ) # read header
@@ -1595,7 +1615,7 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
 
         ''' split a single file into smaller sorted files  '''
         if not flag_merge_multiple_input_files :
-            l_dir_file_chunk = [ ] # collect list of chunk files
+            l_path_file_chunk = [ ] # collect list of chunk files
             ''' initialize a chunk '''
             int_n_count_lines = 0
             l_line = [ ]
@@ -1612,10 +1632,10 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
                     ''' sort lines 'in_memory' and save it as a file '''
                     # sort line using 'key_function_for_sorting'
                     l_line.sort( key = key_function_for_sorting )
-                    dir_file_chunk = f"{dir_file_sorted}.chunk_{int_index_chunk}.tsv.gz"
-                    with gzip.open( dir_file_chunk, 'wb' ) as newfile :
+                    path_file_chunk = f"{path_file_sorted}.chunk_{int_index_chunk}.tsv.gz"
+                    with gzip.open( path_file_chunk, 'wb' ) as newfile :
                         newfile.write( b''.join( l_line ) )
-                    l_dir_file_chunk.append( dir_file_chunk ) 
+                    l_path_file_chunk.append( path_file_chunk ) 
 
                     ''' initialize the next chunk '''
                     int_index_chunk += 1
@@ -1627,9 +1647,9 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
                         break
 
     """ merge-sort individually sorted files into a single sorted output file """
-    def __parse_line__( dir_file, flag_header_line_exists = False ) :
+    def __parse_line__( path_file, flag_header_line_exists = False ) :
         ''' Generator of each line for a gzipped file '''
-        with gzip.open( dir_file, "rb" ) as file : 
+        with gzip.open( path_file, "rb" ) as file : 
             ''' read header line '''
             if flag_header_line_exists :
                 file.readline( ) 
@@ -1639,8 +1659,8 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
                     break
                 yield line # return a line
 
-    l_files = [ __parse_line__( dir_file, flag_header_line_exists = ( flag_header_line_exists if flag_merge_multiple_input_files else False ) ) for dir_file in l_dir_file_chunk ]
-    with gzip.open( dir_file_sorted, 'wb' ) as merged_file :
+    l_files = [ __parse_line__( path_file, flag_header_line_exists = ( flag_header_line_exists if flag_merge_multiple_input_files else False ) ) for path_file in l_path_file_chunk ]
+    with gzip.open( path_file_sorted, 'wb' ) as merged_file :
         ''' write a header if header line exists '''
         if flag_header_line_exists :
             merged_file.write( header_line )
@@ -1648,8 +1668,8 @@ def DF_Sort_without_loading_in_memory( dir_file, dir_file_sorted, l_col_for_sort
     
     """ remove temporary files (individually sorted files) """
     if not flag_merge_multiple_input_files :
-        for dir_file_chunk in l_dir_file_chunk :
-            os.remove( dir_file_chunk )
+        for path_file_chunk in l_path_file_chunk :
+            os.remove( path_file_chunk )
 
 def DF_Build_Index_Using_Dictionary( df, l_col_for_index, str_delimiter = None, function_transform = None ) : # 2020-08-06 17:12:59 
     ''' # 2021-09-07 19:34:16 
@@ -5477,7 +5497,7 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
 # In[ ]:
 
 
-def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
+def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
     """ # 2022-02-23 10:55:34 
     split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
     By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
@@ -5491,7 +5511,7 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
     if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
         arr = np.array( arr )
     str_uuid = UUID( ) # create a identifier for making temporary files
-    l_dir_file = list( ) # split inputs given by 'arr' into 'n_threads' number of temporary files
+    l_path_file = list( ) # split inputs given by 'arr' into 'n_threads' number of temporary files
     if col_split_load is not None : # (only valid when 'arr' is dataframe) a name of column for spliting a given dataframe into 'n_threads' number of dataframes. Each unique value in the column will be present in only one split dataframe.
         if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
             if isinstance( col_split_load, ( str ) ) : # if only single column name is given, put it in a list
@@ -5515,9 +5535,9 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
                 l_index = [ ]
                 for t in l_t_for_the_chunk :
                     l_index.extend( dict_index[ t ] )
-                dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-                pd.DataFrame( arr_df[ np.sort( l_index ) ], columns = l_col ).to_csv( dir_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
-                l_dir_file.append( dir_file_temp )
+                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                pd.DataFrame( arr_df[ np.sort( l_index ) ], columns = l_col ).to_csv( path_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
+                l_path_file.append( path_file_temp )
         else :
             print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
             return -1
@@ -5527,30 +5547,30 @@ def Multiprocessing( arr, Function, n_threads = 12, dir_temp = '/tmp/', Function
             n_threads = len( arr )
         if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
             for index_chunk in range( n_threads ) :
-                dir_file_temp = dir_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-                arr.iloc[ index_chunk : : n_threads ].to_csv( dir_file_temp, sep = '\t', index = False )
-                l_dir_file.append( dir_file_temp )
+                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                arr.iloc[ index_chunk : : n_threads ].to_csv( path_file_temp, sep = '\t', index = False )
+                l_path_file.append( path_file_temp )
         else : # if arr is 1d or 2d array, the temporary file will be tsv file without header
             l_chunk = LIST_Split( arr, n_threads )
             for index, arr in enumerate( l_chunk ) : # save temporary files containing inputs
-                dir_file_temp = dir_temp + str_uuid + '_' + str( index ) + '.tsv'
+                path_file_temp = path_temp + str_uuid + '_' + str( index ) + '.tsv'
                 if len( arr.shape ) == 1 : df = pd.DataFrame( arr.reshape( arr.shape[ 0 ], 1 ) )
                 elif len( arr.shape ) == 2 : df = pd.DataFrame( arr )
                 else : print( 'invalid inputs: input array should be 1D or 2D' ); return -1
-                df.to_csv( dir_file_temp, sep = '\t', header = None, index = False )
-                l_dir_file.append( dir_file_temp )
+                df.to_csv( path_file_temp, sep = '\t', header = None, index = False )
+                l_path_file.append( path_file_temp )
 
     if n_threads > 1 :
         with Pool( n_threads ) as p : 
-            l = p.starmap( Function, list( [ dir_file ] + list( global_arguments ) for dir_file in l_dir_file ) ) # use multiple process to run the given function
+            l = p.starmap( Function, list( [ path_file ] + list( global_arguments ) for path_file in l_path_file ) ) # use multiple process to run the given function
     else :
         ''' if n_threads == 1, does not use multiprocessing module '''
-        l = [ Function( l_dir_file[ 0 ], * list( global_arguments ) ) ]
+        l = [ Function( l_path_file[ 0 ], * list( global_arguments ) ) ]
         
     if Function_PostProcessing is not None :
-        Function_PostProcessing( str_uuid, dir_temp, * global_arguments ) 
+        Function_PostProcessing( str_uuid, path_temp, * global_arguments ) 
         
-    for dir_file in glob.glob( dir_temp + str_uuid + '*' ) : os.remove( dir_file ) # remove temporary files
+    for path_file in glob.glob( path_temp + str_uuid + '*' ) : os.remove( path_file ) # remove temporary files
         
     return l # return mapped results
 
@@ -6744,17 +6764,17 @@ def GFF3_Parse_Attribute( attr ) :
     """
     return dict( e.split( '=', 1 ) for e in attr.split( ';' ) if '=' in e )
 
-def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True, flag_verbose = False, ** dict_filter_gtf ) :
+def GTF_Read( path_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_format = True, remove_chr_from_seqname = True, flag_verbose = False, ** dict_filter_gtf ) :
     ''' 
     # 2022-02-08 08:55:37 
     Load gzipped or plain text GTF files into pandas DataFrame. the file's gzipped-status can be explicitly given by 'flag_gtf_gzipped' argument. 
-    'dir_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
+    'path_gtf' : directory to the gtf file or a dataframe containing GTF records to parse attributes
     'parse_attr' : parse gtf attribute if set to True
     'flag_gtf_format' : set this flag to true if the attributes are in GTF format. If it is in GFF3 format, set this flag to False
     'dict_filter_gtf' : keyworded arguments for 'PD_Select', which will be used to filter df_gtf before parsing attributes
     '''
     try :
-        df = pd.read_csv( dir_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( dir_gtf, ( str ) ) else dir_gtf # if 'dir_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
+        df = pd.read_csv( path_gtf, sep = '\t', header  = None, low_memory = False, comment = '#', skip_blank_lines = True ) if isinstance( path_gtf, ( str ) ) else path_gtf # if 'path_gtf' is a string, read the given gtf file from disk using the given directory # ignore comments 
         df.columns = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ]
     except :
         # return empty GTF when an error occurs during reading a GTF file
@@ -6773,7 +6793,7 @@ def GTF_Read( dir_gtf, flag_gtf_gzipped = False, parse_attr = True, flag_gtf_for
         return df.join( pd.DataFrame( list( GTF_Parse_Attribute( attr ) for attr in df.attribute.values ) if flag_gtf_format else list( GFF3_Parse_Attribute( attr ) for attr in df.attribute.values ) ) )
     return df
 
-def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_gff3 = False ) :
+def GTF_Write( df_gtf, path_file, flag_update_attribute = True, flag_filetype_is_gff3 = False ) :
     ''' # 2021-08-24 21:02:08 
     write gtf file as an unzipped tsv file
     'flag_update_attribute' : ignore the 'attribute' column present in the given dataframe 'df_gtf', and compose a new column based on all the non-essential columns of the dataframe.
@@ -6794,22 +6814,22 @@ def GTF_Write( df_gtf, dir_file, flag_update_attribute = True, flag_filetype_is_
             str_attribute = str_attribute.strip( )
             l_attribute_new.append( str_attribute )
         df_gtf[ 'attribute' ] = l_attribute_new # update attributes
-    df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( dir_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
+    df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( path_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
     
-def GTF_Interval_Tree( dir_file_gtf, feature = [ 'gene' ], value = 'gene_name', drop_duplicated_intervals = False ) :
+def GTF_Interval_Tree( path_file_gtf, feature = [ 'gene' ], value = 'gene_name', drop_duplicated_intervals = False ) :
     """ # 2021-11-23 14:25:17 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
-    'dir_file_gtf' : directory to the gtf file or dataframe iteslf
+    'path_file_gtf' : directory to the gtf file or dataframe iteslf
     'feature' : list of features in the gtf to retrieve intervals from the gtf file
     'value' : list of columne names (including GTF attributes) to include as a list of values for each interval in the returned interval tree.
     'drop_duplicated_intervals' : drop duplicated intervals
     """
     # read GTF file
-    if isinstance( dir_file_gtf, ( str ) ) : # if 'dir_file_gtf' is a string object, used the value to read a GTF file.
-        df_gtf = GTF_Read( dir_file_gtf, parse_attr = True )
-    else : # assumes 'dir_file_gtf' is a dataframe containing GTF records if it is not a string object
-        df_gtf = dir_file_gtf
+    if isinstance( path_file_gtf, ( str ) ) : # if 'path_file_gtf' is a string object, used the value to read a GTF file.
+        df_gtf = GTF_Read( path_file_gtf, parse_attr = True )
+    else : # assumes 'path_file_gtf' is a dataframe containing GTF records if it is not a string object
+        df_gtf = path_file_gtf
     # retrieve gtf records of given list of features if valid query is given
     if feature is not None :
         df_gtf = PD_Select( df_gtf, feature = feature ) 
@@ -6861,36 +6881,36 @@ def GTF_Search_Overlap( df_gtf1, df_gtf2, col_name_indicating_overlap = 'flag_ov
     df_gtf1[ col_name_indicating_overlap ] = list( seqname in dict_it_gtf2 and len( dict_it_gtf2[ seqname ][ start - 1 :  end ] ) > 0 for seqname, start, end in df_gtf1[ [ 'seqname', 'start', 'end' ] ].values )
     return df_gtf1
 
-def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, remove_chr_from_seqname = True, dir_folder_output = None ) :
+def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, remove_chr_from_seqname = True, path_folder_output = None ) :
     ''' # 2021-10-10 01:27:23 
     build a bitarray mask of entries in the gtf file (0 = none, 1 = at least one entry exists).
-    if 'dir_folder_output' is given, save the generated mask to the given folder (an empty directory is recommended)
-    if 'dir_folder_output' is given but 'df_gtf' is not given, load the previously generated mask from the 'dir_folder_output'
+    if 'path_folder_output' is given, save the generated mask to the given folder (an empty directory is recommended)
+    if 'path_folder_output' is given but 'df_gtf' is not given, load the previously generated mask from the 'path_folder_output'
     
     'dict_seqname_to_len_seq' : dictionary containing sequence length information of the genome
-    'df_gtf' : directory to gtf file or a dataframe containing gtf. If none is given, load previously generated masks from 'dir_folder_output'
-    'dir_folder_output' : directory to save or load masks
+    'df_gtf' : directory to gtf file or a dataframe containing gtf. If none is given, load previously generated masks from 'path_folder_output'
+    'path_folder_output' : directory to save or load masks
     '''
-    # retrieve the absolute path of the 'dir_folder_output'
-    if dir_folder_output is not None :
-        dir_folder_output = os.path.abspath( dir_folder_output )
-        dir_folder_output += '/'
+    # retrieve the absolute path of the 'path_folder_output'
+    if path_folder_output is not None :
+        path_folder_output = os.path.abspath( path_folder_output )
+        path_folder_output += '/'
     if df_gtf is None :
-        if dir_folder_output is None :
+        if path_folder_output is None :
             print( 'required inputs were not given' )
             return -1 
         else :
-            ''' load mask from the 'dir_folder_output' '''
+            ''' load mask from the 'path_folder_output' '''
             dict_seqname_to_ba = dict( )
-            for seqname, dir_file in GLOB_Retrive_Strings_in_Wildcards( f"{dir_folder_output}*.bin" ).values :
+            for seqname, path_file in GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_output}*.bin" ).values :
                 ba = bitarray( )
-                with open( dir_file, 'rb' ) as file :
+                with open( path_file, 'rb' ) as file :
                     ba.fromfile( file )
                 dict_seqname_to_ba[ seqname ] = ba[ : dict_seqname_to_len_seq[ seqname ] ] # drop additional '0' added to the end of the binary array
             return dict_seqname_to_ba
     # create output folder if it does not exist
-    if not os.path.exists( dir_folder_output ) :
-        os.makedirs( dir_folder_output, exist_ok = True )
+    if not os.path.exists( path_folder_output ) :
+        os.makedirs( path_folder_output, exist_ok = True )
     # remove 'chr' characters from seqnames in the 'dict_seqname_to_len_seq'
     if remove_chr_from_seqname :
         dict_seqname_to_len_seq = dict( ( seqname if seqname[ : 3 ] != 'chr' else seqname[ 3 : ], dict_seqname_to_len_seq[ seqname ] ) for seqname in dict_seqname_to_len_seq )
@@ -6908,9 +6928,9 @@ def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, 
     # handle an empty GTF file
     if len( df_gtf ) == 0 :
         ''' save empty masks as files '''
-        if dir_folder_output is not None :
+        if path_folder_output is not None :
             for seqname in dict_seqname_to_ba :
-                with open( f'{dir_folder_output}{seqname}.bin', 'wb' ) as file : 
+                with open( f'{path_folder_output}{seqname}.bin', 'wb' ) as file : 
                     dict_seqname_to_ba[ seqname ].tofile( file )
         return dict_seqname_to_ba
     if str_feature is not None : # select only specific features form the gtf if query is given 
@@ -6924,15 +6944,15 @@ def GTF_Build_Mask( dict_seqname_to_len_seq, df_gtf = None, str_feature = None, 
             continue
         dict_seqname_to_ba[ seqname ][ start : end ] = 1
     ''' save masks as files '''
-    if dir_folder_output is not None :
+    if path_folder_output is not None :
         for seqname in dict_seqname_to_ba :
-            with open( f'{dir_folder_output}{seqname}.bin', 'wb' ) as file : 
+            with open( f'{path_folder_output}{seqname}.bin', 'wb' ) as file : 
                 dict_seqname_to_ba[ seqname ].tofile( file )
     return dict_seqname_to_ba
 
-def PARSER_EMBL_Format( dir_file ) :
+def PARSER_EMBL_Format( path_file ) :
     ''' Parse EMBL format into DataFrame '''
-    with open( dir_file, 'r' ) as file :
+    with open( path_file, 'r' ) as file :
         l_record = file.read( ).split( '//\n' )
 
     l_dict_field_to_content = list( )
@@ -7033,17 +7053,17 @@ def OS_CPU_and_Memory_Usage( print_summary = True, return_summary_for_each_user 
 
 # In[1]:
 
-def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = None, title = '', excute_cmd_line = False, wait_n_seconds_between_splited_jobs = 5, split = True, l_cmd_line_initialize = [ 'sleep 1', 'echo "Bookshelves PIPELINE Started"', 'date' ], l_server = None, server_replace_home_dir = False, shellscript_use_relative_path = False, dict_id_server_to_dir_home = { 'node210' : '/node210data/', "node01" : '/node01data/', "node200" : '/home/' } ) : # 2020-11-21 16:14:22 
+def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, path_data = None, title = '', excute_cmd_line = False, wait_n_seconds_between_splited_jobs = 5, split = True, l_cmd_line_initialize = [ 'sleep 1', 'echo "Bookshelves PIPELINE Started"', 'date' ], l_server = None, server_replace_home_dir = False, shellscript_use_relative_path = False, dict_id_server_to_path_home = { 'node210' : '/node210data/', "node01" : '/node01data/', "node200" : '/home/' } ) : # 2020-11-21 16:14:22 
     ''' # 2021-01-07 16:34:06 
     (Usage of 'split' argument is deprecated!) For a give list of cmd lines, execute 'n_lines_at_a_time' number of lines at one cycle, wait until all lines are completed, and start another cycle. 
-    if cmd lines are not executed, write a shell script file at the directory given by dir_data if given.
+    if cmd lines are not executed, write a shell script file at the directory given by path_data if given.
     Additinally, report server time when each pipeline starts and when each command is completed. These information can be located by 'grep "Bookshelves"'
     if 'wait_n_seconds_between_splited_jobs' is given, wait n_seconds between initiating each job, so that resources can be evenly distributed and avoid bottle neck.
     Also, add shell command lines in 'l_cmd_line_initialize' at the start of each splitted file.
     
     l_server: should be a subset of [ 'node200', 'node01', 'node210' ]
               write multiple sets of shellscripts for running jobs in multiple servers
-    server_replace_home_dir: if set to True, replace '/__current_server_home_dir__/' string with home directory of each server (useful for jobs requiring high file IO, such as RNA-Seq index or HMM database) 
+    server_replace_home_dir: if set to True, replace '/__current_server_home_path__/' string with home directory of each server (useful for jobs requiring high file IO, such as RNA-Seq index or HMM database) 
     shellscript_use_relative_path : use relative path of child bash shell scripts when multiple shellscripts are run together. Should be set to True when running shellscripts in a docker environment.
     '''
     if len( arr_cmd_line ) == 0 :
@@ -7059,7 +7079,7 @@ def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = No
         n_lines = len( arr_cmd_line_for_a_server )
         name_file = f'{title}__Muitple_Running_{len( arr_cmd_line_for_a_server )}_lines_{str_time_stamp}'
         for index_shell_script in range( n_lines_at_a_time ) :
-            with open( f'{dir_data}{name_file}__splitted_{index_shell_script + 1}.sh', 'w' ) as file :
+            with open( f'{path_data}{name_file}__splitted_{index_shell_script + 1}.sh', 'w' ) as file :
                 arr_cmd_line_for_a_server_splitted = arr_cmd_line_for_a_server[ index_shell_script : : n_lines_at_a_time ]
                 n_line_splitted = len( arr_cmd_line_for_a_server_splitted ) # add echo command line that report the progress of the given jobs for each splitted file 
                 arr_percents = np.round( np.arange( 0, 100, 100 / n_line_splitted ) + 100 / n_line_splitted, 1 )
@@ -7069,23 +7089,23 @@ def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = No
                 if wait_n_seconds_between_splited_jobs : file.write( f'sleep {int( ( index_shell_script + 1 ) * wait_n_seconds_between_splited_jobs )}\n{str_shell_script}' ) # if 'wait_n_seconds_between_splited_jobs' is given, wait n_seconds between initiating each job, so that resources can be evenly distributed and avoid bottle neck.
                 else : file.write( str_shell_script ) # add shell command lines in 'l_cmd_line_initialize' at the start of each splitted file.
         if n_lines_at_a_time > 1 :
-            with open( f'{dir_data}{name_file}.sh', 'w' ) as file :
+            with open( f'{path_data}{name_file}.sh', 'w' ) as file :
                 if not shellscript_use_relative_path :
-                    file.write( f"cd {dir_data}\n" )
-                file.write( ' & '.join( list( f'bash {name_file if shellscript_use_relative_path else dir_data + name_file}__splitted_{index_shell_script + 1}.sh' for index_shell_script in range( n_lines_at_a_time ) ) ) + '\nwait' )
-        else : os.rename( f'{dir_data}{name_file}__splitted_{index_shell_script + 1}.sh', dir_data + f'{name_file}.sh' )
+                    file.write( f"cd {path_data}\n" )
+                file.write( ' & '.join( list( f'bash {name_file if shellscript_use_relative_path else path_data + name_file}__splitted_{index_shell_script + 1}.sh' for index_shell_script in range( n_lines_at_a_time ) ) ) + '\nwait' )
+        else : os.rename( f'{path_data}{name_file}__splitted_{index_shell_script + 1}.sh', path_data + f'{name_file}.sh' )
     else : # if cmd_lines are run on multiple servers
         n_servers = len( l_server )
         for index_server, id_server in enumerate( l_server ) : # for each server
             arr_cmd_line_for_a_server = arr_cmd_line[ index_server : : n_servers ] # retrieve cmd_line_for_each_server
-            dir_home_current_server = dict_id_server_to_dir_home[ id_server ]
+            path_home_current_server = dict_id_server_to_path_home[ id_server ]
             if server_replace_home_dir : # replace home directory in 'cmd_line' to the current server's home directory
-                arr_cmd_line_for_a_server = np.array( list( cmd_line.replace( '/__current_server_home_dir__/', dir_home_current_server ) for cmd_line in arr_cmd_line_for_a_server ), dtype = object ) # modify the absolute path to match the dir_folder_data_server for each server
+                arr_cmd_line_for_a_server = np.array( list( cmd_line.replace( '/__current_server_home_path__/', path_home_current_server ) for cmd_line in arr_cmd_line_for_a_server ), dtype = object ) # modify the absolute path to match the path_folder_data_server for each server
             n_lines = len( arr_cmd_line_for_a_server )
             n_lines_at_a_time_server = n_lines_at_a_time if n_lines >= n_lines_at_a_time else n_lines # if number of command lines is larger than current 'n_lines_at_a_time', set 'n_lines' as 'n_lines_at_a_time_server' for the current server
             name_file = f'{id_server}.{title}__Muitple_Running_{len( arr_cmd_line_for_a_server )}_lines_{str_time_stamp}'
             for index_shell_script in range( n_lines_at_a_time_server ) :
-                with open( f'{dir_data}{name_file}__splitted_{index_shell_script + 1}.sh', 'w' ) as file :
+                with open( f'{path_data}{name_file}__splitted_{index_shell_script + 1}.sh', 'w' ) as file :
                     arr_cmd_line_for_a_server_splitted = arr_cmd_line_for_a_server[ index_shell_script : : n_lines_at_a_time_server ]
                     n_line_splitted = len( arr_cmd_line_for_a_server_splitted ) # add echo command line that report the progress of the given jobs for each splitted file 
                     arr_percents = np.round( np.arange( 0, 100, 100 / n_line_splitted ) + 100 / n_line_splitted, 1 )
@@ -7095,11 +7115,11 @@ def OS_PIPELINE_Multiple_Running( arr_cmd_line, n_lines_at_a_time, dir_data = No
                     if wait_n_seconds_between_splited_jobs : file.write( f'sleep {int( ( index_shell_script + 1 ) * wait_n_seconds_between_splited_jobs )}\n{str_shell_script}' ) # if 'wait_n_seconds_between_splited_jobs' is given, wait n_seconds between initiating each job, so that resources can be evenly distributed and avoid bottle neck.
                     else : file.write( str_shell_script ) # add shell command lines in 'l_cmd_line_initialize' at the start of each splitted file.
             if n_lines_at_a_time_server > 1 :
-                with open( dir_data + '{name_file}.sh'.format( name_file = name_file ), 'w' ) as file :
+                with open( path_data + '{name_file}.sh'.format( name_file = name_file ), 'w' ) as file :
                     if not shellscript_use_relative_path :
-                        file.write( f"cd {dir_data}\n" )
-                    file.write( ' & '.join( list( f'bash {name_file if shellscript_use_relative_path else dir_data + name_file}__splitted_{index_shell_script + 1}.sh' for index_shell_script in range( n_lines_at_a_time_server ) ) ) + '\nwait' )
-            else : os.rename( f'{dir_data}{name_file}__splitted_1.sh', f'{dir_data}{name_file}.sh' )
+                        file.write( f"cd {path_data}\n" )
+                    file.write( ' & '.join( list( f'bash {name_file if shellscript_use_relative_path else path_data + name_file}__splitted_{index_shell_script + 1}.sh' for index_shell_script in range( n_lines_at_a_time_server ) ) ) + '\nwait' )
+            else : os.rename( f'{path_data}{name_file}__splitted_1.sh', f'{path_data}{name_file}.sh' )
     return f'{title}__Muitple_Running_{len( arr_cmd_line_for_a_server )}_lines_{str_time_stamp}' # return a filename to help to identify shellscripts written by the function
 
 OS_PIPELINE_Muitple_Running = OS_PIPELINE_Multiple_Running
@@ -7114,12 +7134,12 @@ def OS_PIPELINE_Run_Until_Passed( l_popenargs, Func_check_passed, dict_args_Func
      """
     str_id = UUID( ) # retrieve uuid of the current process
 
-    dir_file_stdout = '/tmp/{uuid}.out.txt'.format( uuid = str_id ) # define stdout and stdin files
-    dir_file_stderr = '/tmp/{uuid}.err.txt'.format( uuid = str_id )
+    path_file_stdout = '/tmp/{uuid}.out.txt'.format( uuid = str_id ) # define stdout and stdin files
+    path_file_stderr = '/tmp/{uuid}.err.txt'.format( uuid = str_id )
 
     while True :
-        with open( dir_file_stdout, 'w+' ) as fout : # excute and read std output and std errors of a process
-            with open( dir_file_stderr, 'w+' ) as ferr :
+        with open( path_file_stdout, 'w+' ) as fout : # excute and read std output and std errors of a process
+            with open( path_file_stderr, 'w+' ) as ferr :
                 out = subprocess.call( l_popenargs, stdout = fout, stderr = ferr )
                 fout.seek( 0 )
                 stdout = fout.read( )
@@ -7127,8 +7147,8 @@ def OS_PIPELINE_Run_Until_Passed( l_popenargs, Func_check_passed, dict_args_Func
                 stderr = ferr.read( )
         if Func_check_passed( stdout, stderr, ** dict_args_Func_check_passed ) : break
 
-    os.remove( dir_file_stdout ) # remove temporary files
-    os.remove( dir_file_stderr )
+    os.remove( path_file_stdout ) # remove temporary files
+    os.remove( path_file_stderr )
 
 
 # In[ ]:
@@ -7151,9 +7171,9 @@ def OS_Memory( ) :
             
     return dict_mem
 
-def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False, flag_bgzip_output = True, int_byte_chuck = 100000 ) : # 2020-07-20 11:47:29 
+def OS_FILE_Combine_Files_in_order( l_path_file, path_newfile, overwrite_existing_file = False, delete_input_files = False, header = None, remove_n_lines = 0, flag_use_header_from_first_file = False, flag_bgzip_output = True, int_byte_chuck = 100000 ) : # 2020-07-20 11:47:29 
     ''' # 2021-10-28 10:58:38 
-    combine contents of files in l_dir_file and write at dir_newfile. if header is given, append header (string type with \n at the end) at the front of the file. if 'remove_n_lines' > 0, remove n lines from each files.
+    combine contents of files in l_path_file and write at path_newfile. if header is given, append header (string type with \n at the end) at the front of the file. if 'remove_n_lines' > 0, remove n lines from each files.
     gzipped files are also supported. However, when input files have mixed gzipped status (i.e. first file is gzipped, while second file is a plain text file), it will cause a TypeError.
     Mixed Bgzip and gzipped statues are allowed.
     
@@ -7162,40 +7182,40 @@ def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_
     'int_byte_chuck' : the size of the chuck to be read/write when the input file and output file has different datatype (input file = binary file, output file = plain text, or vice versa)
     '''
     # check the validity of inputs
-    if os.path.exists( dir_newfile ) and not overwrite_existing_file : 
+    if os.path.exists( path_newfile ) and not overwrite_existing_file : 
         print( "[OS_FILE_Combine_Files_in_order][ERROR] output file already exists" )
         return -1 
-    if len( l_dir_file ) == 0 : 
+    if len( l_path_file ) == 0 : 
         print( "[OS_FILE_Combine_Files_in_order][ERROR] given list of files is empty" )
         return -1
     
     # set flags of input/output filetypes
-    str_output_file_extension = dir_newfile.rsplit( '.', 1 )[ 1 ] # retrieve the file extension of the output files
+    str_output_file_extension = path_newfile.rsplit( '.', 1 )[ 1 ] # retrieve the file extension of the output files
     bool_flag_gzipped_output = str_output_file_extension in [ 'gz', 'bgz' ] # set boolean flag for gzipped output file
     bool_flag_bgzipped_output = str_output_file_extension == 'bgz' or flag_bgzip_output # set boolean flag for block-gzipped output file # if 'flag_bgzip_output' is True, write a block-gzipped file even though the output file extension is '.gz'
-    bool_flag_gzipped_input = l_dir_file[ 0 ].rsplit( '.', 1 )[ 1 ] in [ 'gz', 'bgz' ] # set boolean flag for gzipped input file
+    bool_flag_gzipped_input = l_path_file[ 0 ].rsplit( '.', 1 )[ 1 ] in [ 'gz', 'bgz' ] # set boolean flag for gzipped input file
 
     ''' open an output file '''
     if bool_flag_gzipped_output :
         if bool_flag_bgzipped_output :
-            newfile = Bio.bgzf.BgzfWriter( dir_newfile, 'wb' ) # open bgzip file
+            newfile = Bio.bgzf.BgzfWriter( path_newfile, 'wb' ) # open bgzip file
         else :
-            newfile = gzip.open( dir_newfile, 'wb' ) # open simple gzip file
+            newfile = gzip.open( path_newfile, 'wb' ) # open simple gzip file
     else :
-        newfile = open( dir_newfile, 'w' ) # open plain text file
+        newfile = open( path_newfile, 'w' ) # open plain text file
 
     ''' write a header to the output file '''
     if flag_use_header_from_first_file : # if a flag indicating copying header from the first file to the new file is set, open the first file and read the header line
-        dir_file = l_dir_file[ 0 ]
-        with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
+        path_file = l_path_file[ 0 ]
+        with ( gzip.open( path_file, 'rb' ) if bool_flag_gzipped_input else open( path_file, 'r' ) ) as file :
             header = file.readline( )
     if header : 
         header = header.decode( ) if not isinstance( header, ( str ) ) else header # convert header byte string to string if header is not a string type
         newfile.write( ( header.encode( ) if bool_flag_gzipped_output else header ) ) # write a header line to the output file 
 
     ''' copy input files to the output file '''
-    for dir_file in l_dir_file :
-        with ( gzip.open( dir_file, 'rb' ) if bool_flag_gzipped_input else open( dir_file, 'r' ) ) as file :
+    for path_file in l_path_file :
+        with ( gzip.open( path_file, 'rb' ) if bool_flag_gzipped_input else open( path_file, 'r' ) ) as file :
             if remove_n_lines : 
                 for index in range( remove_n_lines ) : file.readline( )
             if not( bool_flag_gzipped_output ^ bool_flag_gzipped_input ) : # if output & input are both binary or plain text (should be same datatype), simply copy byte to byte
@@ -7208,7 +7228,7 @@ def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_
                     newfile.write( content.encode( ) if bool_flag_gzipped_output else content.decode(  ) )
     newfile.close( )
     if delete_input_files :
-        for dir_file in l_dir_file : os.remove( dir_file )
+        for path_file in l_path_file : os.remove( path_file )
 
 
 # ## Function Specific to a Project
@@ -7217,63 +7237,63 @@ def OS_FILE_Combine_Files_in_order( l_dir_file, dir_newfile, overwrite_existing_
 
 # In[ ]:
 
-def OS_Run( l_args, dir_file_stdout = None, dir_file_stderr = None, return_output = True, remove_default_output_files = True, stdout_binary = False ) :
+def OS_Run( l_args, path_file_stdout = None, path_file_stderr = None, return_output = True, remove_default_output_files = True, stdout_binary = False ) :
     """ # 2021-03-30 19:41:16 
     Run a process and save stdout and stderr as a file.
     
     'return_output' : return the output as dictionary of strings
-    'remove_default_output_files' : remove default stdout and stderr files containing the output of the process when 'dir_file_stdout' and 'dir_file_stderr' were not given.
+    'remove_default_output_files' : remove default stdout and stderr files containing the output of the process when 'path_file_stdout' and 'path_file_stderr' were not given.
     'stdout_binary' : set this flag to True if stdout is binary.
     """
     uuid_process = UUID( ) # set uuid of the process
     # define default stdout and stdin files and set approproate flags
-    flag_dir_file_stdout_was_given = dir_file_stdout is not None
-    flag_dir_file_stderr_was_given = dir_file_stderr is not None
+    flag_path_file_stdout_was_given = path_file_stdout is not None
+    flag_path_file_stderr_was_given = path_file_stderr is not None
     
     # default stdout/stderr files will be written to the current working directory
-    dir_cwd = os.getcwd( )
-    if not flag_dir_file_stdout_was_given :
-        dir_file_stdout = f'{dir_cwd}/{uuid_process}.out.txt'
-    if not flag_dir_file_stderr_was_given :
-        dir_file_stderr = f'{dir_cwd}/{uuid_process}.err.txt'
+    path_cwd = os.getcwd( )
+    if not flag_path_file_stdout_was_given :
+        path_file_stdout = f'{path_cwd}/{uuid_process}.out.txt'
+    if not flag_path_file_stderr_was_given :
+        path_file_stderr = f'{path_cwd}/{uuid_process}.err.txt'
     
-    with open( dir_file_stdout, 'w+b' if stdout_binary else 'w+' ) as fout : # excute and read std output and std errors of a process
-        with open( dir_file_stderr, 'w+' ) as ferr :
+    with open( path_file_stdout, 'w+b' if stdout_binary else 'w+' ) as fout : # excute and read std output and std errors of a process
+        with open( path_file_stderr, 'w+' ) as ferr :
             out = subprocess.call( l_args, stdout = fout, stderr = ferr )
             fout.seek( 0 )
             stdout = fout.read( )
             ferr.seek( 0 ) 
             stderr = ferr.read( )
     # remove default output files
-    if not flag_dir_file_stdout_was_given :
-        os.remove( dir_file_stdout )
-    if not flag_dir_file_stderr_was_given :
-        os.remove( dir_file_stderr )
+    if not flag_path_file_stdout_was_given :
+        os.remove( path_file_stdout )
+    if not flag_path_file_stderr_was_given :
+        os.remove( path_file_stderr )
             
     return { 'stdout' : stdout, 'stderr' : stderr } if return_output else None
 
-def OS_Download( url_remote, dir_destination, download_file = True ) :
+def OS_Download( url_remote, path_destination, download_file = True ) :
     """ # 2021-04-19 20:29:02 
     download a remote file or folder (recursively) using wget program in Linux
     'url_remote' : URL of remote file or folder
-    'dir_destination' : destination directory to save the remote file or folder
-    'download_file' : FLAG for downloading a remote file. To download directory, set this flag to False. This flag is automatically set to False if given 'dir_destination' or 'url_remote' ends with '/'
+    'path_destination' : destination directory to save the remote file or folder
+    'download_file' : FLAG for downloading a remote file. To download directory, set this flag to False. This flag is automatically set to False if given 'path_destination' or 'url_remote' ends with '/'
     """
-    if url_remote[ -1 ] == '/' or dir_destination[ -1 ] == '/' : # automatically set 'download_file' FLAG to False if given 'dir_destination' or 'url_remote' ends with '/'
+    if url_remote[ -1 ] == '/' or path_destination[ -1 ] == '/' : # automatically set 'download_file' FLAG to False if given 'path_destination' or 'url_remote' ends with '/'
         download_file = False
         # add '/' to the end of directories (for consistency)
         if url_remote[ -1 ] != '/' :
             url_remote += '/'
-        if dir_destination[ -1 ] != '/' :
-            dir_destination += '/'
+        if path_destination[ -1 ] != '/' :
+            path_destination += '/'
     # create destination folder if it does not exist
     if download_file :
-        os.makedirs( dir_destination.rsplit( '/', 1 )[ 0 ] + '/', exist_ok = True )     
+        os.makedirs( path_destination.rsplit( '/', 1 )[ 0 ] + '/', exist_ok = True )     
     else :
-        os.makedirs( dir_destination, exist_ok = True )     
+        os.makedirs( path_destination, exist_ok = True )     
     l_args = [ 'wget', '--retry-connrefused', '--waitretry=1', '--read-timeout=20', '--timeout=15', '-t', '0' ]
     l_args.extend( [ '-O' ] if download_file else [ '-R', 'index.html', "--recursive", "--no-parent", "--no-host-directorie", '-P' ] )
-    OS_Run( l_args + [ dir_destination, url_remote ], dir_file_stdout = f"{dir_destination}.wget.stdout.out", dir_file_stderr = f"{dir_destination}.wget.stderr.out" )
+    OS_Run( l_args + [ path_destination, url_remote ], path_file_stdout = f"{path_destination}.wget.stdout.out", path_file_stderr = f"{path_destination}.wget.stderr.out" )
     
 
 def TE_eQTL_Swarm_Plot( df_expr, df_genotype, index_entry, index_genotype ) :
@@ -7288,10 +7308,10 @@ def TE_eQTL_Swarm_Plot( df_expr, df_genotype, index_entry, index_genotype ) :
 # In[ ]:
 
 
-def EMBL_Load_into_DataFrame( dir_file ) :
+def EMBL_Load_into_DataFrame( path_file ) :
     ''' Read EMBL format annotation of a given file (should be unzipped) and parse annotations into a DataFrame '''
     l_dict_record = list( )
-    with open( dir_file, 'r' ) as file :
+    with open( path_file, 'r' ) as file :
         while True :
             dict_record = dict( )
             while True :
@@ -7572,16 +7592,16 @@ def SAM_Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_
         return l_seg, int_total_aligned_length
 
 
-def FASTA_Iterate( dir_file_fasta, remove_space_in_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
+def FASTA_Iterate( path_file_fasta, remove_space_in_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
     ''' # 2021-12-28 20:27:27 
-    for a file-like object of file of 'dir_file_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
+    for a file-like object of file of 'path_file_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
     'header_split_at_space' : split a header at the first space, and use the string before the first space as a header string
     '''
     bool_flag_input_gzipped = False
-    if hasattr( dir_file_fasta, 'readline' ) : file = dir_file_fasta # if file-like object was given instead of dir_file_fasta, use dir_file_fasta as file
+    if hasattr( path_file_fasta, 'readline' ) : file = path_file_fasta # if file-like object was given instead of path_file_fasta, use path_file_fasta as file
     else : 
-        bool_flag_input_gzipped = dir_file_fasta[ - 3 : ] == '.gz' 
-        file = gzip.open( dir_file_fasta, 'rb' ) if bool_flag_input_gzipped else open( dir_file_fasta, 'r' ) # open file of dir_file_fasta depending on the detected gzipped status
+        bool_flag_input_gzipped = path_file_fasta[ - 3 : ] == '.gz' 
+        file = gzip.open( path_file_fasta, 'rb' ) if bool_flag_input_gzipped else open( path_file_fasta, 'r' ) # open file of path_file_fasta depending on the detected gzipped status
     line = ( file.readline( ).decode( ) if bool_flag_input_gzipped else file.readline( ) )[ : -1 ]
     while True :
         str_header = line
@@ -7600,19 +7620,19 @@ def FASTA_Iterate( dir_file_fasta, remove_space_in_header = False, header_split_
         if not line : break
     file.close( ) # close the file
 
-def FASTA_Read( dir_file_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
+def FASTA_Read( path_file_fasta, print_message = False, remove_space_in_header = False, return_dataframe = False, parse_uniprot_header = False, header_split_at_space = False ) : # 2020-08-21 14:38:09 
     ''' # 2021-12-28 20:19:44 
-    for a file-like object of file of 'dir_file_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
+    for a file-like object of file of 'path_file_fasta' directory, parse the content into a dictionary. 'remove_space_in_header' option remove space in the header line (required for ABySS output)
     'parse_uniprot_header': if set to True and 'return_dataframe' is set to True, parse uniprot sequence header into [ 'accession', 'description', 'uniprot_source', 'uniprot_acc', 'uniprot_name' ]
     'header_split_at_space' : split a header at the first space, and use the string before the first space as a header string
     '''
     dict_header_to_seq = dict( )
     dict_duplicated_header_count = dict( )
     bool_flag_input_gzipped = False
-    if hasattr( dir_file_fasta, 'readline' ) : file = dir_file_fasta # if file-like object was given instead of dir_file_fasta, use dir_file_fasta as file
+    if hasattr( path_file_fasta, 'readline' ) : file = path_file_fasta # if file-like object was given instead of path_file_fasta, use path_file_fasta as file
     else : 
-        bool_flag_input_gzipped = dir_file_fasta[ - 3 : ] == '.gz' 
-        file = gzip.open( dir_file_fasta, 'rb' ) if bool_flag_input_gzipped else open( dir_file_fasta, 'r' ) # open file of dir_file_fasta depending on the detected gzipped status
+        bool_flag_input_gzipped = path_file_fasta[ - 3 : ] == '.gz' 
+        file = gzip.open( path_file_fasta, 'rb' ) if bool_flag_input_gzipped else open( path_file_fasta, 'r' ) # open file of path_file_fasta depending on the detected gzipped status
     line = ( file.readline( ).decode( ) if bool_flag_input_gzipped else file.readline( ) )[ : -1 ]
     while True :
         str_header = line
@@ -7685,11 +7705,11 @@ def FASTA_Assembly_Stats( dict_fasta = None, arr_length = None, flag_arr_length_
 # In[ ]:
 
 
-def FASTA_Write( dir_file_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False, int_num_characters_for_each_line = 60 ) :
+def FASTA_Write( path_file_fasta, dict_fasta = None, l_id = None, l_seq = None, overwrite_existing_file = False, int_num_characters_for_each_line = 60 ) :
     '''  # 2022-01-12 17:16:43 (improved performance when writing very large fasta file, such as human genome sequence)
     'int_num_characters_for_each_line' : insert the newline character for every 'int_num_characters_for_each_line' number of characters.
     write fasta file at the given directory with dict_fastq (key = fasta_header, value = seq) or given list of id (fasta_header) and seq 
-    write gzipped fasta file if 'dir_file_fasta' ends with '.gz'
+    write gzipped fasta file if 'path_file_fasta' ends with '.gz'
     '''
     
     ''' if 'dict_fasta' was given, compose 'dict_fasta' from the lists of 'l_id' and 'l_seq'. '''
@@ -7703,11 +7723,11 @@ def FASTA_Write( dir_file_fasta, dict_fasta = None, l_id = None, l_seq = None, o
     
     ''' open file '''
     # detect gzipped status of the output file
-    flag_file_gzipped = dir_file_fasta.rsplit( '.', 1 )[ 1 ] == 'gz' 
-    if os.path.exists( dir_file_fasta ) and not overwrite_existing_file : 
+    flag_file_gzipped = path_file_fasta.rsplit( '.', 1 )[ 1 ] == 'gz' 
+    if os.path.exists( path_file_fasta ) and not overwrite_existing_file : 
         print( 'the file already exists' )
         return -1
-    with gzip.open( dir_file_fasta, 'wb' ) if flag_file_gzipped else open( dir_file_fasta, 'w' ) as newfile :
+    with gzip.open( path_file_fasta, 'wb' ) if flag_file_gzipped else open( path_file_fasta, 'w' ) as newfile :
         for str_id in dict_fasta :
             seq = dict_fasta[ str_id ]
             len_seq = len( seq )
@@ -8035,11 +8055,11 @@ def GTF_Visualize_Intervals_with_Exons_and_Introns( start, end, arr_intervals_of
 # In[ ]:
 
 
-def STAR_Read_Log( dir_glob ) :
+def STAR_Read_Log( path_glob ) :
     """read STAR final out logs file using a given glob string and return a dataframe"""
     dict_filename_to_dict_STAR_log = dict( )
-    for dir_file in glob.glob(dir_glob):
-        with open(dir_file) as file :
+    for path_file in glob.glob(path_glob):
+        with open(path_file) as file :
             l_line = file.read().split("\n")  
         dict_STAR_log = dict()
         for key,value in list(line.strip().split(" |\t") for line in Search_list_of_strings_with_multiple_query(l_line, "\t")):
@@ -8050,7 +8070,7 @@ def STAR_Read_Log( dir_glob ) :
             except ValueError :
                 pass
             dict_STAR_log[key] = value
-        dict_filename_to_dict_STAR_log[dir_file.rsplit("/",1)[1]] = dict_STAR_log
+        dict_filename_to_dict_STAR_log[path_file.rsplit("/",1)[1]] = dict_STAR_log
     df_STAR_log = pd.DataFrame(dict_filename_to_dict_STAR_log)
     return df_STAR_log
 
@@ -8076,9 +8096,9 @@ def ANNO_Ensembl_to_Entrez( df ) :
 # In[ ]:
 
 
-def STAR_Parse_final_out( dir_file, return_numeric = False ) :
+def STAR_Parse_final_out( path_file, return_numeric = False ) :
     ''' parse final.out output file from STAR and return a series containing parsed values '''
-    with open( dir_file ) as file : l_value = list( line.strip( ).split( ' |\t' ) for line in file.read( ).split( '\n' ) if ' |\t' in line )
+    with open( path_file ) as file : l_value = list( line.strip( ).split( ' |\t' ) for line in file.read( ).split( '\n' ) if ' |\t' in line )
     s = pd.DataFrame( l_value, columns = [ 'field', 'value' ] ).set_index( 'field' ).value
     if return_numeric :
         s.iloc[ : ] = list( value if ':' in value else float( value.replace( '%', '' ) ) for value in s.values )
@@ -8090,14 +8110,14 @@ def STAR_Parse_final_out( dir_file, return_numeric = False ) :
 # In[ ]:
 
 
-def FASTQ_Iterate( dir_file, return_only_at_index = None ) :
+def FASTQ_Iterate( path_file, return_only_at_index = None ) :
     """ # 2020-12-09 22:22:34 
     iterate through a given fastq file.
     'return_only_at_index' : return value only at the given index. For example, for when 'return_only_at_index' == 1, return sequence only.
     """
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
-    bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
-    with gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file ) as file :
+    bool_flag_file_gzipped = '.gz' in path_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
+    with gzip.open( path_file, 'rb' ) if bool_flag_file_gzipped else open( path_file ) as file :
         while True :
             record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
             if len( record[ 0 ] ) == 0 : break
@@ -8105,17 +8125,17 @@ def FASTQ_Iterate( dir_file, return_only_at_index = None ) :
             else : yield record
                     
                     
-def FASTQ_Read( dir_file, return_only_at_index = None, flag_add_qname = True ) : # 2020-08-18 22:31:31 
+def FASTQ_Read( path_file, return_only_at_index = None, flag_add_qname = True ) : # 2020-08-18 22:31:31 
     ''' # 2021-08-25 07:06:50 
     read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
     'flag_add_qname' : add a column containing qname in the bam file (space-split read name without '@' character at the start of the read name)
     '''
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
-    bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
+    bool_flag_file_gzipped = '.gz' in path_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
     l_seq = list( )
     l_l_values = list( )
     ''' read fastq file '''
-    file = gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file )
+    file = gzip.open( path_file, 'rb' ) if bool_flag_file_gzipped else open( path_file )
     while True :
         record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
         if len( record[ 0 ] ) == 0 : break
@@ -8130,12 +8150,12 @@ def FASTQ_Read( dir_file, return_only_at_index = None, flag_add_qname = True ) :
             df_fq[ 'qname' ] = list( e.split( ' ', 1 )[ 0 ][ 1 : ] for e in df_fq.readname.values ) # retrieve qname
         return df_fq
 
-def FASTQ_Read_Generator( dir_file, return_only_at_index = None ) : # 2020-08-18 22:31:31 
+def FASTQ_Read_Generator( path_file, return_only_at_index = None ) : # 2020-08-18 22:31:31 
     ''' read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
     return a generator that return a tuple of 3 length (name, sequence, and quality) or a value at the index given by "return_only_at_index".  '''
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
-    bool_flag_file_gzipped = '.gz' in dir_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
-    file = gzip.open( dir_file, 'rb' ) if bool_flag_file_gzipped else open( dir_file )
+    bool_flag_file_gzipped = '.gz' in path_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
+    file = gzip.open( path_file, 'rb' ) if bool_flag_file_gzipped else open( path_file )
     while True :
         record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
         if len( record[ 0 ] ) == 0 : break
@@ -8147,7 +8167,7 @@ def FASTQ_Read_Generator( dir_file, return_only_at_index = None ) : # 2020-08-18
 # In[ ]:
 
 
-def FASTQ_Write( dir_file, dict_seq = None, dict_quality = None, df_fastq = None ) : 
+def FASTQ_Write( path_file, dict_seq = None, dict_quality = None, df_fastq = None ) : 
     '''
     # 2021-03-07 15:53:19 
     Write FASTQ file with given dataframe or a pair of dict_seq and dict_quality (keys of both dictionaries should be the same) '''
@@ -8159,8 +8179,8 @@ def FASTQ_Write( dir_file, dict_seq = None, dict_quality = None, df_fastq = None
             df = df_fastq.set_index( 'readname' )
             dict_seq = df.seq.to_dict( )
             dict_quality = df.quality.to_dict( )
-    flag_gzipped = dir_file.rsplit( '.', 1 )[ 1 ] == 'gz' # identify gzipped status
-    with gzip.open( dir_file, 'wb' ) if flag_gzipped else open( dir_file, 'w' ) as file :
+    flag_gzipped = path_file.rsplit( '.', 1 )[ 1 ] == 'gz' # identify gzipped status
+    with gzip.open( path_file, 'wb' ) if flag_gzipped else open( path_file, 'w' ) as file :
         for key in dict_seq :
             str_record = '\n'.join( [ '@' + key if key[ 0 ] != '@' else key, dict_seq[ key ], '+', dict_quality[ key ] ] ) + '\n'
             file.write( str_record.encode( ) if flag_gzipped else str_record )
@@ -8169,13 +8189,13 @@ def FASTQ_Write( dir_file, dict_seq = None, dict_quality = None, df_fastq = None
 # In[ ]:
 
 
-def FASTQ_Split_with_adaptor( dir_file, dir_file_new, str_seq_adaptor ) :
+def FASTQ_Split_with_adaptor( path_file, path_file_new, str_seq_adaptor ) :
     ''' # 2020-12-09 03:09:54 
     Split sequence record in the FASTQ file with a given adaptor sequence 
     '''
-    flag_newfile_gzipped = dir_file_new.rsplit( '.', 1 )[ 1 ] == 'gz' # retrieve flag for gzipped status of the output file
-    newfile = gzip.open( dir_file_new, 'wb' ) if flag_newfile_gzipped else open( dir_file_new, 'w' )
-    for record in FASTQ_Read( dir_file, return_generator = True, return_only_at_index = None ) :
+    flag_newfile_gzipped = path_file_new.rsplit( '.', 1 )[ 1 ] == 'gz' # retrieve flag for gzipped status of the output file
+    newfile = gzip.open( path_file_new, 'wb' ) if flag_newfile_gzipped else open( path_file_new, 'w' )
+    for record in FASTQ_Read( path_file, return_generator = True, return_only_at_index = None ) :
         name_read = record[ 0 ].split( ' ', 1 )[ 0 ]
         str_seq, str_qual = record[ 1 ], record[ 3 ]
         l_pos = [ 0 ] + STR.Find_all( record[ 1 ], str_seq_adaptor ) + [ len( record[ 1 ] ) ]
@@ -8190,9 +8210,9 @@ def FASTQ_Split_with_adaptor( dir_file, dir_file_new, str_seq_adaptor ) :
 # In[ ]:
 
 
-def XML_Read( dir_file, encoding = 'utf-8', character_for_replacing_invalid_characters = ' ' ) : # 2020-08-18 18:07:59 
+def XML_Read( path_file, encoding = 'utf-8', character_for_replacing_invalid_characters = ' ' ) : # 2020-08-18 18:07:59 
     ''' read XML file with a given encoding as an ordered dictionary '''
-    with open( dir_file, 'r', encoding = encoding ) as file :
+    with open( path_file, 'r', encoding = encoding ) as file :
         data = file.read( )
         try : dict_xml = xmltodict.parse( data )
         except ExpatError : 
@@ -8231,10 +8251,10 @@ def HMMER_Map_Positions_Between_Pairwise_Alignment( query_alignment, target_alig
 # In[ ]:
 
 
-def HMMER_HMMSEARCH_Read_output( dir_file ) :
+def HMMER_HMMSEARCH_Read_output( path_file ) :
     ''' read hmmsearch output file (output file of hmmsearch when jackhmmer-produced HMM files are used)  '''
     l_l_values = list( ) # list-based 2D array of values that will store alignment outputs for all hmmsearch output records
-    with open( dir_file ) as file : 
+    with open( path_file ) as file : 
         while True : # iterate line in the file
             line = file.readline( )
             if len( line ) == 0 : break
@@ -8321,9 +8341,9 @@ def HMMER_Add_CIGAR_String( df, dict_hmm_model_name_to_consensus_length ) : # 20
 # In[ ]:
 
 
-def HMMER_Read_nhmmscan_output_with_alignment( dir_file ) : # 2020-05-20 17:02:41 
+def HMMER_Read_nhmmscan_output_with_alignment( path_file ) : # 2020-05-20 17:02:41 
     ''' Read nhmmscan output file with alignment information. read only search summary, not alignments, and return a dataframe containing the summary '''
-    with open( dir_file ) as file :
+    with open( path_file ) as file :
         l_l_value__search_result = list( )
         l_l_value__alignment_result = list( )
         while True : # retrive a directory to a file containing HMM database in the header
@@ -8331,8 +8351,8 @@ def HMMER_Read_nhmmscan_output_with_alignment( dir_file ) : # 2020-05-20 17:02:4
             if len( line ) == 0 : break 
             else : content = line[ : -1 ] 
             if '# target HMM database:' in content : # check whether current line containing HMM db directory
-                dir_file_hmm_db = content.split( '# target HMM database: ' )[ 1 ].strip( )
-                dict_fasta = FASTA_Read( os.popen( 'hmmemit -C {}'.format( dir_file_hmm_db ) ) )
+                path_file_hmm_db = content.split( '# target HMM database: ' )[ 1 ].strip( )
+                dict_fasta = FASTA_Read( os.popen( 'hmmemit -C {}'.format( path_file_hmm_db ) ) )
                 dict_hmm_model_name_to_consensus_length = dict( ( hmm_model_name.rsplit( '-consensus', 1 )[ 0 ], len( dict_fasta[ hmm_model_name ] ) ) for hmm_model_name in dict_fasta ) # retrive length of consensus sequences in a given HMM db, while removing '-consensus' tag from the hmm_model_name
                 break
         while True :
@@ -8398,11 +8418,11 @@ def HMMER_Read_nhmmscan_output_with_alignment( dir_file ) : # 2020-05-20 17:02:4
 # In[ ]:
 
 
-def HMMER_Read_nhmmer_output_with_alignment( dir_file ) : 
+def HMMER_Read_nhmmer_output_with_alignment( path_file ) : 
     ''' # 2021-02-04 11:20:08 
     Read nhmmer output file with alignment information. read search summary, alignments, and return two dataframes containing the summary and alignment result '''
     bool_flag_new_alignment_start = False # in case that there is no alignment
-    with open( dir_file ) as file :
+    with open( path_file ) as file :
         l_l_value__search_result = list( )
         l_l_value__alignment_result = list( )
         while True : # retrive a directory to a file containing HMM database in the header
@@ -8410,12 +8430,12 @@ def HMMER_Read_nhmmer_output_with_alignment( dir_file ) :
             if len( line ) == 0 : break 
             else : content = line[ : -1 ] 
             if '# query file:' in content : # check whether current line containing HMM db directory
-                dir_file_hmm_db = content.split( '# query file: ' )[ 1 ].strip( )
-                if dir_file_hmm_db.rsplit( '.', 1 )[ 1 ].lower( ) in [ 'fa', 'fasta' ] : # if query file is a fasta file
-                    dict_fasta = FASTA_Read( dir_file_hmm_db )
-                    dict_hmm_model_name_to_consensus_length = dict( ( dir_file_hmm_db.rsplit( '/', 1 )[ 1 ].rsplit( '.', 1 )[ 0 ], len( dict_fasta[ hmm_model_name ] ) ) for hmm_model_name in dict_fasta ) # retrive length of sequence # model name is filename
+                path_file_hmm_db = content.split( '# query file: ' )[ 1 ].strip( )
+                if path_file_hmm_db.rsplit( '.', 1 )[ 1 ].lower( ) in [ 'fa', 'fasta' ] : # if query file is a fasta file
+                    dict_fasta = FASTA_Read( path_file_hmm_db )
+                    dict_hmm_model_name_to_consensus_length = dict( ( path_file_hmm_db.rsplit( '/', 1 )[ 1 ].rsplit( '.', 1 )[ 0 ], len( dict_fasta[ hmm_model_name ] ) ) for hmm_model_name in dict_fasta ) # retrive length of sequence # model name is filename
                 else : # if query file is hmm file
-                    dict_fasta = FASTA_Read( os.popen( 'hmmemit -C {}'.format( dir_file_hmm_db ) ) )
+                    dict_fasta = FASTA_Read( os.popen( 'hmmemit -C {}'.format( path_file_hmm_db ) ) )
                     dict_hmm_model_name_to_consensus_length = dict( ( hmm_model_name.rsplit( '-consensus', 1 )[ 0 ], len( dict_fasta[ hmm_model_name ] ) ) for hmm_model_name in dict_fasta ) # retrive length of consensus sequences in a given HMM db, while removing '-consensus' tag from the hmm_model_name
                 break
         while True :
@@ -8583,26 +8603,26 @@ def BLAST_Parse_BTOP_String( str_btop, query_seq = None, subject_seq = None ) : 
 # In[ ]:
 
 
-def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None, dir_file_output = None, float_transfer_pidenta = None, float_transfer_evalueb = None, ** dict_Select ) : # 2020-11-15 17:21:00 
+def BLAST_Read( path_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None, path_file_output = None, float_transfer_pidenta = None, float_transfer_evalueb = None, ** dict_Select ) : # 2020-11-15 17:21:00 
     """ # 2022-01-17 22:18:45 
     Read BLASTp tabular output with following columns [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
     Subset BLASTp output with 'dict_Select' using PD_Select function before BTOP string parsing.
     For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence.
     
-    'dir_file_output' : (default: None) if given, write the output as a file and does not load an entire dataframe in the memory ('dict_Select' column will be ignored).
+    'path_file_output' : (default: None) if given, write the output as a file and does not load an entire dataframe in the memory ('dict_Select' column will be ignored).
     'dict_Select' : dictionary of keyworded arguments for selecting records
     """
     if dict_qaccver_to_seq is None and dict_saccver_to_seq is None : return -1 # For BTOP String parsing, either 'dict_qaccver_to_seq' or 'dict_saccver_to_seq' should be given as a template sequence. 
     bool_flag_use_query_seq = dict_qaccver_to_seq is not None # set a flag for using query_seq
     
-    if dir_file_output is None :
+    if path_file_output is None :
         '''
         if an output file directory is not given, read an entire dataframe and return an output dataframe
         '''
         try : 
-            df_blastp = pd.read_csv( dir_file, sep = '\t', header = None )
+            df_blastp = pd.read_csv( path_file, sep = '\t', header = None )
         except pd.errors.EmptyDataError :
-            print( f"{dir_file} file contains empty blast output" ); return -1 
+            print( f"{path_file} file contains empty blast output" ); return -1 
         df_blastp.columns = [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
         df_blastp = PD_Select( df_blastp, ** dict_Select ) # retrieve search result of multiple-sequence-aligned sequences
         ''' filter records based on thresholds '''
@@ -8620,15 +8640,15 @@ def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None
         return df_blastp
     else :
         # retrieve a flag indicating whether the input file has been gzipped
-        flag_is_input_file_gzipped = dir_file.rsplit( '.', 1 )[ 1 ] == 'gz'
+        flag_is_input_file_gzipped = path_file.rsplit( '.', 1 )[ 1 ] == 'gz'
         try : 
-            file = gzip.open( dir_file, 'rb' ) if flag_is_input_file_gzipped else open( dir_file, 'r' )
+            file = gzip.open( path_file, 'rb' ) if flag_is_input_file_gzipped else open( path_file, 'r' )
         except :
-            print( f"[Error] error while opening the file {dir_file}" ); return -1 
+            print( f"[Error] error while opening the file {path_file}" ); return -1 
         '''
         open an output file
         '''
-        newfile = gzip.open( dir_file_output, 'wb' )
+        newfile = gzip.open( path_file_output, 'wb' )
         ''' set header '''
         l_name_col = [ 'qaccver', 'saccver', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'btop' ]
         l_index_col_for_retrieving_aligned_seq = list( l_name_col.index( name_col ) for name_col in [ 'qaccver', 'qstart', 'qend', 'saccver', 'sstart', 'send', 'btop' ] ) # retrieve indices of the columns of interest
@@ -8658,14 +8678,14 @@ def BLAST_Read( dir_file, dict_qaccver_to_seq = None, dict_saccver_to_seq = None
 # In[ ]:
 
 
-def CIF_Read( dir_file ) : # 2020-07-20 20:31:16 
+def CIF_Read( path_file ) : # 2020-07-20 20:31:16 
     """ Read CIF format file (gzipped file supported) and return it as a dictionary containing dictionaries representing data_blocks, which contains category names as keys and DataFrames and Series as values. """
-    bool_flag_gzipped = dir_file[ -3 : ] == '.gz' # flag for gzipped status of a given cif file
+    bool_flag_gzipped = path_file[ -3 : ] == '.gz' # flag for gzipped status of a given cif file
     dict_cif = dict( )
     str_spanning_multiple_line = None
     dict_data_block = dict( )
     l_l_value = list( )
-    with gzip.open( dir_file, 'rb' ) if bool_flag_gzipped else open( dir_file ) as file :
+    with gzip.open( path_file, 'rb' ) if bool_flag_gzipped else open( path_file ) as file :
         while True :
             line = file.readline( ).decode( ) if bool_flag_gzipped else file.readline( ) 
             if len( line ) == 0 : break
@@ -8714,10 +8734,10 @@ def CIF_Read( dir_file ) : # 2020-07-20 20:31:16
 # In[ ]:
 
 
-def CIF_Write( dir_file, dict_cif ) : # 2020-07-13 23:05:05 
+def CIF_Write( path_file, dict_cif ) : # 2020-07-13 23:05:05 
     """ write CIF file in the given 'dict_cif'. 
     *the output file closely resembles standard CIF file, but it does not have line length limit (no value spans multiple lines enclosed by semicolons ';'). This will prevent some CIF readers, such as mkdssp or chimera from reading the metadata (not 3D coordinate data). Therefore, saving only 'atom_site' category is recommended """
-    with open( dir_file, 'w' ) as file :
+    with open( path_file, 'w' ) as file :
         for str_name_data_block in dict_cif : # for each data block
             dict_data_block = dict_cif[ str_name_data_block ]
             file.write( 'data_' + str_name_data_block + '\n' )
@@ -8757,25 +8777,25 @@ def CIF_from_PDB( df, l_label_entity_id = None ) : # 2020-08-08 15:21:53
 # In[ ]:
 
 
-def DSSP_Read_mkdssp_Result( dir_file ) : # 2020-07-06 17:09:09 
+def DSSP_Read_mkdssp_Result( path_file ) : # 2020-07-06 17:09:09 
     ''' # 2020-12-25 18:23:24 
     Read mkdssp result file into DataFrame. Residue number in the "RESIDUE" column should be integer only.
     if directory of protein structure file is given (.pdb, .cif), run mkdssp program to read output 
     '''
     # preprocess inputs
     content = None
-    if isinstance( dir_file, ( str ) ) :
-        name_file = dir_file.rsplit( '/', 1 )[ 1 ]
+    if isinstance( path_file, ( str ) ) :
+        name_file = path_file.rsplit( '/', 1 )[ 1 ]
         if '.' in name_file : # if name_file has a file extension
             str_file_extension = name_file.rsplit( '.', 1 )[ 1 ].lower( )
             if str_file_extension == 'pdb' or str_file_extension == 'cif' : # if a given file has a file extension for protein structures (an input of MKDSSP program)
-                content = subprocess.run( [ 'mkdssp', '-i', dir_file ], capture_output = True ).stdout.decode( ) # run mkdssp program to read the output of mkdssp program
+                content = subprocess.run( [ 'mkdssp', '-i', path_file ], capture_output = True ).stdout.decode( ) # run mkdssp program to read the output of mkdssp program
         if content is None : # if given file appears to not contain protein structures, read output files 
-            with open( dir_file, 'r' ) as file :
+            with open( path_file, 'r' ) as file :
                 content = file.read( )
-    else : # assume the given object is an opened file if type of the 'dir_file' is not string
-        content = dir_file.read( )
-        dir_file.close( )
+    else : # assume the given object is an opened file if type of the 'path_file' is not string
+        content = path_file.read( )
+        path_file.close( )
         
     l_line = content.split( '\n' )
     l_l_value = list( )
@@ -8810,20 +8830,20 @@ def PRIMER_Tm( seq ) : # 2020-10-13 17:46:10
 # In[ ]:
 
 
-def Bookshelves_pipeline_run_a_function_in_command_line_as_a_script( func, dir_folder, title, import_bookshelves = True ) :
+def Bookshelves_pipeline_run_a_function_in_command_line_as_a_script( func, path_folder, title, import_bookshelves = True ) :
     ''' # 2021-01-04 04:18:02 
     run a given function or a code snippet in command line by writing the function and current Bookshelves as a single script
     if a code snippet is given and it contains special characters like '\n', a raw string (r'some string') should be used.
     'import_bookshelves': import bookshelves scripts if True
     '''
-    dir_folder_code_bookshelves = dict_setting_bookshelves[ 'codedir' ]
+    path_folder_code_bookshelves = dict_setting_bookshelves[ 'codedir' ]
     if import_bookshelves : # update bookshelves python script if 'import_bookshelves' is set to True
-        os.system( f"jupyter nbconvert --to script {dir_folder_code_bookshelves}Bookshelves.ipynb" )
+        os.system( f"jupyter nbconvert --to script {path_folder_code_bookshelves}Bookshelves.ipynb" )
     str_time_stamp = TIME_GET_timestamp( ) 
-    dir_file_code = f'{dir_folder}{title}__Bookshelves__{str_time_stamp}.py' # directory of the code that will be written
-    with open( dir_file_code, 'w' ) as newfile :
+    path_file_code = f'{path_folder}{title}__Bookshelves__{str_time_stamp}.py' # directory of the code that will be written
+    with open( path_file_code, 'w' ) as newfile :
         if import_bookshelves :
-            with open( f"{dir_folder_code_bookshelves}Bookshelves.py", 'r' ) as file : str_bookshelves = file.read( )
+            with open( f"{path_folder_code_bookshelves}Bookshelves.py", 'r' ) as file : str_bookshelves = file.read( )
             newfile.write( str_bookshelves + '\n' )
         if callable( func ) :
             str_function = inspect.getsource( func )
@@ -8831,7 +8851,7 @@ def Bookshelves_pipeline_run_a_function_in_command_line_as_a_script( func, dir_f
             newfile.write( f'\n# run a given function\n{str_function}\n# a definition of a function\n{name_function}( )\n' )
         elif isinstance( func, ( str ) ) :
             newfile.write( f'\n# run a given code snippet \n{func}\n' )
-    return dir_file_code # return the name of the code file written to the storage
+    return path_file_code # return the name of the code file written to the storage
 
 
 # ## Functions for developing web application
@@ -8839,20 +8859,20 @@ def Bookshelves_pipeline_run_a_function_in_command_line_as_a_script( func, dir_f
 # In[ ]:
 
 
-def Base64_Encode( dir_file_binary, dir_file_binary_base64 = None, header = None ) : 
+def Base64_Encode( path_file_binary, path_file_binary_base64 = None, header = None ) : 
     """ # 2021-07-12 13:14:24 
     Perform Base64 Encoding for the given binary file.
-    'dir_file_binary_base64' : default directory is 'dir_file_binary' + ".base64.txt"
+    'path_file_binary_base64' : default directory is 'path_file_binary' + ".base64.txt"
     'header' : write a header string (no needs to include the new line character) in front of the base64-encoded string in the output file
     """
-    dir_file_binary_base64 = dir_file_binary + ".base64.txt" if dir_file_binary_base64 is None else dir_file_binary_base64
-    with open( dir_file_binary, 'rb' ) as file : 
-        with open( dir_file_binary_base64, 'w' ) as newfile :
+    path_file_binary_base64 = path_file_binary + ".base64.txt" if path_file_binary_base64 is None else path_file_binary_base64
+    with open( path_file_binary, 'rb' ) as file : 
+        with open( path_file_binary_base64, 'w' ) as newfile :
             # write the header string isinstancenceas been given
             if header is not None and isinstance( header, ( str ) ) :
                 newfile.write( header )
             newfile.write( base64.b64encode( file.read( ) ).decode( 'ascii' ) )
-    return dir_file_binary_base64
+    return path_file_binary_base64
 
 # correlation 
 

@@ -13,22 +13,22 @@ def Round_Float( df, l_col_scientific_notations, l_col_typical_notation, n_signi
         df[ col ] = list( '' if np.isnan( value ) else str_format_typical_notation.format( value ) for value in df[ col ].values )
     return df
 
-def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, dir_folder_temp = '/tmp/', flag_delete_temp_folder = True ) :
+def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, path_folder_temp = '/tmp/', flag_delete_temp_folder = True ) :
     """ # 2022-01-24 13:08:12 
     'df_to_be_indexed' : dataframe to be exported to base64 encoded file and indexed with values in 'l_col_index'
     'l_col_index' : list of columns for indexing 'df_to_be_indexed'
     'dir_prefix_output' : directory prefix for an indexed base64 encoded file and a base64 encoded index file
-    'dir_folder_temp' : directory where a temporary folder will be created and removed
+    'path_folder_temp' : directory where a temporary folder will be created and removed
     'flag_delete_temp_folder' : flag indicating whether the temporary folder should be removed 
     """
 
-    # retrieve dir_folder_wd
-    dir_folder_temp = os.path.abspath( dir_folder_temp )
-    if dir_folder_temp[ -1 ] != '/' :
-        dir_folder_temp += '/'
+    # retrieve path_folder_wd
+    path_folder_temp = os.path.abspath( path_folder_temp )
+    if path_folder_temp[ -1 ] != '/' :
+        path_folder_temp += '/'
     str_uuid = UUID( )
-    dir_folder_temp = f"{dir_folder_temp}{str_uuid}/"
-    os.makedirs( dir_folder_temp, exist_ok = True )
+    path_folder_temp = f"{path_folder_temp}{str_uuid}/"
+    os.makedirs( path_folder_temp, exist_ok = True )
 
     df_to_be_indexed = deepcopy( df_to_be_indexed )
     # retrieve unique indices from values in the 'l_col_index'
@@ -41,12 +41,12 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, d
     for int_index, t_index in enumerate( l_index ) :
         df = df_to_be_indexed.loc[ t_index ]
         df.reset_index( drop = False, inplace = True )
-        dir_prefix_file = f"{dir_folder_temp}{int_index}"
+        dir_prefix_file = f"{path_folder_temp}{int_index}"
         df.T.to_csv( f"{dir_prefix_file}.tsv.gz", sep = '\t', index = True, header = None ) # save transposed array (each 'row' is column, and the first element in each 'row' is the column name)
         Base64_Encode( f"{dir_prefix_file}.tsv.gz", f"{dir_prefix_file}.tsv.gz.base64.txt", header = ' ' )
 
     # retrieve file size of base64 encoded chucks
-    df_file_base64 = GLOB_Retrive_Strings_in_Wildcards( f"{dir_folder_temp}*.tsv.gz.base64.txt", retrieve_file_size = True )
+    df_file_base64 = GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_temp}*.tsv.gz.base64.txt", retrieve_file_size = True )
     df_file_base64.wildcard_0 = df_file_base64.wildcard_0.astype( int ) # retrieve integer index
     df_file_base64.sort_values( 'wildcard_0', inplace = True ) # sort by gene_name
 
@@ -62,9 +62,9 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, d
         int_byte_accumulated += size_in_bytes # update accumulated number of bytes
     df_index_byte = pd.DataFrame( l_l, columns = l_col_index + [ 'index_byte_start', 'index_byte_end' ] )
 
-    df_index_byte.T.to_csv( f"{dir_folder_temp}index.tsv.gz", sep = '\t', index = True, header = False )
-    Base64_Encode( f"{dir_folder_temp}index.tsv.gz", f"{dir_prefix_output}.index.tsv.gz.base64.txt" ) # convert binary file into text using base64 encoding
+    df_index_byte.T.to_csv( f"{path_folder_temp}index.tsv.gz", sep = '\t', index = True, header = False )
+    Base64_Encode( f"{path_folder_temp}index.tsv.gz", f"{dir_prefix_output}.index.tsv.gz.base64.txt" ) # convert binary file into text using base64 encoding
 
     if flag_delete_temp_folder :
         # remove temporary folder
-        shutil.rmtree( dir_folder_temp )
+        shutil.rmtree( path_folder_temp )

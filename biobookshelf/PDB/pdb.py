@@ -157,14 +157,14 @@ def Compose_ATOM_or_HETATM_line( arr_values ) :
 # In[ ]:
 
 
-def Read_Single_Module( dir_file, enable_automatic_correction = False, verbose = False ) : # 2020-07-07 15:59:00 
+def Read_Single_Module( path_file, enable_automatic_correction = False, verbose = False ) : # 2020-07-07 15:59:00 
     '''   # 2021-04-27 11:25:12 
     Read PDB file with a single module (one chain A and one chain B, etc), and return dataframes of ATOM and HETATM records. If missing chain identifiers are detected, reassign chain identifiers based on chain transitions inferred by residue_numbers  '''
-    if '/' in dir_file : 
-        with open( dir_file, 'r' ) as file :
+    if '/' in path_file : 
+        with open( path_file, 'r' ) as file :
             l_lines = file.read( ).split( '\n' )
-    else : # if a given 'dir_file' is not a directory (does not contain '/') read 'dir_file' as a string
-        l_lines = dir_file.split( '\n' )
+    else : # if a given 'path_file' is not a directory (does not contain '/') read 'path_file' as a string
+        l_lines = path_file.split( '\n' )
     l_lines = list( line for line in l_lines if 'HEADER' not in line and 'REMARK' not in line ) # remove header or remarks from the data
     n_terminations = len( list( line for line in l_lines if 'TER' in line[ : 3 ] ) ) # count the number of terminations
     # parse all lines containing ATOM or HETATM records
@@ -192,10 +192,10 @@ def Read_Single_Module( dir_file, enable_automatic_correction = False, verbose =
 # In[ ]:
 
 
-def Read_Multiple_Models( dir_file ) : # 2020-11-27 16:27:07 
-    """ read pdb file of 'dir_file' containing multiple models (CABS-Dock output 'clus' and 'replica' files) and return l_df """
+def Read_Multiple_Models( path_file ) : # 2020-11-27 16:27:07 
+    """ read pdb file of 'path_file' containing multiple models (CABS-Dock output 'clus' and 'replica' files) and return l_df """
     l_df, l_l = list( ), list( )
-    with open( dir_file ) as file : 
+    with open( path_file ) as file : 
         while True :
             line = file.readline( )
             if len( line ) == 0 : break
@@ -215,20 +215,20 @@ def Read_Multiple_Models( dir_file ) : # 2020-11-27 16:27:07
 # In[ ]:
 
 
-def Split_Multiple_Models( dir_file, dir_folder_output = None ) : # 2020-11-30 03:07:27 
-    """ read pdb file of 'dir_file' containing multiple models (CABS-Dock output 'clus' and 'replica' files) and split the file into individual models without parsing and composing data values.
-    'dir_folder_output' : output directory of split files. by default, it is where the pdb file is located """
-    dir_folder, name_file = dir_file.rsplit( '/', 1 )
-    if dir_folder_output is None : dir_folder_output = dir_folder # set default folder
-    dir_prefix_output = dir_folder_output + name_file.rsplit( '.', 1 )[ 0 ]
+def Split_Multiple_Models( path_file, path_folder_output = None ) : # 2020-11-30 03:07:27 
+    """ read pdb file of 'path_file' containing multiple models (CABS-Dock output 'clus' and 'replica' files) and split the file into individual models without parsing and composing data values.
+    'path_folder_output' : output directory of split files. by default, it is where the pdb file is located """
+    path_folder, name_file = path_file.rsplit( '/', 1 )
+    if path_folder_output is None : path_folder_output = path_folder # set default folder
+    path_prefix_output = path_folder_output + name_file.rsplit( '.', 1 )[ 0 ]
     flag_writing = False # flag for writing
-    with open( dir_file ) as file : 
+    with open( path_file ) as file : 
         while True :
             line = file.readline( )
             if len( line ) == 0 : break
             if line[ : 5 ] == 'MODEL' :
                 name_model = line.strip( ).split( )[ 1 ]
-                newfile = open( dir_prefix_output + '.model_{name_model}.pdb'.format( name_model = name_model ), 'w' )
+                newfile = open( path_prefix_output + '.model_{name_model}.pdb'.format( name_model = name_model ), 'w' )
                 flag_writing = True
                 newfile.write( line )
             elif 'HEADER' not in line and 'REMARK' not in line and ( 'ATOM' in line or 'HETATM' in line ) and flag_writing : # if current line contains ATOM or HETATM records and currently a file is opened for writing
@@ -241,8 +241,8 @@ def Split_Multiple_Models( dir_file, dir_folder_output = None ) : # 2020-11-30 0
 # In[4]:
 
 
-def Write_Single_Module( df, dir_file, verbose = False ) : # 2020-07-07 15:59:03 
-    '''   Add a 'TER' record automatically at the end of each chain, and write values in a given PDB dataframe (output of 'Read_Single_Module' function) as a PDB text file in the given directory 'dir_file'.  '''
+def Write_Single_Module( df, path_file, verbose = False ) : # 2020-07-07 15:59:03 
+    '''   Add a 'TER' record automatically at the end of each chain, and write values in a given PDB dataframe (output of 'Read_Single_Module' function) as a PDB text file in the given directory 'path_file'.  '''
     df = df.sort_values( [ 'Chain_identifier', 'Residue_sequence_number', 'Atom_name' ] ) # sort df before adding 'TER' records after the end of each chain and save the PDB dataframe as a PDB text file 
     df.Atom_serial_number = np.arange( 1, len( df ) + 1 ) # renumber 'Atom_serial_number'
     l_line = list( map( Compose_ATOM_or_HETATM_line, df.values ) ) # convert values in dataframe to string according to PDB text format.
@@ -252,8 +252,8 @@ def Write_Single_Module( df, dir_file, verbose = False ) : # 2020-07-07 15:59:03
     l_line_with_ter = list( ) # add 'TER' records
     for index in np.arange( n_ter ) :
         l_line_with_ter.extend( l_line[ l_index_chain_transition[ index ] : l_index_chain_transition[ index + 1 ] ] + [ 'TER' ] )
-    if '.pdb' not in dir_file.lower( ) : dir_file += '.pdb' # add pdb file extension if it does not exist in the given directory to the file to be written
-    with open( dir_file, 'w' ) as file : file.write( '\n'.join( l_line_with_ter ) + '\nEND\n' )
+    if '.pdb' not in path_file.lower( ) : path_file += '.pdb' # add pdb file extension if it does not exist in the given directory to the file to be written
+    with open( path_file, 'w' ) as file : file.write( '\n'.join( l_line_with_ter ) + '\nEND\n' )
 
 
 # In[ ]:
@@ -305,13 +305,13 @@ def Identify_Protein_and_Assign_Chain_identifier( df, ** dict_identifiable_chain
 # In[ ]:
 
 
-def Clean_Minimal( dir_file_pdb, dir_file_pdb_clean, l_chain_id = None, remove_hetatm = True ) : # 2020-11-30 01:57:22 
+def Clean_Minimal( path_file_pdb, path_file_pdb_clean, l_chain_id = None, remove_hetatm = True ) : # 2020-11-30 01:57:22 
     ''' Clean a pdb (from RCSB PDB) in a minimal fashion
     'l_chain_id' : list of chain_ids to retain. by default, retain all chain_ids
     'remove_hetatm' : remove hetatm lines '''
     if l_chain_id is not None : set_chain_id = set( l_chain_id )
-    with open( dir_file_pdb_clean, 'w' ) as newfile :
-        with open( dir_file_pdb ) as file :
+    with open( path_file_pdb_clean, 'w' ) as newfile :
+        with open( path_file_pdb ) as file :
             while True :
                 line = file.readline( )
                 if len( line ) == 0 : break
