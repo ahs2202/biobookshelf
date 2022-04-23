@@ -148,12 +148,12 @@ def Alignment_Record_from_Mappy_to_String( hit, r_fastq ) :
 """
 Build a list of bookmarks for multithreading (simultaneous access of BAM files) 
 """
-def Bookmark( dir_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_padding_around_interval = 10, verbose = False, l_dict_it = [ ], flag_ignore_record_with_flag_secondary_alignment = True, flag_ignore_record_with_flag_optical_or_pcr_duplicate = True, flag_genome_without_chr_prefix_was_used_for_l_dict_it = True ) :
+def Bookmark( path_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_padding_around_interval = 10, verbose = False, l_dict_it = [ ], flag_ignore_record_with_flag_secondary_alignment = True, flag_ignore_record_with_flag_optical_or_pcr_duplicate = True, flag_genome_without_chr_prefix_was_used_for_l_dict_it = True ) :
     """  # 2021-11-10 23:35:29 
     iterate the given BAM file twice to create a bookmark to mark the start and end of each chunk for simultaneous access of the BAM file
     WARNING: there might be a little overlap of reads analyzed by each process since the chunk boundary is marked with ( qname, flag, refname, refstart ). If the two SAM records with the same ( qname, flag, refname, refstart ), the reads between the two 'identical' SAM records might be analyzed twice by two processes analyzing the two chunk sharing the boundary (however, it is unlikely that this will happens in a typical BAM file).
 
-    'dir_file_bam' : indexed (with .bai file) BAM file to be create bookmarks for access by multiple processes
+    'path_file_bam' : indexed (with .bai file) BAM file to be create bookmarks for access by multiple processes
     'n_threads' : number of threads (or number of bookmarks to create) to access a single BAM file 
     'l_dict_it' : a list of dictionaries of interval trees (pip intervaltree package) containing intervals (genes and repeat annotations, etc.). When boundaries between chunk overlaps with the given intervals, it will be adjusted so that the boundary is at least 'int_n_bases_padding_around_interval' base pair away from the interval. 
         This functionality will allow analyzing all reads aligned to a single interval in the 'dict_it' to be analyzed in a single thread, thus abolishing the need to combine results from all threads to produce interval-level output, thus simplifying  downstream analysis. if chromosome name contains 'chr' prefix, please set 'flag_genome_without_chr_prefix_was_used_for_l_dict_it' to False
@@ -166,7 +166,7 @@ def Bookmark( dir_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_p
         l_dict_it = [ l_dict_it ]
 
     ''' retrieve sequence length of reference sequence from the BAM header '''
-    with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+    with pysam.AlignmentFile( path_file_bam, 'rb' ) as samfile :
         dict_header = samfile.header.to_dict( )
     dict_seqname_to_len_seq = pd.DataFrame( dict_header[ 'SQ' ] ).set_index( 'SN' ).LN.to_dict( )
 
@@ -185,7 +185,7 @@ def Bookmark( dir_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_p
         ''' retrieve the total number of SAM records '''
         # iterate the entire BAM file to retrieve the total number of SAM records
         int_n_total_sam_records = 0
-        with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+        with pysam.AlignmentFile( path_file_bam, 'rb' ) as samfile :
             for r in samfile.fetch( ) :
                 ''' filter alignments based on mapq and flag '''
                 if r.mapq < int_min_mapq_unique_mapped : # skip read whose mapq is below 'int_min_mapq_unique_mapped'
@@ -213,7 +213,7 @@ def Bookmark( dir_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_p
 
         l_int_actual_n_sam_records_per_chunk = [ ] # actual number of sam records per chunk for the created bookmarks
         # iterate the entire BAM file to retrieve the total number of SAM records
-        with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+        with pysam.AlignmentFile( path_file_bam, 'rb' ) as samfile :
             for r in samfile.fetch( ) :
                 ''' filter alignments based on mapq and flag '''
                 if r.mapq < int_min_mapq_unique_mapped : # skip read whose mapq is below 'int_min_mapq_unique_mapped'
@@ -321,13 +321,13 @@ def Bookmark( dir_file_bam, n_threads, int_min_mapq_unique_mapped, int_n_bases_p
         df_bookmark = pd.DataFrame( [ [ 'single_thread' ] * 6 ], columns = l_col )
     return df_bookmark, l_int_actual_n_sam_records_per_chunk
 
-def Bookmark_Generator( dir_file_bam, int_min_mapq_unique_mapped, int_num_sam_records_for_each_chunk = 1000000, int_n_bases_padding_around_interval = 10, verbose = False, l_dict_it = [ ], flag_ignore_record_with_flag_secondary_alignment = True, flag_ignore_record_with_flag_optical_or_pcr_duplicate = True, flag_genome_without_chr_prefix_was_used_for_l_dict_it = True ) :
+def Bookmark_Generator( path_file_bam, int_min_mapq_unique_mapped, int_num_sam_records_for_each_chunk = 1000000, int_n_bases_padding_around_interval = 10, verbose = False, l_dict_it = [ ], flag_ignore_record_with_flag_secondary_alignment = True, flag_ignore_record_with_flag_optical_or_pcr_duplicate = True, flag_genome_without_chr_prefix_was_used_for_l_dict_it = True ) :
     """  # 2022-01-17 21:50:42 
     iterate the given BAM file twice to create a bookmark to mark the start and end of each chunk for simultaneous access of the BAM file.
     yield a single bookmark at a time
     WARNING: there might be a little overlap of reads analyzed by each process since the chunk boundary is marked with ( qname, flag, refname, refstart ). If the two SAM records with the same ( qname, flag, refname, refstart ), the reads between the two 'identical' SAM records might be analyzed twice by two processes analyzing the two chunk sharing the boundary (however, it is unlikely that this will happens in a typical BAM file).
 
-    'dir_file_bam' : indexed (with .bai file) BAM file to be create bookmarks for access by multiple processes
+    'path_file_bam' : indexed (with .bai file) BAM file to be create bookmarks for access by multiple processes
     'int_num_sam_records_for_each_chunk' : a guidance to the number of sam records contained in each chunk 
     'l_dict_it' : a list of dictionaries of interval trees (pip intervaltree package) containing intervals (genes and repeat annotations, etc.). When boundaries between chunk overlaps with the given intervals, it will be adjusted so that the boundary is at least 'int_n_bases_padding_around_interval' base pair away from the interval. 
         This functionality will allow analyzing all reads aligned to a single interval in the 'dict_it' to be analyzed in a single thread, thus abolishing the need to combine results from all threads to produce interval-level output, thus simplifying  downstream analysis. if chromosome name contains 'chr' prefix, please set 'flag_genome_without_chr_prefix_was_used_for_l_dict_it' to False
@@ -341,7 +341,7 @@ def Bookmark_Generator( dir_file_bam, int_min_mapq_unique_mapped, int_num_sam_re
         l_dict_it = [ l_dict_it ]
 
     ''' retrieve sequence length of reference sequence used in the input BAM file from the BAM header '''
-    with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+    with pysam.AlignmentFile( path_file_bam, 'rb' ) as samfile :
         dict_header = samfile.header.to_dict( )
     dict_seqname_to_len_seq = pd.DataFrame( dict_header[ 'SQ' ] ).set_index( 'SN' ).LN.to_dict( )
 
@@ -371,7 +371,7 @@ def Bookmark_Generator( dir_file_bam, int_min_mapq_unique_mapped, int_num_sam_re
     id_refname_current = None # default reference name
 
     # iterate the entire BAM file to retrieve the total number of SAM records
-    with pysam.AlignmentFile( dir_file_bam, 'rb' ) as samfile :
+    with pysam.AlignmentFile( path_file_bam, 'rb' ) as samfile :
         for r in samfile.fetch( ) :
             ''' filter alignments based on mapq and flag '''
             if r.mapq < int_min_mapq_unique_mapped : # skip read whose mapq is below 'int_min_mapq_unique_mapped'

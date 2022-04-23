@@ -251,7 +251,7 @@ def MTX_10X_Split( path_folder_mtx_10x_output, int_max_num_entries_for_chunk = 1
     return l_path_file_mtx_10x
 dict_id_feature_to_index_feature = dict( )
 def __MTX_10X_Combine__renumber_feature_mtx_10x__( path_file_input, path_folder_mtx_10x_output ) :
-    '''
+    ''' # deprecated
     internal function for MTX_10X_Combine
     # 2022-02-22 00:38:33 
     '''
@@ -277,7 +277,110 @@ def __MTX_10X_Combine__renumber_feature_mtx_10x__( path_file_input, path_folder_
                     index_row, index_col, int_value = tuple( map( int, line.strip( ).split( ) ) ) # parse each entry of the current matrix 
                     newfile.write( ( ' '.join( tuple( map( str, [ dict_id_feature_to_index_feature[ arr_id_feature[ index_row - 1 ] ], index_col + int_total_n_barcodes_of_previously_written_matrices, int_value ] ) ) ) + '\n' ).encode( ) ) # translate indices of the current matrix to that of the combined matrix            
                     line = file.readline( ).decode( ) # read the next line
-def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000 ) :
+def MTX_SPLiT_Seq_Read( path_folder_mtx ) :
+    ''' # 2022-04-22 07:10:50 
+    Read SPLiT-Seq pipeline output 
+    return:
+    df_feature, df_mtx
+    '''
+    path_file_bc = f'{path_folder_mtx}cell_metadata.csv'
+    path_file_feature = f'{path_folder_mtx}genes.csv'
+    path_file_mtx = f'{path_folder_mtx}DGE.mtx'
+
+    # read mtx file as a tabular format
+    df_mtx = pd.read_csv( path_file_mtx, sep = ' ', comment = '%' )
+    df_mtx.columns = [ 'id_row', 'id_column', 'read_count' ]
+
+    # read barcode and feature information
+    df_bc = pd.read_csv( path_file_bc )[ [ 'cell_barcode' ] ]
+    df_bc.columns = [ 'barcode' ]
+    df_feature = pd.read_csv( path_file_feature, index_col = 0 )
+    df_feature.columns = [ 'id_feature', 'feature', 'genome' ]
+
+    # mapping using 1 based coordinates (0->1 based coordinate )
+    df_mtx[ 'barcode' ] = df_mtx.id_row.apply( MAP.Map( DICTIONARY_Build_from_arr( df_bc.barcode.values, index_start = 1 ) ).a2b ) # mapping using 1 based coordinates (0->1 based coordinate )
+    df_mtx[ 'id_feature' ] = df_mtx.id_column.apply( MAP.Map( DICTIONARY_Build_from_arr( df_feature.id_feature.values, index_start = 1 ) ).a2b ) 
+    df_mtx.drop( columns = [ 'id_row', 'id_column' ], inplace = True ) # drop unnecessary columns
+    return df_feature, df_mtx
+def MTX_10X_Barcode_add_prefix_or_suffix( path_file_barcodes_input, path_file_barcodes_output = None, barcode_prefix = '', barcode_suffix = '' ) :
+    ''' # 2022-04-21 21:10:15 
+    Add prefix or suffix to the 'barcode' of a given 'barcodes.tsv.gz' file
+    'path_file_barcodes_output' : default: None. by default, the input 'path_file_barcodes_input' file will be overwritten with the modified barcodes
+    '''
+    print( path_file_barcodes_input, path_file_barcodes_output )
+    flag_replace_input_file = path_file_barcodes_output is None # retrieve a flag indicating the replacement of original input file with modified input file
+    if flag_replace_input_file :
+        path_file_barcodes_output = f'{path_file_barcodes_input}.writing.tsv.gz' # set a temporary output file 
+    newfile = gzip.open( path_file_barcodes_output, 'wb' ) # open an output file
+    with gzip.open( path_file_barcodes_input, 'rb' ) as file :
+        while True :
+            line = file.readline( )
+            if len( line ) == 0 :
+                break
+            barcode = line.decode( ).strip( ) # parse a barcode
+            barcode_new = barcode_prefix + barcode + barcode_suffix # compose new barcode
+            newfile.write( ( barcode_new + '\n' ).encode( ) ) # write a new barcode
+    newfile.close( ) # close the output file
+    # if the output file path was not given, replace the original file with modified file
+    if flag_replace_input_file :
+        os.remove( path_file_barcodes_input )
+        os.rename( path_file_barcodes_output, path_file_barcodes_input )
+def MTX_10X_Feature_add_prefix_or_suffix( path_file_features_input, path_file_features_output = None, id_feature_prefix = '', id_feature_suffix = '', name_feature_prefix = '', name_feature_suffix = '' ) :
+    ''' # 2022-04-21 21:10:21 
+    Add prefix or suffix to the id_feature and name_feature of a given 'features.tsv.gz' file
+    'path_file_features_output' : default: None. by default, the input 'path_file_features_input' file will be overwritten with the modified features
+    '''
+    print( path_file_features_input, path_file_features_output )
+    flag_replace_input_file = path_file_features_output is None # retrieve a flag indicating the replacement of original input file with modified input file
+    if flag_replace_input_file :
+        path_file_features_output = f'{path_file_features_input}.writing.tsv.gz' # set a temporary output file 
+    newfile = gzip.open( path_file_features_output, 'wb' ) # open an output file
+    with gzip.open( path_file_features_input, 'rb' ) as file :
+        while True :
+            line = file.readline( )
+            if len( line ) == 0 :
+                break
+            id_feature, name_feature, type_feature = line.decode( ).strip( ).split( '\t' ) # parse a feature
+            id_feature_new = id_feature_prefix + id_feature + id_feature_suffix # compose new id_feature
+            name_feature_new = name_feature_prefix + name_feature + name_feature_suffix # compose new name_feature
+            newfile.write( ( '\t'.join( [ id_feature_new, name_feature_new, type_feature ] ) + '\n' ).encode( ) ) # write a new feature
+    newfile.close( ) # close the output file
+    # if the output file path was not given, replace the original file with modified file
+    if flag_replace_input_file :
+        os.remove( path_file_features_input )
+        os.rename( path_file_features_output, path_file_features_input )
+def __MTX_10X_Combine__renumber_barcode_or_feature_index_mtx_10x__( path_file_input, path_folder_mtx_10x_output, flag_renumber_feature_index ) :
+    '''
+    internal function for MTX_10X_Combine
+    # 2022-04-21 12:10:53 
+    
+    'flag_renumber_feature_index' : if True, assumes barcodes are not shared between matrices and renumber features only. If False, assumes features are not shared between matrices and renumber barcodes only.
+    '''
+    global dict_id_entry_to_index_entry
+    for path_folder_mtx_10x, int_total_n_entries_of_previously_written_matrices, index_mtx_10x in pd.read_csv( path_file_input, sep = '\t' ).values :
+        # directly write matrix.mtx.gz file without header
+        with gzip.open( f"{path_folder_mtx_10x_output}matrix.mtx.gz.{index_mtx_10x}.gz", 'wb' ) as newfile :
+            arr_id_entry = pd.read_csv( f"{path_folder_mtx_10x}{'features' if flag_renumber_feature_index else 'barcodes'}.tsv.gz", sep = '\t', header = None ).values[ :, 0 ] # retrieve a list of id_feature for the current dataset
+            with gzip.open( f'{path_folder_mtx_10x}matrix.mtx.gz', 'rb' ) as file : # retrieve a list of features
+                line = file.readline( ).decode( ) # read the first line
+                # if the first line of the file contains a comment line, read all comment lines and a description line following the comments.
+                if line[ 0 ] == '%' :
+                    # read comment and the description line
+                    while True :
+                        if line[ 0 ] != '%' :
+                            break
+                        line = file.readline( ).decode( ) # read the next line
+                    line = file.readline( ).decode( ) # discard the description line and read the next line
+                # process entries
+                while True :
+                    if len( line ) == 0 :
+                        break
+                    index_row, index_col, int_value = tuple( map( int, line.strip( ).split( ) ) ) # parse each entry of the current matrix 
+                    
+                    newfile.write( ( ' '.join( tuple( map( str, ( [ dict_id_entry_to_index_entry[ arr_id_entry[ index_row - 1 ] ], index_col + int_total_n_entries_of_previously_written_matrices ] if flag_renumber_feature_index else [ index_row + int_total_n_entries_of_previously_written_matrices, dict_id_entry_to_index_entry[ arr_id_entry[ index_col - 1 ] ] ] ) + [ int_value ] ) ) ) + '\n' ).encode( ) ) # translate indices of the current matrix to that of the combined matrix            
+                    line = file.readline( ).decode( ) # read the next line
+
+def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000, flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs = None, flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs = None, verbose = False ) :
     '''
     # 2022-02-22 00:38:36 
     Combine 10X count matrix files from the given list of folders and write combined output files to the given output folder 'path_folder_mtx_10x_output'
@@ -286,66 +389,84 @@ def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, 
     
     'int_num_threads' : number of threads to use when combining datasets. multiple threads will be utilized only when datasets does not share cells and thus can be safely concatanated.
     'flag_split_mtx' : split the resulting mtx file so that the contents in the output mtx file can be processed in parallel without ungzipping the mtx.gz file and spliting the file.
+    'flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs' : a flag for entering low-memory mode when there is no shared cells between given input matrices. By default (when None is given), matrices will be examined and the flag will be set automatically by the program. To reduce running time and memory, this flag can be manually set by users.
+    'flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs' : a flag for entering low-memory mode when there is no shared features between given input matrices. By default (when None is given), matrices will be examined and the flag will be set automatically by the program. To reduce running time and memory, this flag can be manually set by users.
     '''
     
     # create an output folder
     os.makedirs( path_folder_mtx_10x_output, exist_ok = True ) 
 
-    """ retrieve cell barcodes of all 10X matrices and check whether cell barcodes are not shared between matrices """
-    int_total_n_barcodes_of_previously_written_matrices = 0 # follow the number of barcodes that are previously written
-    l_int_total_n_barcodes_of_previously_written_matrices = [ ] # calculate the number of barcodes of the previous dataset in the combined mtx.
-    set_barcode = set( ) # update a set of unique barcodes
-    for path_folder_mtx_10x in l_path_folder_mtx_10x_input :
-        arr_barcode = pd.read_csv( f'{path_folder_mtx_10x}barcodes.tsv.gz', sep = '\t', header = None ).squeeze( "columns" ).values # retrieve a list of features
-        set_barcode.update( arr_barcode ) # update a set of barcodes
-        l_int_total_n_barcodes_of_previously_written_matrices.append( int_total_n_barcodes_of_previously_written_matrices )
-        int_total_n_barcodes_of_previously_written_matrices += len( arr_barcode ) # update the number of barcodes 
-
-    ''' check whether there are shared cell barcodes between matrices and set a flag for entering a low-memory mode '''
-    flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs = len( set_barcode ) == int_total_n_barcodes_of_previously_written_matrices # update flag
-
-    if flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs :
-        """ low-memory mode """
-        """ write a combined barcodes.tsv.gz """
-        OS_FILE_Combine_Files_in_order( list( f"{path_folder_mtx_10x}barcodes.tsv.gz" for path_folder_mtx_10x in l_path_folder_mtx_10x_input ), f"{path_folder_mtx_10x_output}barcodes.tsv.gz", overwrite_existing_file = True )
-
-        ''' collect a set of unique features and a list of id_feature for each 10X matrix '''
-        # assumes id_feature is unique for all features across 10X matrices
-        set_t_feature = set( ) # update a set of feature tuples
+    if flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs is None :
+        """ retrieve cell barcodes of all 10X matrices and check whether cell barcodes are not shared between matrices """
+        int_total_n_barcodes_of_previously_written_matrices = 0 # follow the number of barcodes that are previously written
+        l_int_total_n_barcodes_of_previously_written_matrices = [ ] # calculate the number of barcodes of the previous dataset in the combined mtx.
+        set_barcode = set( ) # update a set of unique barcodes
         for path_folder_mtx_10x in l_path_folder_mtx_10x_input :
-            arr_feature = pd.read_csv( f'{path_folder_mtx_10x}features.tsv.gz', sep = '\t', header = None ).values # retrieve a list of features
-            set_t_feature.update( list( map( tuple, arr_feature ) ) ) # update a set of feature tuples
+            arr_barcode = pd.read_csv( f'{path_folder_mtx_10x}barcodes.tsv.gz', sep = '\t', header = None ).squeeze( "columns" ).values # retrieve a list of features
+            set_barcode.update( arr_barcode ) # update a set of barcodes
+            l_int_total_n_barcodes_of_previously_written_matrices.append( int_total_n_barcodes_of_previously_written_matrices )
+            int_total_n_barcodes_of_previously_written_matrices += len( arr_barcode ) # update the number of barcodes 
+        ''' check whether there are shared cell barcodes between matrices and set a flag for entering a low-memory mode '''
+        flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs = len( set_barcode ) == int_total_n_barcodes_of_previously_written_matrices # update flag
+    
+    if not flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs and flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs is None :
+        """ retrieve features of all 10X matrices and check whether features are not shared between matrices """
+        int_total_n_features_of_previously_written_matrices = 0 # follow the number of features that are previously written
+        l_int_total_n_features_of_previously_written_matrices = [ ] # calculate the number of features of the previous dataset in the combined mtx.
+        set_feature = set( ) # update a set of unique features
+        for path_folder_mtx_10x in l_path_folder_mtx_10x_input :
+            arr_feature = pd.read_csv( f'{path_folder_mtx_10x}features.tsv.gz', sep = '\t', header = None, usecols = [ 0 ] ).squeeze( "columns" ).values # retrieve a list of features
+            set_feature.update( arr_feature ) # update a set of features
+            l_int_total_n_features_of_previously_written_matrices.append( int_total_n_features_of_previously_written_matrices )
+            int_total_n_features_of_previously_written_matrices += len( arr_feature ) # update the number of features 
+        ''' check whether there are shared features between matrices and set a flag for entering a low-memory mode '''
+        flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs = len( set_feature ) == int_total_n_features_of_previously_written_matrices # update flag
 
-        """ write a combined features.tsv.gz """
-        l_t_feature = list( set_t_feature ) # convert set to list
-        with gzip.open( f"{path_folder_mtx_10x_output}features.tsv.gz", 'wb' ) as newfile :
-            for t_feature in l_t_feature :
-                newfile.write( ( '\t'.join( t_feature ) + '\n' ).encode( ) )
+    flag_low_memory_mode = flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs or flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs # retrieve flag for low-memory mode
+    if flag_low_memory_mode :
+        """ low-memory mode """
+        flag_renumber_feature_index = flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs # retrieve a flag for renumbering features
+        if verbose :
+            print( f"entering low-memory mode, re-numbering {'features' if flag_renumber_feature_index else 'barcodes'} index because {'barcodes' if flag_renumber_feature_index else 'features'} are not shared across the matrices." )
+        
+        """ write a combined barcodes/features.tsv.gz - that are not shared between matrices """
+        OS_FILE_Combine_Files_in_order( list( f"{path_folder_mtx_10x}{'barcodes' if flag_renumber_feature_index else 'features'}.tsv.gz" for path_folder_mtx_10x in l_path_folder_mtx_10x_input ), f"{path_folder_mtx_10x_output}{'barcodes' if flag_renumber_feature_index else 'features'}.tsv.gz", overwrite_existing_file = True )
 
-        """ build a mapping of id_feature to index_feature, which will be consistent across datasets """
-        global dict_id_feature_to_index_feature # use global variable for multiprocessing
-        dict_id_feature_to_index_feature = dict( ( t_feature[ 0 ], index_feature + 1 ) for index_feature, t_feature in enumerate( l_t_feature ) )
-        PICKLE_Write( f'{path_folder_mtx_10x_output}dict_id_feature_to_index_feature.pickle', dict_id_feature_to_index_feature ) # save id_feature to index_feature mapping as a pickle file
+        ''' collect a set of unique entries and a list of entries for each 10X matrix '''
+        set_t_entry = set( ) # update a set unique id_entry (either id_cell or id_entry)
+        for path_folder_mtx_10x in l_path_folder_mtx_10x_input :
+            set_t_entry.update( list( map( tuple, pd.read_csv( f"{path_folder_mtx_10x}{'features' if flag_renumber_feature_index else 'barcodes'}.tsv.gz", sep = '\t', header = None ).values ) ) ) # update a set of feature tuples
 
-        ''' collect the number of entries for each 10X matrix '''
-        int_total_n_entries = 0 
+        """ write a combined features/barcodes.tsv.gz - that are shared between matrices """
+        l_t_entry = list( set_t_entry ) # convert set to list
+        with gzip.open( f"{path_folder_mtx_10x_output}{'features' if flag_renumber_feature_index else 'barcodes'}.tsv.gz", 'wb' ) as newfile :
+            for t_entry in l_t_entry :
+                newfile.write( ( '\t'.join( t_entry ) + '\n' ).encode( ) )
+
+        """ build a mapping of id_entry to index_entry, which will be consistent across datasets - for features/barcodes that are shared between matrices """
+        global dict_id_entry_to_index_entry # use global variable for multiprocessing
+        dict_id_entry_to_index_entry = dict( ( t_entry[ 0 ], index_entry + 1 ) for index_entry, t_entry in enumerate( l_t_entry ) ) # 0>1 based index
+        PICKLE_Write( f'{path_folder_mtx_10x_output}dict_id_entry_to_index_entry.pickle', dict_id_entry_to_index_entry ) # save id_feature to index_feature mapping as a pickle file
+
+        ''' collect the number of records for each 10X matrix '''
+        int_total_n_records = 0 
         for path_folder_mtx_10x in l_path_folder_mtx_10x_input :
             with gzip.open( f'{path_folder_mtx_10x}matrix.mtx.gz', 'rb' ) as file : # retrieve a list of features
                 file.readline( ), file.readline( )
-                int_total_n_entries += int( file.readline( ).decode( ).strip( ).split( )[ 2 ] ) # update the total number of entries
+                int_total_n_records += int( file.readline( ).decode( ).strip( ).split( )[ 2 ] ) # update the total number of entries
 
         """ write a part of a combined matrix.mtx.gz for each dataset using multiple processes """
         # compose inputs for multiprocessing
-        df_input = pd.DataFrame( { 'path_folder_input_mtx_10x' : l_path_folder_mtx_10x_input, 'int_total_n_barcodes_of_previously_written_matrices' : l_int_total_n_barcodes_of_previously_written_matrices, 'index_mtx_10x' : np.arange( len( l_int_total_n_barcodes_of_previously_written_matrices ) ) } )
-        Multiprocessing( df_input, __MTX_10X_Combine__renumber_feature_mtx_10x__, int_num_threads, global_arguments = [ path_folder_mtx_10x_output ] )
-#         os.remove( f'{path_folder_mtx_10x_output}dict_id_feature_to_index_feature.pickle' ) # remove pickle file
+        df_input = pd.DataFrame( { 'path_folder_input_mtx_10x' : l_path_folder_mtx_10x_input, 'int_total_n_barcodes_of_previously_written_matrices' : ( l_int_total_n_barcodes_of_previously_written_matrices if flag_renumber_feature_index else l_int_total_n_features_of_previously_written_matrices ), 'index_mtx_10x' : np.arange( len( l_int_total_n_barcodes_of_previously_written_matrices ) if flag_renumber_feature_index else len( l_int_total_n_features_of_previously_written_matrices ) ) } )
+        Multiprocessing( df_input, __MTX_10X_Combine__renumber_barcode_or_feature_index_mtx_10x__, int_num_threads, global_arguments = [ path_folder_mtx_10x_output, flag_renumber_feature_index ] )
+#         os.remove( f'{path_folder_mtx_10x_output}dict_id_entry_to_index_entry.pickle' ) # remove pickle file
         
         """ combine parts and add the MTX file header to compose a combined mtx file """
         df_file = GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_mtx_10x_output}matrix.mtx.gz.*.gz" )
         df_file.wildcard_0 = df_file.wildcard_0.astype( int )
         df_file.sort_values( 'wildcard_0', inplace = True )
         # if 'flag_split_mtx' is True, does not delete the split mtx files
-        OS_FILE_Combine_Files_in_order( df_file.dir.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( l_t_feature )} {len( set_barcode )} {int_total_n_entries}\n" ) # combine the output mtx files in the order
+        OS_FILE_Combine_Files_in_order( df_file.dir.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( l_t_entry ) if flag_renumber_feature_index else len( set_feature )} {len( set_barcode ) if flag_renumber_feature_index else len( l_t_entry )} {int_total_n_records}\n" ) # combine the output mtx files in the given order
         # write a flag indicating that the current output directory contains split mtx files
         with open( f"{path_folder_mtx_10x_output}matrix.mtx.gz.split.flag", 'w' ) as file :
             file.write( 'completed' )
