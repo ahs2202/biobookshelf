@@ -185,13 +185,25 @@ known_reference_genes_including_predicted = [ 60, 203068, 11315, 59, 2597, 6161,
 
 """ AWS functions """
 
-def S3_ls( path_s3url_folder ) :
-    """ # 2021-12-09 21:47:34 
+def S3_ls( path_s3url_folder, flag_recursion = False ) :
+    """ # 2022-04-26 09:42:46 
     perform ls operation (list files or folders in the given AWS S3 URL directory) using the properly configured AWS-CLI and return a dataframe containing the list of folders and files 
     """
     l_l = list( line.split( ) for line in OS_Run( [ "aws", "s3", "ls", path_s3url_folder ], return_output = True )[ 'stdout' ].strip( ).split( '\n' ) )
-    df_ls = pd.read_csv( StringIO( '\n'.join( list( '\t'.join( [ '', '', '', l[ 1 ] ] if len( l ) == 2 else l ) for l in l_l ) ) ), sep = '\t', header = None )
+    try :
+        df_ls = pd.read_csv( StringIO( '\n'.join( list( '\t'.join( [ '', '', '', l[ 1 ] ] if len( l ) == 2 else l ) for l in l_l ) ) ), sep = '\t', header = None )
+    except pd.errors.EmptyDataError : # when the directory does not contain any items
+        return 0
     df_ls.columns = [ 'date', 'time', 'size', 'file_name' ]
+    df_ls[ 'path_base' ] = path_s3url_folder
+    df_ls[ 'path_s3url' ] = path_s3url_folder + df_ls[ 'file_name' ] # retrieve s3 object URL
+    
+    # perform recursive search
+    if flag_recursion :
+        l_df_ls = [ df_ls ]
+        for name_folder in list( e for e in df_ls.file_name.values if e[ -1 ] == '/' ) :
+            l_df_ls.append( S3_ls( f"{path_s3url_folder}{name_folder}", flag_recursion = flag_recursion ) )
+        df_ls = pd.concat( l_df_ls )
     return df_ls
 
 # ### Useful Functions in applications 
@@ -2172,6 +2184,7 @@ def PANDAS_MULTIINDEX_get_indices_from_multiIndex_of_df( df, index_among_multiIn
         return -1
     return np.array( list( multiIndex[ index_among_multiIndex ] for multiIndex in arr_multiIndex ), dtype = object )
 MULTIINDEX_At = PANDAS_MULTIINDEX_get_indices_from_multiIndex_of_df
+DF_MultiIndex_At =  PANDAS_MULTIINDEX_get_indices_from_multiIndex_of_df
 
 
 # In[ ]:
@@ -2183,6 +2196,7 @@ def PANDAS_MULTIINDEX_get_multiIndex_as_np_array( df ) :
     if type( arr_multiIndex[ 0 ] ) is not tuple :
         return -1
     return np.array( list( list( index for index in multiIndex ) for multiIndex in arr_multiIndex ), dtype = object )
+DF_MultiIndex_As_Array =  PANDAS_MULTIINDEX_get_multiIndex_as_np_array
 
 
 # ### Functions for Scipy.stats

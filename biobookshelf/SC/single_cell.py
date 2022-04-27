@@ -27,6 +27,9 @@ def CB_Match_Batch( l_id_cell_1, l_id_cell_2, flag_calculate_proportion_using_l_
     'l_id_cell_1' : first list of id_cells 
     'l_id_cell_2' : second list of id_cells
     'flag_calculate_proportion_using_l_id_cell_2' : if True, finding matching batches using the shared proportion calculated using the cell barcodes from 'l_id_cell_2'. if False, proportion of the matching barcodes will be calculated using the cell barcodes from 'l_id_cell_1'
+    
+    return:
+    df_id_cell_matched, df_sample_matched
     '''
     # retrieve set of cell barcodes 
     df_id_cell_1 = CB_Parse_list_of_id_cell( l_id_cell_1 )
@@ -58,7 +61,7 @@ def CB_Match_Batch( l_id_cell_1, l_id_cell_2, flag_calculate_proportion_using_l_
     df_id_cell_matched.reset_index( drop = False, inplace = True )
     df_id_cell_matched = df_id_cell_matched[ [ 'id_cell_1', 'id_cell_2', 'CB', 'id_sample_from_id_cell_1', 'id_sample_from_id_cell_2' ] ] # reorder columns
     
-    return df_id_cell_matched
+    return df_id_cell_matched, df_sample_matched
 def SCANPY_Detect_cell_barcode_from_cell_id( adata ) :
     ''' # 2022-03-24 20:35:22 
     Detect cell barcodes from id_cell (index of adata.obs), and add new two columns to the adata.obs [ 'CB', 'id_sample_from_id_cell' ]
@@ -207,18 +210,27 @@ def __function_for_adjusting_thresholds_for_filtering_empty_droplets__( path_fol
         else :
             break
     return min_counts, min_features, min_cells
-def MTX_10X_Split( path_folder_mtx_10x_output, int_max_num_entries_for_chunk = 10000000, flag_split_mtx = True ) :
-    ''' # 2022-02-22 00:41:20 
+def MTX_10X_Split( path_folder_mtx_10x_output, int_max_num_entries_for_chunk = 10000000, flag_split_mtx = True, flag_split_mtx_again = False ) :
+    ''' # 2022-04-28 01:16:35 
     split input mtx file into multiple files and write a flag file indicating the splitting has been completed. 
     return the list of split mtx files
     
     'flag_split_mtx' : if 'flag_split_mtx' is True, split input mtx file into multiple files. if False, does not split the input matrix, and just return the list containing a single path pointing to the input matrix. This flag exists for the compatibility with single-thread operations
+    'flag_split_mtx_again' : split the input matrix again even if it has beem already split. It will remove previously split files.
     '''
     # 'flag_split_mtx' : if False, does not split the input matrix, and just return the list containing a single path pointing to the input matrix
     if not flag_split_mtx :
         return [ f"{path_folder_mtx_10x_output}matrix.mtx.gz" ]
     
+    ''' if 'flag_split_mtx_again' flag is True, remove previously split files '''
     path_file_flag = f"{path_folder_mtx_10x_output}matrix.mtx.gz.split.flag"
+    if flag_split_mtx_again :
+        os.remove( path_file_flag ) # remove the flag
+        # remove previously split files
+        for path_file in glob.glob( f'{path_folder_mtx_10x_output}matrix.mtx.gz.*.gz' ) :
+            os.remove( path_file )
+
+    ''' split input matrix file '''
     if not os.path.exists( path_file_flag ) : # check whether the flag exists
         index_mtx_10x = 0
         newfile = gzip.open( f"{path_folder_mtx_10x_output}matrix.mtx.gz.{index_mtx_10x}.gz", 'wb' )
@@ -247,7 +259,7 @@ def MTX_10X_Split( path_folder_mtx_10x_output, int_max_num_entries_for_chunk = 1
         df = GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_mtx_10x_output}matrix.mtx.gz.*.gz" )
         df.wildcard_0 = df.wildcard_0.astype( int )
         df.sort_values( 'wildcard_0', ascending = True, inplace = True )
-        l_path_file_mtx_10x = df.dir.values
+        l_path_file_mtx_10x = df.path.values
     return l_path_file_mtx_10x
 dict_id_feature_to_index_feature = dict( )
 def __MTX_10X_Combine__renumber_feature_mtx_10x__( path_file_input, path_folder_mtx_10x_output ) :
@@ -380,7 +392,7 @@ def __MTX_10X_Combine__renumber_barcode_or_feature_index_mtx_10x__( path_file_in
                     newfile.write( ( ' '.join( tuple( map( str, ( [ dict_id_entry_to_index_entry[ arr_id_entry[ index_row - 1 ] ], index_col + int_total_n_entries_of_previously_written_matrices ] if flag_renumber_feature_index else [ index_row + int_total_n_entries_of_previously_written_matrices, dict_id_entry_to_index_entry[ arr_id_entry[ index_col - 1 ] ] ] ) + [ int_value ] ) ) ) + '\n' ).encode( ) ) # translate indices of the current matrix to that of the combined matrix            
                     line = file.readline( ).decode( ) # read the next line
 
-def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000, flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs = None, flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs = None, verbose = False ) :
+def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, int_num_threads = 15, flag_split_mtx = True, flag_split_mtx_again = False, int_max_num_entries_for_chunk = 10000000, flag_low_memory_mode_because_there_is_no_shared_cell_between_mtxs = None, flag_low_memory_mode_because_there_is_no_shared_feature_between_mtxs = None, verbose = False ) :
     '''
     # 2022-02-22 00:38:36 
     Combine 10X count matrix files from the given list of folders and write combined output files to the given output folder 'path_folder_mtx_10x_output'
@@ -466,7 +478,7 @@ def MTX_10X_Combine( path_folder_mtx_10x_output, * l_path_folder_mtx_10x_input, 
         df_file.wildcard_0 = df_file.wildcard_0.astype( int )
         df_file.sort_values( 'wildcard_0', inplace = True )
         # if 'flag_split_mtx' is True, does not delete the split mtx files
-        OS_FILE_Combine_Files_in_order( df_file.dir.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( l_t_entry ) if flag_renumber_feature_index else len( set_feature )} {len( set_barcode ) if flag_renumber_feature_index else len( l_t_entry )} {int_total_n_records}\n" ) # combine the output mtx files in the given order
+        OS_FILE_Combine_Files_in_order( df_file.path.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( l_t_entry ) if flag_renumber_feature_index else len( set_feature )} {len( set_barcode ) if flag_renumber_feature_index else len( l_t_entry )} {int_total_n_records}\n" ) # combine the output mtx files in the given order
         # write a flag indicating that the current output directory contains split mtx files
         with open( f"{path_folder_mtx_10x_output}matrix.mtx.gz.split.flag", 'w' ) as file :
             file.write( 'completed' )
@@ -514,8 +526,8 @@ def __Combine_Dictionaries__( path_folder_mtx_10x_input, name_dict ) :
     
 def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_input, path_folder_mtx_10x_input ) :
     '''
-    internal function for MTX_10X_Filter
-    # 2022-02-17 21:26:32   
+    internal function for MTX_10X_Summarize_Count
+    # 2022-04-28 04:26:57 
     '''
     ''' survey the metrics '''
     ''' for each split mtx file, count number of umi and n_feature for each cells or the number of cells for each feature '''
@@ -526,6 +538,8 @@ def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_i
     dict_id_row_to_n_cells = dict( )
     dict_id_row_to_log_transformed_count = dict( )
     
+    global dict_name_set_feature_to_set_id_row # use global read-only object
+    dict_name_set_feature_to_dict_id_column_to_count = dict( ( name_set_feature, dict( ) ) for name_set_feature in dict_name_set_feature_to_set_id_row ) # initialize 'dict_name_set_feature_to_dict_id_column_to_count'
     for path_file_input_mtx in pd.read_csv( path_file_input, sep = '\t', header = None ).values.ravel( ) :
         with gzip.open( path_file_input_mtx, 'rb' ) as file :
             ''' read the first line '''
@@ -553,6 +567,12 @@ def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_i
                 if id_column not in dict_id_column_to_count :
                     dict_id_column_to_count[ id_column ] = 0
                 dict_id_column_to_count[ id_column ] += int_value
+                ''' update umi count of specific set of features for each cell '''
+                for name_set_feature in dict_name_set_feature_to_dict_id_column_to_count :
+                    if id_row in dict_name_set_feature_to_set_id_row[ name_set_feature ] :
+                        if id_column not in dict_name_set_feature_to_dict_id_column_to_count[ name_set_feature ] :
+                            dict_name_set_feature_to_dict_id_column_to_count[ name_set_feature ][ id_column ] = 0
+                        dict_name_set_feature_to_dict_id_column_to_count[ name_set_feature ][ id_column ] += int_value
                 ''' update n_features for each cell '''
                 if id_column not in dict_id_column_to_n_features :
                     dict_id_column_to_n_features[ id_column ] = 0
@@ -578,21 +598,35 @@ def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_i
     pd.Series( dict_id_row_to_count ).to_csv( f'{path_folder_mtx_10x_input}dict_id_row_to_count.{str_uuid_process}.tsv.gz', sep = '\t', header = None )
     pd.Series( dict_id_row_to_n_cells ).to_csv( f'{path_folder_mtx_10x_input}dict_id_row_to_n_cells.{str_uuid_process}.tsv.gz', sep = '\t', header = None )
     pd.Series( dict_id_row_to_log_transformed_count ).to_csv( f'{path_folder_mtx_10x_input}dict_id_row_to_log_transformed_count.{str_uuid_process}.tsv.gz', sep = '\t', header = None )
-def MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = False, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000 ) :
-    """ # 2022-02-23 22:54:35 
-    Summarize 
-    (1) UMI and Feature counts for cells, 
-    (2) UMI and Cell counts for features, and
-    (3) log10-transformed values of UMI counts (X_new = log_10(X_old + 1)) for features
-    and save these metrics as TSV files
     
+    # save collected counts as tsv files for 'dict_name_set_feature_to_dict_id_column_to_count'
+    for name_set_feature in dict_name_set_feature_to_dict_id_column_to_count :
+        pd.Series( dict_name_set_feature_to_dict_id_column_to_count[ name_set_feature ] ).to_csv( f'{path_folder_mtx_10x_input}{name_set_feature}.dict_id_column_to_count.{str_uuid_process}.tsv.gz', sep = '\t', header = None )
+def MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = False, int_num_threads = 15, flag_split_mtx = True, int_max_num_entries_for_chunk = 10000000, dict_name_set_feature_to_l_id_feature = dict( ) ) :
+    """ # 2022-04-28 06:53:45 
+    Summarize 
+    (1) UMI and Feature counts for each cell, 
+    (2) UMI and Cell counts for each feature, and
+    (3) log10-transformed values of UMI counts (X_new = log_10(X_old + 1)) for each feature
+    (4) UMI counts for the optionally given lists of features for each cell
+    and save these metrics as TSV files
+
+    Inputs:
+    'dict_name_set_feature_to_l_id_feature' : (Default: None)
+                                            a dictionary with 'name_set_features' as key and a list of id_feature as value for each set of id_features. 
+                                            If None is given, only the basic metrics will be summarized. 
+                                            'name_set_features' should be compatible as a Linux file system (should not contain '/' and other special characters, such as newlines).
+                                            (for Scarab short_read outputs)
+                                            If 'atac' is given, 'promoter_and_gene_body', 'promoter' features will be summarized.
+                                            If 'multiome' is given, total 'atac' counts will be summarized separately in addition to 'atac' mode
+
     Returns:
-    dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count
+    a dictionary containing the following and other additional dictionaries: dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count
     """
 
-    ''' the name of the dictionaries handled by this function '''
+    ''' the name of the dictionaries handled by this function (basic) '''
     l_name_dict = [ 'dict_id_column_to_count', 'dict_id_column_to_n_features', 'dict_id_row_to_count', 'dict_id_row_to_n_cells', 'dict_id_row_to_log_transformed_count' ]
-    
+
     ''' handle inputs '''
     if path_folder_mtx_10x_input[ -1 ] != '/' :
         path_folder_mtx_10x_input += '/'
@@ -611,12 +645,45 @@ def MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = False, int_nu
                 print( f'required file(s) is not present at {path_folder_mtx_10x}' )
 
         ''' split input mtx file into multiple files '''
-        l_path_file_mtx_10x = MTX_10X_Split( path_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx )
+        l_path_file_mtx_10x = MTX_10X_Split( path_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx, flag_split_mtx_again = flag_split_mtx_again )
+
+        ''' prepare 'dict_name_set_feature_to_set_id_row' for summarizing total counts for given sets of features '''
+        global dict_name_set_feature_to_set_id_row
+        dict_name_set_feature_to_set_id_row = dict( ) # initialize 'dict_name_set_feature_to_set_id_row'
+        if dict_name_set_feature_to_l_id_feature is not None :
+            arr_id_feature = pd.read_csv( path_file_input_feature, sep = '\t', usecols = [ 0 ], header = None ).values.ravel( ) # retrieve array of id_features
+            dict_id_feature_to_id_row = dict( ( e, i ) for i, e in enumerate( arr_id_feature ) ) # retrieve id_feature -> id_row mapping
+
+            ''' handle presets for 'dict_name_set_feature_to_l_id_feature' '''
+            if isinstance( dict_name_set_feature_to_l_id_feature, str ) :    
+                str_preset = dict_name_set_feature_to_l_id_feature # retrieve preset
+                dict_name_set_feature_to_l_id_feature = dict( ) # initialize the dictionary
+                if str_preset in [ 'multiome', 'atac' ] :
+                    if str_preset == 'multiome' :
+                        arr_id_feature_atac = Search_list_of_strings_with_multiple_query( arr_id_feature, '|mode=atac' )
+                        dict_name_set_feature_to_l_id_feature[ 'atac_all' ] = arr_id_feature_atac
+                    elif str_preset == 'atac' :
+                        arr_id_feature_atac = arr_id_feature
+                    # add sets of promoter and gene_body features
+                    arr_id_feature_atac_promoter_and_gene_body = Search_list_of_strings_with_multiple_query( arr_id_feature_atac, '-genomic_region|', '-repeatmasker_ucsc|', '-regulatory_element|' )
+                    arr_id_feature_atac_promoter = Search_list_of_strings_with_multiple_query( arr_id_feature_atac_promoter_and_gene_body, 'promoter|' )
+                    dict_name_set_feature_to_l_id_feature[ 'atac_promoter_and_gene_body' ] = arr_id_feature_atac_promoter_and_gene_body    
+                    dict_name_set_feature_to_l_id_feature[ 'atac_promoter' ] = arr_id_feature_atac_promoter
+
+            # make sure that 'name_set_feature' does not contains characters incompatible with linux file path
+            for name_set_feature in dict_name_set_feature_to_l_id_feature :
+                assert not( '/' in name_set_feature or '\n' in name_set_feature )
+
+            dict_name_set_feature_to_set_id_row = dict( ( name_set_feature, set( dict_id_feature_to_id_row[ id_feature ] for id_feature in dict_name_set_feature_to_l_id_feature[ name_set_feature ] ) ) for name_set_feature in dict_name_set_feature_to_l_id_feature )
+            # PICKLE_Write( f"{path_folder_mtx_10x_input}dict_name_set_feature_to_set_id_row.binary.pickle", dict_name_set_feature_to_set_id_row ) # write the dictionary as a pickle
 
         ''' summarize each split mtx file '''
         Multiprocessing( l_path_file_mtx_10x, __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__, n_threads = int_num_threads, global_arguments = [ path_folder_mtx_10x_input ] )
 
         ''' combine summarized results '''
+        # update the list of the names of dictionaries
+        l_name_dict += list( f"{name_set_feature}.dict_id_column_to_count" for name_set_feature in GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_mtx_10x_input}*.dict_id_column_to_count.*.tsv.gz' ).wildcard_0.unique( ) ) 
+
         dict_dict = dict( )
         for name_dict in l_name_dict :
             dict_dict[ name_dict ] = __Combine_Dictionaries__( path_folder_mtx_10x_input, name_dict )
@@ -625,12 +692,15 @@ def MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = False, int_nu
             newfile.write( 'completed at ' + TIME_GET_timestamp( True ) )
     else :
         ''' read summarized results '''
+        # update the list of the names of dictionaries
+        l_name_dict += list( f"{name_set_feature}.dict_id_column_to_count" for name_set_feature in GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_mtx_10x_input}*.dict_id_column_to_count.tsv.gz' ).wildcard_0.unique( ) ) 
+
         dict_dict = dict( )
         for name_dict in l_name_dict :
             dict_dict[ name_dict ] = pd.read_csv( f'{path_folder_mtx_10x_input}{name_dict}.tsv.gz', sep = '\t', header = None, index_col = 0 ).iloc[ :, 0 ].to_dict( )
-                          
+
     # return summarized metrics
-    return tuple( dict_dict[ name_dict ] for name_dict in l_name_dict )
+    return dict_dict
 def MTX_10X_Retrieve_number_of_rows_columns_and_entries( path_folder_mtx_10x_input ) :
     """ # 2022-03-05 19:58:32 
     Retrieve the number of rows, columns, and entries from the matrix with the matrix market format 
@@ -820,7 +890,8 @@ def MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr( path_folder_mtx
         
         ''' summarizes counts '''
         global dict_id_column_to_count, dict_id_row_to_avg_count, dict_id_row_to_avg_log_transformed_count, dict_id_row_to_avg_normalized_count, dict_id_row_to_avg_log_transformed_normalized_count # use global variable
-        dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count = MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = verbose, int_num_threads = int_num_threads, flag_split_mtx = flag_split_mtx, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
+        dict_data = MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = verbose, int_num_threads = int_num_threads, flag_split_mtx = flag_split_mtx, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
+        dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count = dict_data[ 'dict_id_column_to_count' ], dict_data[ 'dict_id_column_to_n_features' ], dict_data[ 'dict_id_row_to_count' ], dict_data[ 'dict_id_row_to_n_cells' ], dict_data[ 'dict_id_row_to_log_transformed_count' ] # parse 'dict_data'
 
         """ first pass """
         # calculate mean counts
@@ -971,7 +1042,8 @@ def MTX_10X_Filter( path_folder_mtx_10x_input, path_folder_mtx_10x_output, min_c
     l_path_file_mtx_10x = MTX_10X_Split( path_folder_mtx_10x_input, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk, flag_split_mtx = flag_split_mtx )
     
     ''' summarizes counts '''
-    dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count = MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = verbose, int_num_threads = int_num_threads, flag_split_mtx = flag_split_mtx, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
+    dict_data = MTX_10X_Summarize_Counts( path_folder_mtx_10x_input, verbose = verbose, int_num_threads = int_num_threads, flag_split_mtx = flag_split_mtx, int_max_num_entries_for_chunk = int_max_num_entries_for_chunk )
+    dict_id_column_to_count, dict_id_column_to_n_features, dict_id_row_to_count, dict_id_row_to_n_cells, dict_id_row_to_log_transformed_count = dict_data[ 'dict_id_column_to_count' ], dict_data[ 'dict_id_column_to_n_features' ], dict_data[ 'dict_id_row_to_count' ], dict_data[ 'dict_id_row_to_n_cells' ], dict_data[ 'dict_id_row_to_log_transformed_count' ] # parse 'dict_data'
     
     ''' adjust thresholds based on the summarized metrices (if a function has been given) '''
     if function_for_adjusting_thresholds is not None :
@@ -1041,7 +1113,7 @@ def MTX_10X_Filter( path_folder_mtx_10x_input, path_folder_mtx_10x_output, min_c
     df_file = GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_mtx_10x_output}matrix.mtx.gz.*.gz" )
     df_file.wildcard_0 = df_file.wildcard_0.astype( int )
     df_file.sort_values( 'wildcard_0', inplace = True )
-    OS_FILE_Combine_Files_in_order( df_file.dir.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( dict_id_row_previous_to_id_row_current )} {len( dict_id_column_previous_to_id_column_current )} {int_total_n_entries}\n" ) # combine the output mtx files in the order # does not delete temporary files if 'flag_split_mtx' is True
+    OS_FILE_Combine_Files_in_order( df_file.path.values, f"{path_folder_mtx_10x_output}matrix.mtx.gz", delete_input_files = not flag_split_mtx, header = f"%%MatrixMarket matrix coordinate integer general\n%\n{len( dict_id_row_previous_to_id_row_current )} {len( dict_id_column_previous_to_id_column_current )} {int_total_n_entries}\n" ) # combine the output mtx files in the order # does not delete temporary files if 'flag_split_mtx' is True
     
     # write a flag indicating that the current output directory contains split mtx files
     with open( f"{path_folder_mtx_10x_output}matrix.mtx.gz.split.flag", 'w' ) as file :
