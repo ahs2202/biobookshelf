@@ -1,1 +1,0 @@
-from .uniprot import *

@@ -7763,6 +7763,24 @@ def FASTA_Write( path_file_fasta, dict_fasta = None, l_id = None, l_seq = None, 
                     pos_seq += len_seq - pos_seq
                     break
 
+def FASTA_Filter_by_Accession(path_fasta_input, path_fasta_output, set_accession, header_split_at_space = True, flag_insert_characters_every_n_characters = True ) :
+    """
+    2022-04-29
+    path_fasta_input: path of input fasta file that will be filtered
+    path_fasta_output: path of output fasta file after filtering
+    set_accession: a set of accessions (should not contain any space if "header_split_at_space" is True ) for filtering
+    """
+    # Handle input
+    if not isinstance(set_accession, set):
+        set_accession = set(set_accession)
+    bool_flag_output_gzipped = path_fasta_output[ - 3 : ] == '.gz'
+    new_file =  gzip.open( path_fasta_output, 'wb' ) if bool_flag_output_gzipped else open( path_fasta_output, 'w' ) # open file of path_file_fasta depending on the detected gzipped statu
+    for r in FASTA_Iterate(path_fasta_input, header_split_at_space = header_split_at_space ):
+        if r['header'] in set_accession :
+            str_contents = '>' + r['header'] + '\n' + ( STR.Insert_characters_every_n_characters( r['sequence'], n_characters=60, insert_characters= '\n') if flag_insert_characters_every_n_characters else r['sequence'] ) + '\n'
+            new_file.write( str_contents.encode() if bool_flag_output_gzipped else str_contents )
+    new_file.close()
+
 # In[ ]:
 
 
