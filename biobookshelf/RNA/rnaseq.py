@@ -26,7 +26,7 @@ def STAR_Index( dir_file_fasta, dir_file_annotation, dir_folder_index = None, in
     with open( f'{dir_folder_index}{name_file_fasta}.STAR_index.out', 'w' ) as file :
         file.write( run_star.stdout.decode( ) )
         
-def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_prefix_output = None, n_threads = 10, index_bam = True, star_option = None ) :
+def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_prefix_output = None, n_threads = 10, index_bam = True, star_option = None, return_bash_script = False ) :
     """
     # 2021-07-05 21:34:33 
     Align reads with STAR aligner
@@ -58,11 +58,15 @@ def STAR_Align( dir_folder_index, dir_file_read_1, dir_file_read_2 = None, dir_p
     l_args += [ "--readFilesIn", dir_file_read_1 ]
     if dir_file_read_2 is not None :
         l_args += [ dir_file_read_2 ]
-    run_star = subprocess.run( l_args, capture_output = True )
+    dir_file_bam = f"{dir_prefix_output}Aligned.sortedByCoord.out.bam" # output file name
+    # return bash script
+    if return_bash_script :
+        return ' '.join( l_args ) + ( f' && samtools index {dir_file_bam}' if index_bam else '' )
+    
+    run_star = subprocess.run( l_args, capture_output = True ) # run STAR
     
     with open( f'{dir_prefix_output}.STAR_Align.out', 'w' ) as file :
         file.write( run_star.stdout.decode( ) )
-    dir_file_bam = f"{dir_prefix_output}Aligned.sortedByCoord.out.bam"
     if index_bam : # index output bam file if 'index_bam' is True
         pysam.index( dir_file_bam )
     return dir_file_bam

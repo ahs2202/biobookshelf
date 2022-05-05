@@ -48,6 +48,7 @@ import Bio.bgzf
 import gzip # to handle gzip file
 import shutil # for copying file
 import base64 # for converting binary to text data (web application)
+import io
 from io import StringIO # for converting a string to a file-like stream
 import json # to read and write JSON file
 from xml.parsers.expat import ExpatError
@@ -780,7 +781,7 @@ def GLOB_Retrive_Strings_in_Wildcards( str_glob, l_path_match = None, return_dat
             df[ 'size_in_bytes' ] = list( os.stat( path_match ).st_size for path_match in l_path_match )
             df[ 'size_in_gigabytes' ] = df[ 'size_in_bytes' ] / 2 ** 30
         if retrieve_last_modified_time : 
-            df[ 'time_last_modified' ] = list( datetime.datetime.utcfromtimestamp( os.path.getmtime( path_file ) + time_offset_in_seconds ).strftime( '%Y-%m-%d %H:%M:%S' ) for path_file in df.dir.values )
+            df[ 'time_last_modified' ] = list( datetime.datetime.utcfromtimestamp( os.path.getmtime( path_file ) + time_offset_in_seconds ).strftime( '%Y-%m-%d %H:%M:%S' ) for path_file in df.path.values )
             df.time_last_modified = pd.to_datetime( df.time_last_modified ) # convert to datetime datatype
         return df
     else : return l_l_str_in_wildcard
@@ -9059,7 +9060,7 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
         xmlstr = ET.tostring( xml_data, encoding = 'utf-8', method = 'xml' )
         data_dict = dict( xmltodict.parse( xmlstr ) )
         l = list( data_dict[ 'EXPERIMENT_PACKAGE_SET' ][ 'EXPERIMENT_PACKAGE' ] )
-        print( name_file, f"{len( l )} records will be added" )
+        print( name_file, f"{len( l )} records will be added from XML data" )
         l_record.extend( l )
 
 
