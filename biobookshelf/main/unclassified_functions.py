@@ -1036,12 +1036,42 @@ def SET_union_list_sets( list_sets ) :
 
 # In[ ]:
 
+def LIST_Split( l = None, n_split = 0, return_slice = False, flag_contiguous_chunk = False, arr_weight_for_load_balancing = None, return_split_arr_weight = False ) :
+    """ # 2022-05-08 00:40:10 
+    split a list into 'n_split' number of chunks. if 'return_slice' is True, return slice() instances instead of actually spliting the given list-like object.
+    performs load balancing based on given list of weights (the 'arr_weight_for_load_balancing' argument)
+    
+    'flag_contiguous_chunk' : split the list in a continguous manner so that each chunk contains a region of a original list
+    'arr_weight_for_load_balancing' : only valid when 'flag_contiguous_chunk' is True. 'arr_weight_for_load_balancing' should contains the list of weights for each element for load balancing
+    'return_split_arr_weight' : return split arr_weights, too (only valid if 'flag_contiguous_chunk' == True and valid arr_weight is given through the 'arr_weight_for_load_balancing' element)
+    """
+    # retrieve slice
+    if flag_contiguous_chunk :
+        if arr_weight_for_load_balancing is None : # process equal number of entries for each chunk
+            int_num_entries_for_each_chunk = int( np.ceil( len( l ) / n_split ) )        
+            l_slice = list( slice( index_split * int_num_entries_for_each_chunk, ( index_split + 1 ) * int_num_entries_for_each_chunk ) for index_split in np.arange( n_split ) )
+        else : # if an array of weights are given, use the weights to balance the load for each chunk
+            # calculate total weight for each chunk
+            int_total_weight = np.sum( arr_weight_for_load_balancing )
+            int_total_weight_for_each_chunk = np.ceil( int_total_weight / n_split )
 
-def LIST_Split( l = None, n_split = 0, return_slice = False ) : # 2020-07-30 01:04:31 
-    """ split a list into 'n_split' number of chunks. if 'return_slice' is True, return slice() instances instead of actually spliting the given list-like object """
-    if return_slice : return list( slice( index_split, None, n_split ) for index_split in np.arange( n_split ) ) # if 'return_slice' is True, return slice() instances instead of actually spliting the given list-like object
-    else : return list( l[ index_split : : n_split ] for index_split in np.arange( n_split ) )
-
+            # collect the start positions of each chunk
+            index_chunk = 0
+            l_index_start_of_chunk = [ ]
+            for index, accumulated_weight in enumerate( np.cumsum( arr_weight_for_load_balancing ) ) : 
+                if int_total_weight_for_each_chunk * ( index_chunk ) < accumulated_weight : # if current accumulated bytes is larger than the start of the current chunk calculated using the number of bytes for each chunk
+                    l_index_start_of_chunk.append( index ) # mark the current position as the start of the chunk (and thus the start of the next chunk)
+                    index_chunk += 1 # update the index of the chunk
+            l_pos_start_chunk = l_index_start_of_chunk + [ len( arr_weight_for_load_balancing ) ]
+            l_slice = list( slice( l_pos_start_chunk[ index_split ], l_pos_start_chunk[ index_split + 1 ] ) for index_split in np.arange( n_split ) )
+    else :
+        l_slice = list( slice( index_split, None, n_split ) for index_split in np.arange( n_split ) )
+    if return_slice : return l_slice # if 'return_slice' is True, return slice() instances instead of actually spliting the given list-like object
+    else : 
+        if flag_contiguous_chunk and arr_weight_for_load_balancing is not None and return_split_arr_weight : # return split input list and the weights
+            return list( l[ a_slice ] for a_slice in l_slice ), list( arr_weight_for_load_balancing[ a_slice ] for a_slice in l_slice )
+        else :
+            return list( l[ a_slice ] for a_slice in l_slice )
 
 # In[ ]:
 
@@ -8810,10 +8840,11 @@ def CIF_from_PDB( df, l_label_entity_id = None ) : # 2020-08-08 15:21:53
 # In[ ]:
 
 
-def DSSP_Read_mkdssp_Result( path_file ) : # 2020-07-06 17:09:09 
-    ''' # 2020-12-25 18:23:24 
+def DSSP_Read_mkdssp_Result( path_file, flag_retrieve_coords = False ) : # 2020-07-06 17:09:09 
+    ''' # 2022-05-14 15:08:47 
     Read mkdssp result file into DataFrame. Residue number in the "RESIDUE" column should be integer only.
     if directory of protein structure file is given (.pdb, .cif), run mkdssp program to read output 
+    'flag_retrieve_coords' : If True, retrieve x, y, z coordinates of the atoms, too.
     '''
     # preprocess inputs
     content = None
@@ -8829,15 +8860,20 @@ def DSSP_Read_mkdssp_Result( path_file ) : # 2020-07-06 17:09:09
     else : # assume the given object is an opened file if type of the 'path_file' is not string
         content = path_file.read( )
         path_file.close( )
-        
+
     l_line = content.split( '\n' )
     l_l_value = list( )
-    for line in l_line[ 28 : -1 ] :
-        try : l_l_value.append( [ int( line[ 6 : 10 ] ), line[ 11 ], line[ 13 ], line[ 16 : 25 ], int( line[ 35 : 38 ] ), float( line[ 103 : 109 ] ), float( line[ 109 : 115 ] ) ] ) # retrieve valid line in the dssp output file
-        except : continue
-    df = pd.DataFrame( l_l_value, columns = [ 'residue_sequence_number', 'chain_identifier', 'amino_acid', 'structure', 'accessibility', 'phi', 'psi' ] )
+    if flag_retrieve_coords :
+        for line in l_line[ 28 : -1 ] :
+            try : l_l_value.append( [ int( line[ 6 : 10 ] ), line[ 11 ], line[ 13 ], line[ 16 : 25 ], int( line[ 35 : 38 ] ), float( line[ 103 : 109 ] ), float( line[ 109 : 115 ] ), float( line[ 115 : 122 ] ), float( line[ 122 : 129 ] ), float( line[ 129 : 136 ] ) ] ) # retrieve valid line in the dssp output file
+            except : continue
+    else :
+        for line in l_line[ 28 : -1 ] :
+            try : l_l_value.append( [ int( line[ 6 : 10 ] ), line[ 11 ], line[ 13 ], line[ 16 : 25 ], int( line[ 35 : 38 ] ), float( line[ 103 : 109 ] ), float( line[ 109 : 115 ] ) ] ) # retrieve valid line in the dssp output file
+            except : continue
+    df = pd.DataFrame( l_l_value, columns = [ 'residue_sequence_number', 'chain_identifier', 'amino_acid', 'structure', 'accessibility', 'phi', 'psi' ] + ( [ 'x', 'y', 'z' ] if flag_retrieve_coords else [ ] ) )
     df[ 'Structure_Simple' ] = list( structure[ 0 ] if structure[ 0 ] != ' ' else 'C' for structure in df.structure ) # retrive one letter representation of a secondary structure
-    
+
     dict_amino_acid_to_MaxASA__Tien_et_al__2013__emp__ = { 'A': 121.0, 'R': 265.0, 'N': 187.0, 'D': 187.0, 'C': 148.0, 'E': 214.0, 'Q': 214.0, 'G': 97.0, 'H': 216.0, 'I': 195.0, 'L': 191.0, 'K': 230.0, 'M': 203.0, 'F': 228.0, 'P': 154.0, 'S': 143.0, 'T': 163.0, 'W': 264.0, 'Y': 255.0, 'V': 165.0 }
     dict_amino_acid_to_maxasa = dict_amino_acid_to_MaxASA__Tien_et_al__2013__emp__ # use MaxASA__Tien_et_al__2013__emp__ data for calculating relative accessible area
     df[ 'relative_surface_accessibility' ] = list( min( 1, max( 0, record[ 'accessibility' ] / dict_amino_acid_to_maxasa[ record[ 'amino_acid' ] ] ) ) for record in df.to_dict( orient = 'records' ) ) # calculate relative surface area

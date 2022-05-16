@@ -189,9 +189,9 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
 #     # build index for the output bam file
 #     run = subprocess.run( [ 'samtools', 'index', path_file_bam ], capture_output = False )
         
-def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False ) :
+def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False, n_threads_for_sort = 1 ) :
     """ 
-    # 2021-06-14 23:19:19 
+    # 2022-05-06 21:48:57 
     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
     'path_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
     'path_file_minimap2_index' : minimap2 index file
@@ -226,7 +226,7 @@ def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/sh
             print( 'minimap2 completed' )
             
     ''' sort output SAM file '''
-    l_arg = [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', path_file_bam, path_file_sam ]
+    l_arg = [ 'samtools', 'sort', '-@', str( int( min( n_threads_for_sort, 10 ) ) ), '-O', "BAM", '-o', path_file_bam, path_file_sam ]
     if return_bash_shellscript : # perform minimap2 alignment using subprocess module
         l_bash_shellscript.append( ' '.join( l_arg ) )
         l_bash_shellscript.append( ' '.join( [ 'rm', '-f', path_file_sam ] ) )
@@ -245,8 +245,7 @@ def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/sh
     
     if return_bash_shellscript : # retrun bash shell scripts
         return ' && '.join( l_bash_shellscript )
-        
-        
+    
 def Minimap2_Index( path_file_fasta, path_file_minimap2_index = None, verbose = False ) :
     """ 
     # 2021-03-24 00:44:51 
