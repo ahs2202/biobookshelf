@@ -1037,7 +1037,7 @@ def SET_union_list_sets( list_sets ) :
 # In[ ]:
 
 def LIST_Split( l = None, n_split = 0, return_slice = False, flag_contiguous_chunk = False, arr_weight_for_load_balancing = None, return_split_arr_weight = False ) :
-    """ # 2022-05-08 00:40:10 
+    """ # 2022-05-26 10:14:31 
     split a list into 'n_split' number of chunks. if 'return_slice' is True, return slice() instances instead of actually spliting the given list-like object.
     performs load balancing based on given list of weights (the 'arr_weight_for_load_balancing' argument)
     
@@ -1051,18 +1051,24 @@ def LIST_Split( l = None, n_split = 0, return_slice = False, flag_contiguous_chu
             int_num_entries_for_each_chunk = int( np.ceil( len( l ) / n_split ) )        
             l_slice = list( slice( index_split * int_num_entries_for_each_chunk, ( index_split + 1 ) * int_num_entries_for_each_chunk ) for index_split in np.arange( n_split ) )
         else : # if an array of weights are given, use the weights to balance the load for each chunk
-            # calculate total weight for each chunk
+            # convert dtype of the array to increase the resolution and prevent error due to small resolution of np.float32 # 2022-05-26 10:07:10 by ahs2202
+            arr_weight_for_load_balancing = np.array( arr_weight_for_load_balancing, dtype = np.float64 )
+            # calculate total weaight for each chunk
             int_total_weight = np.sum( arr_weight_for_load_balancing )
             int_total_weight_for_each_chunk = np.ceil( int_total_weight / n_split )
 
             # collect the start positions of each chunk
             index_chunk = 0
-            l_index_start_of_chunk = [ ]
+            l_index_start_of_chunk = [ 0 ]
             for index, accumulated_weight in enumerate( np.cumsum( arr_weight_for_load_balancing ) ) : 
-                if int_total_weight_for_each_chunk * ( index_chunk ) < accumulated_weight : # if current accumulated bytes is larger than the start of the current chunk calculated using the number of bytes for each chunk
+                if int_total_weight_for_each_chunk * ( index_chunk + 1 ) < accumulated_weight : # if the accumulated bytes is larger than the 'int_total_weight_for_each_chunk' times the number of chunk written, record a chunk boundary.
                     l_index_start_of_chunk.append( index ) # mark the current position as the start of the chunk (and thus the start of the next chunk)
                     index_chunk += 1 # update the index of the chunk
-            l_pos_start_chunk = l_index_start_of_chunk + [ len( arr_weight_for_load_balancing ) ]
+            if len( l_index_start_of_chunk ) > n_split : # when a possible overflow/errors from too low resolution was detected, correct the boundary
+                l_index_start_of_chunk[ n_split ] = len( arr_weight_for_load_balancing )
+                l_pos_start_chunk = l_index_start_of_chunk[ : n_split + 1 ]
+            else :
+                l_pos_start_chunk = l_index_start_of_chunk + [ len( arr_weight_for_load_balancing ) ]
             l_slice = list( slice( l_pos_start_chunk[ index_split ], l_pos_start_chunk[ index_split + 1 ] ) for index_split in np.arange( n_split ) )
     else :
         l_slice = list( slice( index_split, None, n_split ) for index_split in np.arange( n_split ) )
@@ -6862,7 +6868,7 @@ def GTF_Write( df_gtf, path_file, flag_update_attribute = True, flag_filetype_is
     df_gtf[ [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute' ] ].to_csv( path_file, index = False, header = None, sep = '\t', quoting = csv.QUOTE_NONE )
     
 def GTF_Interval_Tree( path_file_gtf, feature = [ 'gene' ], value = 'gene_name', drop_duplicated_intervals = False ) :
-    """ # 2021-11-23 14:25:17 
+    """ # 2022-05-20 22:48:35 
     Return an interval tree containing intervals retrieved from the given gtf file.
     
     'path_file_gtf' : directory to the gtf file or dataframe iteslf
@@ -6884,8 +6890,6 @@ def GTF_Interval_Tree( path_file_gtf, feature = [ 'gene' ], value = 'gene_name',
     # remove duplicated intervals
     if drop_duplicated_intervals :
         df_gtf.drop_duplicates( subset = [ 'seqname', 'start', 'end' ], inplace = True )
-    # ignore 'null' intervals
-    df_gtf = df_gtf[ df_gtf.end > df_gtf.start ]
     dict_it = dict( )
     for arr_interval, arr_value in zip( df_gtf[ [ 'seqname', 'start', 'end' ] ].values, df_gtf[ value ].values ) :
         seqname, start, end = arr_interval
@@ -8767,7 +8771,7 @@ def CIF_Read( path_file ) : # 2020-07-20 20:31:16
             elif '#' == line[ 0 ] : # when new category start, add category data (Series format for key-value data and DataFrame format for tabular data) to 'dict_data_block' with 'str_name_category'
                 if len( l_l_value ) > 0 :
                     str_category = '\n'.join( list( '\t'.join( l_value ) for l_value in l_l_value ) ) + '\n' # converting data to a 'file' and parse it using pandas.read_csv allows automatic data type detection and conversion when building pandas data
-                    dict_data_block[ str_name_category ] = pd.read_csv( StringIO( str_category ), sep = '\t', low_memory = False, quoting = csv.QUOTE_NONE, keep_default_na = False ) if bool_flag_datetype_category_is_tabular else pd.read_csv( StringIO( str_category ), sep = '\t', squeeze = True, header = None, index_col = 0, low_memory = False, quoting = csv.QUOTE_NONE, keep_default_na = False ) # csv.QUOTE_NONE to deal with single quotation mark inside quotation # keep_default_na = False (prevent automatic conversion of NA chain to np.nan)
+                    dict_data_block[ str_name_category ] = pd.read_csv( StringIO( str_category ), sep = '\t', low_memory = False, quoting = csv.QUOTE_NONE, keep_default_na = False ) if bool_flag_datetype_category_is_tabular else pd.read_csv( StringIO( str_category ), sep = '\t', header = None, index_col = 0, low_memory = False, quoting = csv.QUOTE_NONE, keep_default_na = False ).squeeze( "columns" ) # csv.QUOTE_NONE to deal with single quotation mark inside quotation # keep_default_na = False (prevent automatic conversion of NA chain to np.nan)
                 bool_flag_datetype_category_is_tabular = False # 'bool_flag_datetype_category_is_tabular' is False by default (default category datatype is key-value datatype)
                 l_l_value = list( )
             elif 'loop_' == line[ : 5 ] : # when 'loop_' directive is used, set 'bool_flag_datetype_category_is_tabular' to True (category datatype is tabular datatype)
@@ -8789,7 +8793,7 @@ def CIF_Read( path_file ) : # 2020-07-20 20:31:16
             else : l_l_value[ -1 ].append( line.replace( '\t', ' ' ) ) # for key-value category data, add a value spanning an entire line to the current row # remove '\t' from value to be compativle with parsing method
         if len( l_l_value ) > 0 : # when file ends, add category data to 'dict_data_block', and add data_block to 'dict_cif'
             str_category = '\n'.join( list( '\t'.join( l_value ) for l_value in l_l_value ) ) + '\n' # converting data to a 'file' and parse it using pandas.read_csv allows automatic data type detection and conversion when building pandas data
-            dict_data_block[ str_name_category ] = pd.read_csv( StringIO( str_category ), sep = '\t', low_memory = False ) if bool_flag_datetype_category_is_tabular else pd.read_csv( StringIO( str_category ), sep = '\t', squeeze = True, header = None, index_col = 0, low_memory = False )
+            dict_data_block[ str_name_category ] = pd.read_csv( StringIO( str_category ), sep = '\t', low_memory = False ) if bool_flag_datetype_category_is_tabular else pd.read_csv( StringIO( str_category ), sep = '\t', header = None, index_col = 0, low_memory = False ).squeeze( "columns" )
         if len( dict_data_block ) > 0 : dict_cif[ str_name_data_block ] = dict_data_block
     return dict_cif
 
