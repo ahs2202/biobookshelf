@@ -1,4 +1,5 @@
 from biobookshelf.main import *
+import biobookshelf.SEQ as SEQ
 
 def Cigartuple_Convert( r_mappy = None, seq_mappy = None, cigartuple_pysam = None ) :
     """ # 2021-11-25 13:36:51 
@@ -650,4 +651,151 @@ def Retrieve_Variant( r, dict_fasta_genome, set_mut_filtered = None, return_corr
                     pos_read += 1
         return l_mut
 
+def Get_dict_pysam_alignmentheader_from_dict_seqname_to_len_seq( dict_seqname_to_len_seq ) :
+    ''' # 2022-06-10 17:55:59 
+    compose a dictionary that can be used to build an alignment header from 'dict_seqname_to_len_seq'
+    '''
+    dict_header = dict( )
+    dict_header[ 'HD' ] = { 'VN': '1.6', 'SO': 'coordinate' }
+    dict_header[ 'SQ' ] = list( { 'SN': seqname, 'LN': dict_seqname_to_len_seq[ seqname ] } for seqname in dict_seqname_to_len_seq )
+    return dict_header
 
+def Convert_mappy_alignment_to_pysam_aligned_segment( qname, seq, qual, mappy_alignment, samfile_header, start = None, flag_mark_as_supplementary_alignment = False ) :
+    ''' # 2022-06-13 17:34:29 
+    convert 'mappy_alignment' (mappy.Alignment record) to pysam.AlignedSegment object
+    
+    'flag_mark_as_supplementary_alignment' : mark the alignment record for supplementary alignment. for mappy, unlike minimap2 output, supplementary alignment is not marked by default (https://github.com/lh3/minimap2/issues/342). The first alignment can be considered primary, and all other alignment can be marked as supplementary.
+    'start' : if a subset sequence of the 'query' sequence was searched using mappy, set this argument as the 0-based coordinate of the start of the subsequence
+    '''
+    len_seq = len( seq )
+    # set default arguments
+    if start is None :
+        start = 0
+
+    flag = 0 # initialize flag
+    if not mappy_alignment.is_primary :
+        flag ^= 1 << 8
+    if flag_mark_as_supplementary_alignment :
+        flag ^= 1 << 11
+    if mappy_alignment.strand == -1 : # mark reverse complemented reads
+        flag ^= 1 << 4
+        flag_reverse_complemented = True
+        # reverse complement reads
+        seq = SEQ.Reverse_Complement( seq )
+        qual = qual[ : : -1 ]
+        # retrieve numbers of soft-clipped bases
+        int_num_soft_clipped_bases_left, int_num_soft_clipped_bases_right = len_seq - mappy_alignment.q_en - start, mappy_alignment.q_st + start
+        start, end
+    else :
+        # retrieve numbers of soft-clipped bases
+        int_num_soft_clipped_bases_left, int_num_soft_clipped_bases_right = mappy_alignment.q_st + start, len_seq - mappy_alignment.q_en - start
+        
+        
+    # retrieve a modify cigar string
+    cigar_str = ( str( int_num_soft_clipped_bases_left ) + 'S' if int_num_soft_clipped_bases_left > 0 else '' ) + mappy_alignment.cigar_str + ( str( int_num_soft_clipped_bases_right ) + 'S' if int_num_soft_clipped_bases_right else '' )
+
+    l_sam = [ qname, flag, mappy_alignment.ctg, mappy_alignment.r_st + 1, mappy_alignment.mapq, cigar_str, '*', 0, 0, seq, qual ] # compose a basic sam record using list
+    # add tag
+    for name_attr, type_val in zip( [ 'NM', 'MD', 'cs' ], [ 'i', 'A', 'A' ] ) :
+        val = getattr( mappy_alignment, name_attr )
+        if val != '' : # if the current tag contains a valid value
+            l_sam.append( ''.join( [ name_attr, ':', type_val, ':', str( val ) ] ) ) # add a SAM tag
+    # add transcript strand tag
+    if hasattr( mappy_alignment, 'trans_strand' ) :
+        l_sam.append( 'ts:A:' + { -1 : '-', 0 : '.', 1 : '+' }[ mappy_alignment.trans_strand ] ) # add a SAM tag
+    
+    return pysam.AlignedSegment.fromstring( '\t'.join( map( str, l_sam ) ), samfile_header ) # return pysam AlignedSegment object
+
+def Visualize_alignment( r, am = None, seq_ref_aligned = None, flag_display = True ) :
+    ''' # 2022-06-12 16:01:22 
+    'am' : minimap2 index used for alignment 
+    'r' : pysam.AlignedSegment record
+    'seq_ref_aligned' : if 'am' is not given, use this sequence as the aligned portion of the reference sequence
+    'flag_display' : display the aligned record if True. return two strings, 'str_aligned_seq_ref' and 'str_aligned_seq_query' if False
+    '''
+    # retrieve aligned portion of reference and query sequences
+    if am is not None :
+        seq_ref = am.seq( r.reference_name, r.reference_start, r.reference_end )
+    else :
+        seq_ref = seq_ref_aligned
+    seq_query = r.seq
+
+    # initialize
+    l_aligned_seq_ref = [ ]
+    l_aligned_seq_query = [ ]
+
+    pos_ref, pos_query = 0, 0
+
+    l_mask_consumes_query = [ True, True, False, False, True, False, False, True, True ]
+    l_mask_consumes_ref = [ True, False, True, True, False, False, False, True, True ]
+    l_flag_record_alignment = [ True, True, True, False, False, False, False, True, True ]
+    l_fill_value = [ '', '-', '-', f'__splicing__', '__soft_clipping__', '', '', '', '' ]
+    for int_cigarop, int_num_bases in r.cigartuples :
+        flag_consumes_query = l_mask_consumes_query[ int_cigarop ]
+        flag_consumes_ref = l_mask_consumes_ref[ int_cigarop ]
+        flag_record_alignment = l_flag_record_alignment[ int_cigarop ]
+        str_fill_value = l_fill_value[ int_cigarop ]
+
+        # annotate alignment
+        if flag_record_alignment :
+            if flag_consumes_ref :
+                l_aligned_seq_ref.append( seq_ref[ pos_ref : pos_ref + int_num_bases ] )
+            else :
+                l_aligned_seq_ref.append( str_fill_value * int_num_bases )
+            if flag_consumes_query :
+                l_aligned_seq_query.append( seq_query[ pos_query : pos_query + int_num_bases ] )
+            else :
+                l_aligned_seq_query.append( str_fill_value * int_num_bases )
+        elif len( str_fill_value ) > 0 :
+            l_aligned_seq_ref.append( str_fill_value )
+            l_aligned_seq_query.append( str_fill_value )
+
+        # update coordinate
+        if flag_consumes_query :
+            pos_query += int_num_bases
+        if flag_consumes_ref :
+            pos_ref += int_num_bases
+    
+    # compose visual representation of the alignment
+    str_aligned_seq_ref = ''.join( l_aligned_seq_ref )
+    str_aligned_seq_query = ''.join( l_aligned_seq_query )
+    
+    if flag_display :
+        from IPython.display import display, HTML
+        # display a long text strings with overflow
+        display(HTML("<div style='overflow: scroll; width: 100%; min-width: 1px; font-family:consolas; white-space: nowrap; display: block;'>" +
+                    str_aligned_seq_ref + '<br>' + str_aligned_seq_query +
+                     "</div>"))
+        
+    else :
+        return str_aligned_seq_ref, str_aligned_seq_query
+
+def Plot_alignment( l_r, figsize = ( 10, 1 ), len_head = 100, verbose = True, min_dx_abs = 1e-2, color = 'random' ) :
+    """ # 2022-06-12 19:06:43 
+    plot a given list of pysam.AlignedSegment records of a single read aligned against the same reference.
+    
+    'len_head' : the length of the arrow head
+    'min_dx_abs' : the min absolute length of arrow stem
+    """
+    qname = l_r[ 0 ].qname
+    fig, ax = plt.subplots( 1, 2, figsize = figsize )
+    for i, r in enumerate( l_r ) :
+        # retrieve a random color 
+        c = Get_random_hex_color( ) if color == 'random' else color
+        
+        # draw an alignment on the reference
+        y = i
+        ax[ 0 ].arrow( x = r.query_alignment_start if not r.is_reverse > 0 else len( r.seq ) - r.query_alignment_end, y = y, dx = max( r.query_alignment_end - r.query_alignment_start, min_dx_abs ), dy = 0, head_width = 1, head_length = len_head, fc = c, ec = 'k', length_includes_head = True ) # direction of the arrow on the query is always + direction!
+        
+        # draw an alignment on the reference
+        
+        for ref_start, ref_end in Retrive_List_of_Mapped_Segments( r.cigartuples, r.reference_start )[ 0 ] :
+            dx_ref = ref_end - ref_start if not r.is_reverse else ref_start - ref_end
+            if dx_ref == 0 :
+                dx_ref = min_dx_abs if r.is_reverse else - min_dx_abs
+            ax[ 1 ].arrow( x = ref_start if not r.is_reverse else ref_end, y = y, dx = dx_ref, dy = 0, head_width = 1, head_length = len_head, fc = c, ec = 'k', length_includes_head = True )
+        if verbose :
+            print( r.flag, qname, r.mapq, r.query_alignment_start, r.query_alignment_end, r.reference_start, r.reference_end, r.is_reverse, Retrive_List_of_Mapped_Segments( r.cigar, r.reference_start, flag_is_cigartuples_from_mappy = False ) )
+    ax[ 0 ].set_title( f'query aligned regions for\n{qname}' )
+    ax[ 1 ].set_title( f'reference aligned regions for\n{qname}' )
+    

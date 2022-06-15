@@ -1550,8 +1550,8 @@ def DF_from_Anndata( adata ) :
         df = adata.to_df( )
     return df
 
-def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataframe_transformed, function_transformation, flag_output_gzipped = True, chunksize = 10000, sep = '\t', index = False, header = 0, ** dict_arg_pd_read_csv ) :
-    """ # 2022-03-09 12:49:56 
+def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataframe_transformed, function_transformation, flag_output_gzipped = True, chunksize = 10000, sep_input = '\t', sep_output = '\t', index = False, header = 0, ** dict_arg_pd_read_csv ) :
+    """ # 2022-06-01 20:08:07 
 
     Apply a given function to a dataframe, except that the entire dataframe will not be loaded into the memory. Instead, a chunk of the dataframe will be loaded.
     
@@ -1566,7 +1566,7 @@ def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataf
     """
     
     # create the pandas dataframe iterator
-    iter_tabular_data = pd.read_csv( path_file_dataframe, iterator = True, header = header, chunksize = chunksize, sep = sep, ** dict_arg_pd_read_csv ) # concatenate according to a filter to our result dataframe
+    iter_tabular_data = pd.read_csv( path_file_dataframe, iterator = True, header = header, chunksize = chunksize, sep = sep_input, ** dict_arg_pd_read_csv ) # concatenate according to a filter to our result dataframe
     
     ''' open an output file '''
     newfile = gzip.open( path_file_dataframe_transformed, 'wb' ) if flag_output_gzipped else open( path_file_dataframe_transformed, 'w' )
@@ -1575,21 +1575,25 @@ def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataf
         df_chunk_transformed = function_transformation( df_chunk )
         ''' if header is present in the input dataframe, write the header '''
         if not flag_header_was_written and header is not None :
-            str_header = sep.join( df_chunk_transformed.columns.values ) + '\n'
+            str_header = sep_output.join( df_chunk_transformed.columns.values ) + '\n'
             newfile.write( str_header.encode( ) if flag_output_gzipped else str_header )
             flag_header_was_written = True # set the flag indicating the header has been written
-        df_chunk_transformed.to_csv( newfile, sep = sep, header = None, index = index )
+        df_chunk_transformed.to_csv( newfile, sep = sep_output, header = None, index = index )
 
-def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t' ) :
+def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t', flag_collect_the_number_of_processed_lines = False ) :
     """
-    # 2021-12-25 15:14:24 
-
+    # 2022-06-01 20:20:28 
+    (Assumes the given dataframe is gzipped.)
     similar to pandas.DataFrame.drop_duplicates, except that the dataframe will not be loaded into the memory. duplicates are identified and redundant records will be dropped with keep = 'first' setting
     
+    
+    inputs:
     'path_file_dataframe' directory of the dataframe to remove duplicates
     'path_file_dataframe_deduplicated' : an output file directory containing unique records
     'l_col_for_identifying_duplicates' : list of column names (should be all string types) if 'flag_header_is_present' is True else list of column indices (should be all integer types)
     
+    returns:
+    int_num_lines: collect the number of processed lines
     """
     
     ''' open an output file '''
@@ -1607,17 +1611,20 @@ def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dat
             l_int_index_col_for_identifying_duplicates = l_col_for_identifying_duplicates
             
         ''' check whether each record is redundant and write only unique record to the output file '''
+        int_num_lines = 0
         set_t_val = set( ) # a set that will record the occurrence of a unique set of values
         while True :
             line = file.readline( ) # read line
             if len( line ) == 0 :
                 break
+            int_num_lines += 1
             l_val = line.decode( ).strip( ).split( str_delimiter ) # parse the current line
             t_val = tuple( l_val[ int_index ] for int_index in l_int_index_col_for_identifying_duplicates ) # retrieve a tuple of values containined in the line
             if t_val not in set_t_val :
                 newfile.write( line )  # write line if the line contain a unqiue set of values
                 set_t_val.add( t_val ) # add a unique set of values to the set
     newfile.close( )
+    return int_num_lines
     
 def DF_Sort_without_loading_in_memory( path_file, path_file_sorted, l_col_for_sorting, delimiter = '\t', key_function_for_sorting = None, l_type = None, int_num_lines_for_a_chunk = 1000000, flag_header_line_exists = True ) :
     """ # 2021-12-26 20:44:17 
@@ -3675,6 +3682,14 @@ def CLUSTER_GET_Gene_IDs_by_cluster_name( dict_tree_clus, cluster_name ) :
 # ### Utility functions for Matplotlib Plotting
 
 # In[ ]:
+
+
+# color
+def Get_random_hex_color( ) :
+    ''' # 2022-06-12 19:16:29 
+    generate random hex color 
+    '''
+    return "#{:02x}{:02x}{:02x}".format( * list( int( np.random.random( ) * 256 ) for i in range( 3 ) ) )
 
 
 def MATPLOTLIB_savefig( title, dpi = 200, folder = None, close_fig = True, format = '.png' ) :
@@ -8946,6 +8961,17 @@ def Base64_Encode( path_file_binary, path_file_binary_base64 = None, header = No
                 newfile.write( header )
             newfile.write( base64.b64encode( file.read( ) ).decode( 'ascii' ) )
     return path_file_binary_base64
+
+def Base64_Decode( path_file_binary_base64, path_file_binary = None ) : 
+    """ # 2022-06-01 19:36:13 
+    Perform Base64 decoding for the given file.
+    'path_file_binary_base64' : the input base64-encoded file
+    """
+    path_file_binary = path_file_binary_base64 + ".binary" if path_file_binary is None else path_file_binary
+    with open( path_file_binary_base64, 'r' ) as file : 
+        with open( path_file_binary, 'wb' ) as newfile :
+            newfile.write( base64.b64decode( file.read( ).encode( 'ascii' ) ) )
+    return path_file_binary
 
 # correlation 
 

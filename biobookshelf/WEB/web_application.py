@@ -13,11 +13,11 @@ def Round_Float( df, l_col_scientific_notations, l_col_typical_notation, n_signi
         df[ col ] = list( '' if np.isnan( value ) else str_format_typical_notation.format( value ) for value in df[ col ].values )
     return df
 
-def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, path_folder_temp = '/tmp/', flag_delete_temp_folder = True ) :
+def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, path_prefix_output, path_folder_temp = '/tmp/', flag_delete_temp_folder = True ) :
     """ # 2022-01-24 13:08:12 
     'df_to_be_indexed' : dataframe to be exported to base64 encoded file and indexed with values in 'l_col_index'
     'l_col_index' : list of columns for indexing 'df_to_be_indexed'
-    'dir_prefix_output' : directory prefix for an indexed base64 encoded file and a base64 encoded index file
+    'path_prefix_output' : directory prefix for an indexed base64 encoded file and a base64 encoded index file
     'path_folder_temp' : directory where a temporary folder will be created and removed
     'flag_delete_temp_folder' : flag indicating whether the temporary folder should be removed 
     """
@@ -41,9 +41,9 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, p
     for int_index, t_index in enumerate( l_index ) :
         df = df_to_be_indexed.loc[ t_index ]
         df.reset_index( drop = False, inplace = True )
-        dir_prefix_file = f"{path_folder_temp}{int_index}"
-        df.T.to_csv( f"{dir_prefix_file}.tsv.gz", sep = '\t', index = True, header = None ) # save transposed array (each 'row' is column, and the first element in each 'row' is the column name)
-        Base64_Encode( f"{dir_prefix_file}.tsv.gz", f"{dir_prefix_file}.tsv.gz.base64.txt", header = ' ' )
+        path_prefix_file = f"{path_folder_temp}{int_index}"
+        df.T.to_csv( f"{path_prefix_file}.tsv.gz", sep = '\t', index = True, header = None ) # save transposed array (each 'row' is column, and the first element in each 'row' is the column name)
+        Base64_Encode( f"{path_prefix_file}.tsv.gz", f"{path_prefix_file}.tsv.gz.base64.txt", header = ' ' )
 
     # retrieve file size of base64 encoded chucks
     df_file_base64 = GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_temp}*.tsv.gz.base64.txt", retrieve_file_size = True )
@@ -51,7 +51,7 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, p
     df_file_base64.sort_values( 'wildcard_0', inplace = True ) # sort by gene_name
 
     # concatanate base64 encoded files in the specified order
-    OS_FILE_Combine_Files_in_order( df_file_base64.dir.values, f"{dir_prefix_output}.tsv.gz.base64.concatanated.txt", overwrite_existing_file = True )
+    OS_FILE_Combine_Files_in_order( df_file_base64.path.values, f"{path_prefix_output}.tsv.gz.base64.concatanated.txt", overwrite_existing_file = True )
 
     # write an index file describing the byte positions of each gene_symbol in the concatanated file
     int_byte_accumulated = 0
@@ -63,7 +63,7 @@ def Index_and_Base64_Encode( df_to_be_indexed, l_col_index, dir_prefix_output, p
     df_index_byte = pd.DataFrame( l_l, columns = l_col_index + [ 'index_byte_start', 'index_byte_end' ] )
 
     df_index_byte.T.to_csv( f"{path_folder_temp}index.tsv.gz", sep = '\t', index = True, header = False )
-    Base64_Encode( f"{path_folder_temp}index.tsv.gz", f"{dir_prefix_output}.index.tsv.gz.base64.txt" ) # convert binary file into text using base64 encoding
+    Base64_Encode( f"{path_folder_temp}index.tsv.gz", f"{path_prefix_output}.index.tsv.gz.base64.txt" ) # convert binary file into text using base64 encoding
 
     if flag_delete_temp_folder :
         # remove temporary folder

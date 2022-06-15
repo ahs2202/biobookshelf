@@ -1,6 +1,7 @@
 import numpy as np
 import regex
 
+import biobookshelf.BA as BA
 
 # In[ ]:
 
