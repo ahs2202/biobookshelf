@@ -160,6 +160,68 @@ def Search_Subsequence( str_seq, str_subseq, error_rate = 0.1, index_start_windo
 
     return { "index_start_subsequence" : index_start_subsequence, "index_end_subsequence" : index_end_subsequence, "matched_subsequence" : str_matched_subsequence, "num_errors" : int_num_errors } # return dictionary containing the index after the subsequence
 
+def Search_Subsequences( str_seq, str_subseq, error_rate = 0.1, index_start_window = None, index_end_window = None, int_min_num_errors = 0 ) :
+    ''' # 2022-06-15 23:48:25 
+    perform an exhuastive search of a sequence with a given subsequence and return the integer index after the subsequence (for example, when subsequence presents from 10-19, return 20)
+    ignore overlapping matches. if one region was matched with the subsequence, the subsequent search will be done in the sequences excluding the region
+    
+    'error_rate' : maximum allowed error_rate (including substitutions, insertions and deletions)
+    'index_start_window', 'index_end_window' : start and end position of the region to search the subsequence
+    
+    'int_min_num_errors' : an internal argument. the minimum number of errors for the search. used in the recursive calling of this function internally.
+    '''
+    l_sr = [ ] # initialize search results
+    def _initialize_search_result_( ) :
+        # set default values
+        return { 'index_start_subsequence' : None, 'index_end_subsequence' : -1, 'matched_subsequence' : -1, 'num_errors' : -1 } # 0-based coordinates
+
+    def _add_search_results_of_a_subsequence_( str_subseq, int_num_errors ) :
+        len_subseq = len( str_subseq )
+        for index_found in Find_all( str_seq_of_a_given_window, str_subseq ) :
+            ba[ index_found : index_found + len_subseq ] = 1 # set the mask to mark the region matched with the subsequence
+            sr = _initialize_search_result_( )
+            sr[ 'matched_subsequence' ] = str_subseq # return the index after the subsequence
+            sr[ 'index_start_subsequence' ] = index_start_window + index_found
+            sr[ 'index_end_subsequence' ] = sr[ 'index_start_subsequence' ] + len_subseq
+            sr[ 'num_errors' ] = int_num_errors
+            l_sr.append( sr )
+            
+    ''' indexing '''
+    # search all positions of a given sequence by default
+    len_seq = len( str_seq )
+    if index_start_window is None :
+        index_start_window = 0
+    if index_end_window is None :
+        index_end_window = len_seq
+    # handle negative indices (indices from the end of the sequence)
+    if index_start_window < 0 :
+        index_start_window = len_seq + index_start_window
+    if index_end_window < 0 :
+        index_end_window = len_seq + index_end_window
+    # retrieve a sequence of the given window
+    str_seq_of_a_given_window = str_seq[ index_start_window : index_end_window ]
+    
+    ''' handle premature exit condition '''
+    if len( str_seq_of_a_given_window ) < len( str_subseq ) - int_min_num_errors : # if the searched region is smaller than the query sequence (considering errors), exit without performing the search
+        return l_sr
+    
+    ''' initialize bitarray mask '''
+    # 'ba' : an internal argument. a bitarray object of 'str_seq_of_a_given_window', marking the regions were matched subsequences were found (marked by 1). these region will be ignored 
+    ba = bitarray( len( str_seq_of_a_given_window ) )
+    ba.setall( 0 ) 
+    
+    ''' performing search for 'int_num_allowed_errors' '''
+    int_max_num_allowed_errors = int( len( str_subseq ) * error_rate ) # retrieve maximum number of allowed errors
+    if int_min_num_errors == 0 :
+        _add_search_results_of_a_subsequence_( str_subseq, 0 )
+    elif int_min_num_errors <= int_max_num_allowed_errors :
+        for str_matched_subsequence in regex.findall( f"({str_subseq}){{e<={int_min_num_errors}}}", str_seq_of_a_given_window ) :
+            _add_search_results_of_a_subsequence_( str_matched_subsequence, int_min_num_errors )
+        
+    if int_min_num_errors < int_max_num_allowed_errors : # recursive calls only when terminating condition (int_min_num_errors == int_max_num_allowed_errors) is not met 
+        for start_next_window, end_next_window in BA.Find_Segment( ba, background = 1 ) : # ignore matched regions in the subsequent searches
+            l_sr.extend( Search_Subsequences( str_seq, str_subseq, error_rate = error_rate, index_start_window = index_start_window + start_next_window, index_end_window = index_start_window + end_next_window, int_min_num_errors = int_min_num_errors + 1 ) ) # perform recursive search for the larger number of errors and collect the result
+    return l_sr # return the search result
 
 # In[ ]:
 

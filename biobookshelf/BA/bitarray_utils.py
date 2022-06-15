@@ -1,4 +1,5 @@
-from biobookshelf.main import *
+from bitarray import bitarray
+import numpy as np
 
 def Find( ba, val = 1 ) :
     ''' # 2022-06-12 21:09:22 
