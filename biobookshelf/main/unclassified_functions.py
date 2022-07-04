@@ -184,6 +184,16 @@ def Jupyter_Notebook_Extension__Build_Snippet( str_code, str_name, indentation =
 known_reference_genes = [ 60, 203068, 11315, 59, 2597, 6161, 1915, 3251, 5430, 7846 ] # List_Gene__2__List_Gene_ID( ['ACTB', 'TUBB', 'PARK7', 'ACTA2', 'GAPDH', 'RPL32', 'EF1A', 'HPRT', 'POLR2A', 'TUBA1A' ] )
 known_reference_genes_including_predicted = [ 60, 203068, 11315, 59, 2597, 6161, 1915, 3251, 5430, 7846, 25912, 27243, 56851, 2821, 5690, 5692, 7879, 7905, 6634,  7415, 51699 ]
 
+# slice functions
+def Slice_to_Range( sl, length ) :
+    """ # 2022-06-28 21:47:51 
+    iterate indices from the given slice
+    """
+    assert isinstance( sl, slice ) # make sure sl is slice
+    # convert slice to integer indices
+    for i in range( * sl.indices( length ) ) :
+        yield i
+
 """ AWS functions """
 
 def S3_ls( path_s3url_folder, flag_recursion = False ) :
@@ -5562,6 +5572,63 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
 
 # In[ ]:
 
+def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
+    """ # 2022-07-04 01:16:29 
+    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (1) and (3) will be run in the main process, while (2) will be offloaded to worker processes. 
+    the 'batch' and result returned by 'process_batch' will be communicated through pipes.
+    
+    'gen_batch' : a generator object returning batches
+    'process_batch( batch, pipe_sender )' : a function that can process batch. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
+    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
+    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used.
+    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
+    """
+    q_batch = collections.deque( ) # initialize queue of batchs
+    flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
+    dict_running_process = dict( ) # dictionary of running processes
+    while True :
+        ''' retrieve batch (if available) '''
+        if not flag_batch_generation_completed :
+            try :
+                batch = next( gen_batch ) # retrieve the next barcode
+                q_batch.appendleft( batch ) # append batch
+            except StopIteration : 
+                flag_batch_generation_completed = True
+
+        ''' when all batchs were retrieved, exit or wait '''
+        if flag_batch_generation_completed :
+            ''' if all batchs were retrieved and processed, exit the loop '''
+            if len( q_batch ) == 0 and len( dict_running_process ) == 0 : # define exit condition
+                break
+            else :
+                ''' if there are some remaining batchs to be retrieved or processed, wait before checking the results produced by the processes  '''
+                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop )
+
+        ''' identify completed processes and remove the completed process from the dictionary of processes '''
+        for str_uuid_process in list( dict_running_process ) : # for the current list of processes
+            if dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].poll( ) : # check whether the current process has been completed
+                # if 'post_process_batch' function has been given.
+                if post_process_batch is not None :
+                    ''' collect the result of a completed process, and run 'post_process_batch' function using the result in the main process '''
+                    res = dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].recv( ) # retrieve result
+                    post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
+                    del res
+                dict_running_process[ str_uuid_process ][ 'process' ].join( ) # dismiss the worker process
+                dict_running_process.pop( str_uuid_process ) # remove the completed worker process from the dictionary
+
+        ''' if the number of currently running processes is smaller than the number of threads and there are remaining batchs to be processed, open and run a process until jobs are given to all threads '''
+        while len( q_batch ) > 0 and len( dict_running_process ) < int_num_threads - 1 : # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function
+            ''' open a process to analyze reads for a region in a batch '''
+            str_uuid_process = UUID( ) # retrieve uuid of the process
+            # retrieve a batch
+            batch = q_batch.pop( )
+            # open a pipe to communicate with the new process once the analysis is completed
+            pipe_sender, pipe_receiver = mp.Pipe( )
+            # open and run a process
+            p = mp.Process( target = process_batch, args = ( batch, pipe_sender ) ) # run 'process_batch' fuction in the 'WORKER PROCESS'
+            p.start( ) # start the process
+            dict_running_process[ str_uuid_process ] = { 'process' : p, 'pipe_receiver' : pipe_receiver }  # add the process to the dictionary
+
 
 def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
     """ # 2022-02-23 10:55:34 
@@ -7090,29 +7157,37 @@ def Substring_allow_mismatch( pattern, text ) :
 
 # In[ ]:
 
-
 def OS_Currently_running_processes( ) :
-    ''' Parse the output of a command line 'ps -ef' and parse it into a DataFrame, and return the DataFrame '''
-    l_lines = os.popen( 'ps -ef' ).read( ).split( '\n' )[ 1 : -1 ]
-    l_csv_lines = list( '\t'.join( list( entry.strip( ) for entry in [ line[ : 8 ], line[ 9 : 15 ], line[ 16 : 22 ], line[ 24 ], line[ 26 : 31 ], line[ 32 : 40 ], line[ 41 : 49 ], line[ 50 : ] ] ) ) for line in l_lines )
-    df = pd.read_csv( StringIO( '\n'.join( l_csv_lines ) ), header = None, sep = '\t' )
-    df.columns = [ 'UID', 'PID', 'PPID', 'C', 'STIME', 'TTY', 'TIME', 'CMD' ]
-    return df
-
+    ''' # 2022-06-16 22:32:58 
+    Parse the output of a command line 'ps -ef' and parse it into a DataFrame, and return the DataFrame
+    '''
+    return Parse_Printed_Table( os.popen( 'ps -ef' ).read( ).strip( ) )
 
 # In[ ]:
 
+def OS_CPU_and_Memory_Usage( flag_ignore_processes_using_neglible_amount_of_resources = True ) :
+    ''' # 2022-06-17 13:12:35 
+    Parse the output of a command line 'top -bn 1' and parse it into a DataFrame, and return the DataFrame 
+    '''
+    
+    df = Parse_Printed_Table( '\n'.join( os.popen( 'top -bn 1' ).read( ).split( '\n' )[ 6 : - 1 ] ) ).rename( columns = { '%CPU' : 'CPU', '%MEM' : 'MEM'  } ) # rename columns to make it compatible with pandas DataFrame
+    if flag_ignore_processes_using_neglible_amount_of_resources :
+        df = df[ ( df.CPU > 0 ) | ( df.MEM > 0 ) ] # if remove processes using '0' CPU and '0' MEM.
+    return df
 
-def OS_CPU_and_Memory_Usage( print_summary = True, return_summary_for_each_user = False, return_summary_for_each_program_of_each_user = False, ignore_processes_using_neglible_amount_of_resources = True ) :
-    ''' Parse the output of a command line 'top -bn 1' and parse it into a DataFrame, and return the DataFrame '''
-    l_line = os.popen( 'top -bn 1' ).read( ).split( '\n' )[ 6 : - 1 ]
-    l_csv_line = list( '\t'.join( list( entry.strip( ) for entry in [ line[ : 6 ], line[ 7 : 15 ], line[ 16 : 19 ], line[ 20 : 23 ], line[ 24 : 31 ], line[ 32 : 38 ], line[ 39 : 45 ], line[ 46 ], line[ 48 : 53 ], line[ 54 : 58 ], line[ 59 : 68 ], line[ 69 : ] ] ) ) for line in l_line )
-    df = pd.read_csv( StringIO( '\n'.join( l_csv_line ) ), sep = '\t' ).rename( columns = { '%CPU' : 'CPU', '%MEM' : 'MEM'  } ) # rename columns to make it compatible with pandas DataFrame
-    if ignore_processes_using_neglible_amount_of_resources : df = df[ ( df.CPU > 0 ) | ( df.MEM > 0 ) ] # if 'ignore_processes_using_neglible_amount_of_resources' is true, remove processes using '0' CPU and '0' MEM.
-    if print_summary : print( df[ [ 'CPU', 'MEM' ] ].sum( ) )
-    if return_summary_for_each_user : return df[ [ 'USER', 'CPU', 'MEM' ] ].groupby( 'USER' ).sum( ).sort_values( 'MEM', ascending = False )
-    elif return_summary_for_each_program_of_each_user : return df[ [ 'USER', 'COMMAND', 'CPU', 'MEM' ] ].groupby( [ 'USER', 'COMMAND' ] ).sum( ).sort_values( 'MEM', ascending = False )
-    else : return df
+# def OS_CPU_and_Memory_Usage( print_summary = True, return_summary_for_each_user = False, return_summary_for_each_program_of_each_user = False, ignore_processes_using_neglible_amount_of_resources = True ) :
+#     ''' Parse the output of a command line 'top -bn 1' and parse it into a DataFrame, and return the DataFrame '''
+#     l_line = os.popen( 'top -bn 1' ).read( ).split( '\n' )[ 6 : - 1 ]
+#     l_csv_line = list( '\t'.join( list( entry.strip( ) for entry in [ line[ : 6 ], line[ 7 : 15 ], line[ 16 : 19 ], line[ 20 : 23 ], line[ 24 : 31 ], line[ 32 : 38 ], line[ 39 : 45 ], line[ 46 ], line[ 48 : 53 ], line[ 54 : 58 ], line[ 59 : 68 ], line[ 69 : ] ] ) ) for line in l_line )
+#     df = pd.read_csv( StringIO( '\n'.join( l_csv_line ) ), sep = '\t' ).rename( columns = { '%CPU' : 'CPU', '%MEM' : 'MEM'  } ) # rename columns to make it compatible with pandas DataFrame
+#     if ignore_processes_using_neglible_amount_of_resources : df = df[ ( df.CPU > 0 ) | ( df.MEM > 0 ) ] # if 'ignore_processes_using_neglible_amount_of_resources' is true, remove processes using '0' CPU and '0' MEM.
+#     if print_summary : print( df[ [ 'CPU', 'MEM' ] ].sum( ) )
+#     if return_summary_for_each_user : return df[ [ 'USER', 'CPU', 'MEM' ] ].groupby( 'USER' ).sum( ).sort_values( 'MEM', ascending = False )
+#     elif return_summary_for_each_program_of_each_user : return df[ [ 'USER', 'COMMAND', 'CPU', 'MEM' ] ].groupby( [ 'USER', 'COMMAND' ] ).sum( ).sort_values( 'MEM', ascending = False )
+#     else : return df
+    
+#     df = Parse_Printed_Table( '\n'.join( os.popen( 'top -bn 1' ).read( ).split( '\n' )[ 6 : ] ) ).rename( columns = { '%CPU' : 'CPU', '%MEM' : 'MEM'  } ) # rename columns to make it compatible with pandas DataFrame
+#     df = df[ ( df.CPU > 0 ) | ( df.MEM > 0 ) ] # if remove processes using '0' CPU and '0' MEM.
 
 
 # In[1]:

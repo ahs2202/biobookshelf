@@ -661,7 +661,7 @@ def Get_dict_pysam_alignmentheader_from_dict_seqname_to_len_seq( dict_seqname_to
     return dict_header
 
 def Convert_mappy_alignment_to_pysam_aligned_segment( qname, seq, qual, mappy_alignment, samfile_header, start = None, flag_mark_as_supplementary_alignment = False ) :
-    ''' # 2022-06-13 17:34:29 
+    ''' # 2022-06-16 00:04:36 
     convert 'mappy_alignment' (mappy.Alignment record) to pysam.AlignedSegment object
     
     'flag_mark_as_supplementary_alignment' : mark the alignment record for supplementary alignment. for mappy, unlike minimap2 output, supplementary alignment is not marked by default (https://github.com/lh3/minimap2/issues/342). The first alignment can be considered primary, and all other alignment can be marked as supplementary.
@@ -685,7 +685,6 @@ def Convert_mappy_alignment_to_pysam_aligned_segment( qname, seq, qual, mappy_al
         qual = qual[ : : -1 ]
         # retrieve numbers of soft-clipped bases
         int_num_soft_clipped_bases_left, int_num_soft_clipped_bases_right = len_seq - mappy_alignment.q_en - start, mappy_alignment.q_st + start
-        start, end
     else :
         # retrieve numbers of soft-clipped bases
         int_num_soft_clipped_bases_left, int_num_soft_clipped_bases_right = mappy_alignment.q_st + start, len_seq - mappy_alignment.q_en - start

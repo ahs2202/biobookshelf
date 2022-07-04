@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name='biobookshelf',
-    version='0.1.36',
+    version='0.1.37',
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -53,6 +53,7 @@ setup(
         'edlib>=1.3.9',
         'h5py>=2.1.0',
         'psutil>=5.7.0',
+        'zarr>=2.12.0',
     ],
     entry_points={
         "console_scripts": [

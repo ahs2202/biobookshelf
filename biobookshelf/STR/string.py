@@ -1,6 +1,8 @@
 import numpy as np
 import regex
 
+from bitarray import bitarray
+
 import biobookshelf.BA as BA
 
 # In[ ]:

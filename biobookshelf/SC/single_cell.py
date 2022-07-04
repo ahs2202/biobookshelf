@@ -191,13 +191,13 @@ def SCANPY_Retrieve_Markers_as_DataFrame( adata ) :
         l_df.append( df )
     df_marker = pd.concat( l_df )
     return df_marker
-def __function_for_adjusting_thresholds_for_filtering_empty_droplets__( path_folder_mtx_10x_output, min_counts, min_features, min_cells ) :
+def __function_for_adjusting_thresholds_for_filtering_empty_droplets__( path_folder_mtx_10x_input, min_counts, min_features, min_cells ) :
     ''' # 2022-02-23 14:26:07 
     This function is intended for the use in 'MTX_10X_Filter' function for filtering cells from the 10X dataset (before chromium X, 10,000 cells per channel)
     
     Assuming a typical number of droplets in a experiment is 100,000, adjust 'min_counts' to reduce the number of filtered cells below 'int_max_num_cells' 
     '''
-    s_count = pd.read_csv( f"{path_folder_mtx_10x_output}dict_id_column_to_count.before_filtering.tsv.gz", sep = '\t', header = None, index_col = 0 )[ 1 ].sort_values( ascending = False ).iloc[ : 100000 ]
+    s_count = pd.read_csv( f"{path_folder_mtx_10x_input}dict_id_column_to_count.tsv.gz", sep = '\t', header = None, index_col = 0 )[ 1 ].sort_values( ascending = False ).iloc[ : 100000 ]
     
     int_max_num_cells = 20000 # maximum number of allowed cells
     min_counts_maximum = 2000
@@ -1007,7 +1007,7 @@ def MTX_10X_Filter( path_folder_mtx_10x_input, path_folder_mtx_10x_output, min_c
     'l_cells' : a list of cells (values in the first column of 'barcodes.tsv.gz') to include. All other cells will be excluded from the output matrix. (default: None) If None is given, include all cells in the output matrix.
     'int_num_threads' : when 'int_num_threads' is 1, does not use the multiprocessing  module for parallel processing
     'function_for_adjusting_thresholds' : a function for adjusting thresholds based on the summarized metrics. Useful when the exact threshold for removing empty droplets are variable across the samples. the function should receive arguments and return values in the following structure: 
-                                        min_counts_new, min_features_new, min_cells_new = function_for_adjusting_thresholds( path_folder_mtx_10x_output, min_counts, min_features, min_cells )
+                                        min_counts_new, min_features_new, min_cells_new = function_for_adjusting_thresholds( path_folder_mtx_10x_input, min_counts, min_features, min_cells )
     '''
 
     ''' handle inputs '''
@@ -1047,7 +1047,7 @@ def MTX_10X_Filter( path_folder_mtx_10x_input, path_folder_mtx_10x_output, min_c
     
     ''' adjust thresholds based on the summarized metrices (if a function has been given) '''
     if function_for_adjusting_thresholds is not None :
-        min_counts, min_features, min_cells = function_for_adjusting_thresholds( path_folder_mtx_10x_output, min_counts, min_features, min_cells )
+        min_counts, min_features, min_cells = function_for_adjusting_thresholds( path_folder_mtx_10x_input, min_counts, min_features, min_cells )
     
     ''' filter row or column that do not satisfy the given thresholds '''
     if min_counts is not None :
