@@ -105,7 +105,7 @@ def Index_Chunks_and_Base64_Encode( df_to_be_chunked_and_indexed, int_num_rows_f
     df_file_base64.sort_values( 'wildcard_0', inplace = True ) # sort by gene_name
 
     # concatanate base64 encoded files in the specified order
-    OS_Run( [ 'cat' ] + list( df_file_base64.path.values ), path_file_stdout = f"{path_prefix_output}.tsv.gz.base64.concatanated.txt" )
+    OS_Run( [ 'cat' ] + list( df_file_base64.path.values ), path_file_stdout = f"{path_prefix_output}.tsv.gz.base64.concatenated.txt" )
 
     # write an index file describing the byte positions of each gene_symbol in the concatanated file
     int_byte_accumulated = 0

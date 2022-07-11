@@ -102,8 +102,6 @@ def CB_detect_cell_barcode_from_id_cell( id_cell, int_number_atgc_in_cell_barcod
     ''' return None when cell_barcode was not found '''
     return [ None, None ]
 
-
-
 def MTX_10X_Read( path_folder_mtx_10x, verbose = False ) :
     ''' # 2021-11-24 13:00:13 
     read 10x count matrix
@@ -275,7 +273,7 @@ def __MTX_10X_Combine__renumber_feature_mtx_10x__( path_file_input, path_folder_
             with gzip.open( f'{path_folder_mtx_10x}matrix.mtx.gz', 'rb' ) as file : # retrieve a list of features
                 line = file.readline( ).decode( ) # read the first line
                 # if the first line of the file contains a comment line, read all comment lines and a description line following the comments.
-                if line[ 0 ] == '%' :
+                if len( line ) > 0 and line[ 0 ] == '%' :
                     # read comment and the description line
                     while True :
                         if line[ 0 ] != '%' :
@@ -376,7 +374,7 @@ def __MTX_10X_Combine__renumber_barcode_or_feature_index_mtx_10x__( path_file_in
             with gzip.open( f'{path_folder_mtx_10x}matrix.mtx.gz', 'rb' ) as file : # retrieve a list of features
                 line = file.readline( ).decode( ) # read the first line
                 # if the first line of the file contains a comment line, read all comment lines and a description line following the comments.
-                if line[ 0 ] == '%' :
+                if len( line ) > 0 and line[ 0 ] == '%' :
                     # read comment and the description line
                     while True :
                         if line[ 0 ] != '%' :
@@ -527,7 +525,7 @@ def __Combine_Dictionaries__( path_folder_mtx_10x_input, name_dict ) :
 def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_input, path_folder_mtx_10x_input ) :
     '''
     internal function for MTX_10X_Summarize_Count
-    # 2022-04-28 04:26:57 
+    # 2022-07-07 20:22:36 
     '''
     ''' survey the metrics '''
     ''' for each split mtx file, count number of umi and n_feature for each cells or the number of cells for each feature '''
@@ -545,7 +543,7 @@ def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_i
             ''' read the first line '''
             line = file.readline( ).decode( ) 
             ''' if the first line of the file contains a comment line, read all comment lines and a description line following the comments. '''
-            if line[ 0 ] == '%' :
+            if len( line ) > 0 and line[ 0 ] == '%' :
                 # read comment and the description line
                 while True :
                     if line[ 0 ] != '%' :
@@ -555,9 +553,7 @@ def __MTX_10X_Summarize_Counts__summarize_counts_for_each_mtx_10x__( path_file_i
                 int_num_rows, int_num_columns, int_num_entries = tuple( int( e ) for e in line.strip( ).split( ) ) # retrieve the number of rows, number of columns and number of entries
                 line = file.readline( ).decode( ) # read the next line
             ''' process entries'''
-            while True :
-                if len( line ) == 0 :
-                    break
+            while len( line ) > 0 :
                 ''' parse a record, and update metrics '''
                 id_row, id_column, int_value = tuple( int( e ) for e in line.strip( ).split( ) ) # parse a record of a matrix-market format file
                 ''' 1-based > 0-based coordinates '''
@@ -725,7 +721,7 @@ def MTX_10X_Retrieve_number_of_rows_columns_and_entries( path_folder_mtx_10x_inp
         ''' read the first line '''
         line = file.readline( ).decode( ) 
         ''' if the first line of the file contains a comment line, read all comment lines and a description line following the comments. '''
-        if line[ 0 ] == '%' :
+        if len( line ) > 0 and line[ 0 ] == '%' :
             # read comment and the description line
             while True :
                 if line[ 0 ] != '%' :
@@ -755,7 +751,7 @@ def __MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr__first_pass__(
             ''' read the first line '''
             line = file.readline( ).decode( ) 
             ''' if the first line of the file contains a comment line, read all comment lines and a description line following the comments. '''
-            if line[ 0 ] == '%' :
+            if len( line ) > 0 and line[ 0 ] == '%' :
                 # read comment and the description line
                 while True :
                     if line[ 0 ] != '%' :
@@ -815,7 +811,7 @@ def __MTX_10X_Calculate_Average_Log10_Transformed_Normalized_Expr__second_pass__
             ''' read the first line '''
             line = file.readline( ).decode( ) 
             ''' if the first line of the file contains a comment line, read all comment lines and a description line following the comments. '''
-            if line[ 0 ] == '%' :
+            if len( line ) > 0 and line[ 0 ] == '%' :
                 # read comment and the description line
                 while True :
                     if line[ 0 ] != '%' :
@@ -969,7 +965,7 @@ def __MTX_10X_Filter__filter_mtx_10x__( path_file_input, path_folder_mtx_10x_out
                 ''' read the first line '''
                 line = file.readline( ).decode( ) 
                 ''' if the first line of the file contains a comment line, read all comment lines and a description line following the comments. '''
-                if line[ 0 ] == '%' :
+                if len( line ) > 0 and line[ 0 ] == '%' :
                     # read comment and the description line
                     while True :
                         if line[ 0 ] != '%' :

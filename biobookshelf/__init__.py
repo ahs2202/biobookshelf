@@ -1,7 +1,8 @@
 # Version of biobookshelf package
 __version__ = "0.1.37"
 from .__main__ import *
-
+from biobookshelf.main import *
+from biobookshelf import *
 
 # import modules
 
