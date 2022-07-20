@@ -9186,7 +9186,7 @@ def Parse_Printed_Table( str_output ) :
 # function related to handle data from the SRA database
 
 def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
-    """ # 2022-04-23 16:24:30 
+    """ # 2022-07-20 16:16:17 
     Retrieve informations from SRA downloaded files (SraRunTable and XML records) and combine them as a dataframe.
     
     'path_glob_SraRunTable' a path (* wildcard can be used) for retrieving downloaded SraRunTable text files
@@ -9229,7 +9229,7 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
         ''' retrieve accessions '''
         val_exp_accession = r[ 'EXPERIMENT' ][ '@accession' ]
         val_study_accession = r[ 'STUDY' ][ '@accession' ]
-        val_sample_accession = r[ 'SAMPLE' ][ '@accession' ]
+        val_sample_accession = ( r[ 'SAMPLE' ][ '@accession' ] if 'SAMPLE' in r else np.nan ) # SAMPLE might not exists
 
         ''' retrieve study descriptions '''
         r_study = r[ 'STUDY' ][ 'DESCRIPTOR' ]
