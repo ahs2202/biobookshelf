@@ -9186,7 +9186,7 @@ def Parse_Printed_Table( str_output ) :
 # function related to handle data from the SRA database
 
 def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
-    """ # 2022-07-20 16:16:17 
+    """ # 2022-07-20 16:46:07 
     Retrieve informations from SRA downloaded files (SraRunTable and XML records) and combine them as a dataframe.
     
     'path_glob_SraRunTable' a path (* wildcard can be used) for retrieving downloaded SraRunTable text files
@@ -9253,18 +9253,23 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
         val_CENTER_PROJECT_NAME = r_study[ 'CENTER_PROJECT_NAME' ] if 'CENTER_PROJECT_NAME' in r_study else np.nan
 
         ''' retrieve sample descriptions '''
-        r_sample = r[ 'SAMPLE' ]
-        val_TITLE = r_sample[ 'TITLE' ] if 'TITLE' in r_sample else np.nan
-        val_TAXON_ID = r_sample[ 'SAMPLE_NAME' ][ 'TAXON_ID' ]
-        val_TAXON_SCIENTIFIC_NAME = r_sample[ 'SAMPLE_NAME' ][ 'SCIENTIFIC_NAME' ]
-        ''' retrieve sample attribute '''
+        val_TITLE = np.nan
+        val_TAXON_ID = np.nan
+        val_TAXON_SCIENTIFIC_NAME = np.nan
         val_SAMPLE_ATTRIBUTES = np.nan
-        if 'SAMPLE_ATTRIBUTES' in r_sample :
-            r_sample_attr = r_sample[ 'SAMPLE_ATTRIBUTES' ][ 'SAMPLE_ATTRIBUTE' ]
-            # if only single attribute is available, put it in a list
-            if isinstance( r_sample_attr, collections.OrderedDict ) :
-                r_sample_attr = [ r_sample_attr ]
-            val_SAMPLE_ATTRIBUTES = '; '.join( list( f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr ) ) 
+        if 'SAMPLE' in r : 
+            r_sample = r[ 'SAMPLE' ]
+            val_TITLE = r_sample[ 'TITLE' ] if 'TITLE' in r_sample else np.nan
+            val_TAXON_ID = r_sample[ 'SAMPLE_NAME' ][ 'TAXON_ID' ]
+            val_TAXON_SCIENTIFIC_NAME = r_sample[ 'SAMPLE_NAME' ][ 'SCIENTIFIC_NAME' ]
+            ''' retrieve sample attribute '''
+
+            if 'SAMPLE_ATTRIBUTES' in r_sample :
+                r_sample_attr = r_sample[ 'SAMPLE_ATTRIBUTES' ][ 'SAMPLE_ATTRIBUTE' ]
+                # if only single attribute is available, put it in a list
+                if isinstance( r_sample_attr, collections.OrderedDict ) :
+                    r_sample_attr = [ r_sample_attr ]
+                val_SAMPLE_ATTRIBUTES = '; '.join( list( f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr ) ) 
 
         ''' retrieve list of id_sra for the given record '''
         if 'RUN_SET' not in r :
