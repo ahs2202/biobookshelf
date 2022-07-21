@@ -1,6 +1,70 @@
 from biobookshelf.main import *
 import biobookshelf.SEQ as SEQ
 
+def combine_bam( path_file_bam_output, * l_bam_file, int_max_num_files = 900, flag_remove_file = False, int_num_threads = 12 ) :
+    """ # 2022-07-21 14:49:08 CML & HSA 
+    abstraction: hide the detail implementation to users.
+
+    'path_file_bam_output' : path to output file. if the output file already exists, this throw an error
+    'l_bam_file' : list of bam files that will be merged
+    'int_max_num_files' : maximum number of files that can be opened in a process (typicaly 1024 in linux)
+    'flag_remove_file' : if True, input files will be removed.
+    'int_num_threads' : the number of threads to merge input bam files. one thread will be used to distribute works (so int_num_threads - 1 threads will be actually used for sorting)
+    """
+    int_num_files = len( l_bam_file )
+    int_num_of_recursive_merging = int( np.ceil( math.log( int_num_files, int_max_num_files ) ) ) # retrieve the minmum number of recursive merging
+
+    path_folder_output = path_file_bam_output.rsplit( '/', 1 )[ 0 ] + '/' # retrieve output folder where the output file will reside
+    path_folder_temp = f'{path_folder_output}temp_{UUID( )}/'
+    
+    # create folders
+    for path_folder in [ path_folder_output, path_folder_temp ] :
+        os.makedirs( path_folder, exist_ok = True ) # create temp folder
+
+    # merge files until all files are merged in to a single file
+    while len( l_bam_file ) > 1 : # while loop is active when there is files to be merged
+        int_num_files = len( l_bam_file )  # retreive number of bam files
+        l_file_size = list( os.stat( path_file ).st_size for path_file in l_bam_file ) # retrieve file size of input bam files
+
+        str_uuid_current_merge_step = UUID( ) # identifier for the current merge step
+
+        # retrieve number of output bam files
+        if int_num_files < int_max_num_files :
+            int_num_output_bam_file = 1
+        else :
+            int_num_output_bam_file = int( np.ceil( int_num_files / int_max_num_files ) ) 
+
+        def batch_generator(  ) :
+            l_batch = LIST_Split( l_bam_file, n_split = int_num_output_bam_file, flag_contiguous_chunk = True, arr_weight_for_load_balancing = l_file_size )
+            for batch in l_batch :
+                yield batch
+        def process_batch( batch, pipe_sender = None ) :
+            l_file_bam_to_be_merged_into_a_single_bam_file = batch 
+            path_file_bam_combined_for_a_batch = f"{path_folder_temp}{str_uuid_current_merge_step}.{UUID( )}.bam"
+            print( len( l_file_bam_to_be_merged_into_a_single_bam_file ), 'files will be merged into', path_file_bam_combined_for_a_batch )
+            pysam.merge( '--no-PG', path_file_bam_combined_for_a_batch, * l_file_bam_to_be_merged_into_a_single_bam_file )
+            pysam.index( path_file_bam_combined_for_a_batch )
+            pipe_sender.send( 'completed' ) # tell the distributor that the work is done! 
+
+        Multiprocessing_Batch( batch_generator(  ), process_batch, int_num_threads = max( 2, int_num_threads ) )
+
+        # remove temporary or input files
+        if flag_remove_file :
+            for path_file in l_bam_file :
+                os.remove( path_file )
+                os.remove( path_file + '.bai' ) # delete index files, too
+                pass
+        flag_remove_file = True # remove temporary files
+
+        l_bam_file = glob.glob( f"{path_folder_temp}{str_uuid_current_merge_step}.*.bam" ) # retrieve input bam files for the next round
+
+    # rename combined output file
+    os.rename( l_bam_file[ 0 ], path_file_bam_output )
+    os.rename( l_bam_file[ 0 ] + '.bai', path_file_bam_output + '.bai' )
+
+    # delete temporary folder
+    shutil.rmtree( path_folder_temp )
+
 def Cigartuple_Convert( r_mappy = None, seq_mappy = None, cigartuple_pysam = None ) :
     """ # 2021-11-25 13:36:51 
     convert cigartuple from mappy to that of pysam and vice versa
