@@ -9189,7 +9189,7 @@ def Parse_Printed_Table( str_output ) :
 # function related to handle data from the SRA database
 
 def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
-    """ # 2022-04-23 16:24:30 
+    """ # 2022-07-20 16:46:07 
     Retrieve informations from SRA downloaded files (SraRunTable and XML records) and combine them as a dataframe.
     
     'path_glob_SraRunTable' a path (* wildcard can be used) for retrieving downloaded SraRunTable text files
@@ -9232,7 +9232,7 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
         ''' retrieve accessions '''
         val_exp_accession = r[ 'EXPERIMENT' ][ '@accession' ]
         val_study_accession = r[ 'STUDY' ][ '@accession' ]
-        val_sample_accession = r[ 'SAMPLE' ][ '@accession' ]
+        val_sample_accession = ( r[ 'SAMPLE' ][ '@accession' ] if 'SAMPLE' in r else np.nan ) # SAMPLE might not exists
 
         ''' retrieve study descriptions '''
         r_study = r[ 'STUDY' ][ 'DESCRIPTOR' ]
@@ -9256,18 +9256,23 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
         val_CENTER_PROJECT_NAME = r_study[ 'CENTER_PROJECT_NAME' ] if 'CENTER_PROJECT_NAME' in r_study else np.nan
 
         ''' retrieve sample descriptions '''
-        r_sample = r[ 'SAMPLE' ]
-        val_TITLE = r_sample[ 'TITLE' ] if 'TITLE' in r_sample else np.nan
-        val_TAXON_ID = r_sample[ 'SAMPLE_NAME' ][ 'TAXON_ID' ]
-        val_TAXON_SCIENTIFIC_NAME = r_sample[ 'SAMPLE_NAME' ][ 'SCIENTIFIC_NAME' ]
-        ''' retrieve sample attribute '''
+        val_TITLE = np.nan
+        val_TAXON_ID = np.nan
+        val_TAXON_SCIENTIFIC_NAME = np.nan
         val_SAMPLE_ATTRIBUTES = np.nan
-        if 'SAMPLE_ATTRIBUTES' in r_sample :
-            r_sample_attr = r_sample[ 'SAMPLE_ATTRIBUTES' ][ 'SAMPLE_ATTRIBUTE' ]
-            # if only single attribute is available, put it in a list
-            if isinstance( r_sample_attr, collections.OrderedDict ) :
-                r_sample_attr = [ r_sample_attr ]
-            val_SAMPLE_ATTRIBUTES = '; '.join( list( f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr ) ) 
+        if 'SAMPLE' in r : 
+            r_sample = r[ 'SAMPLE' ]
+            val_TITLE = r_sample[ 'TITLE' ] if 'TITLE' in r_sample else np.nan
+            val_TAXON_ID = r_sample[ 'SAMPLE_NAME' ][ 'TAXON_ID' ]
+            val_TAXON_SCIENTIFIC_NAME = r_sample[ 'SAMPLE_NAME' ][ 'SCIENTIFIC_NAME' ]
+            ''' retrieve sample attribute '''
+
+            if 'SAMPLE_ATTRIBUTES' in r_sample :
+                r_sample_attr = r_sample[ 'SAMPLE_ATTRIBUTES' ][ 'SAMPLE_ATTRIBUTE' ]
+                # if only single attribute is available, put it in a list
+                if isinstance( r_sample_attr, collections.OrderedDict ) :
+                    r_sample_attr = [ r_sample_attr ]
+                val_SAMPLE_ATTRIBUTES = '; '.join( list( f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr ) ) 
 
         ''' retrieve list of id_sra for the given record '''
         if 'RUN_SET' not in r :
@@ -9293,7 +9298,10 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
 
     df_meta_xml = pd.DataFrame( l_l, columns = [ 'id_sra', 'id_sra_title', 'val_RUN_SAMPLE_TITLE', 'val_SAMPLE_ATTRIBUTES', 'val_exp_accession', 'val_study_accession', 'val_sample_accession', 'val_LIBRARY_STRATEGY', 'val_LIBRARY_SOURCE', 'val_LIBRARY_SELECTION', 'val_LIBRARY_LAYOUT', 'val_LIBRARY_CONSTRUCTION_PROTOCOL', 'val_STUDY_TITLE', 'val_STUDY_ABSTRACT', 'val_STUDY_DESCRIPTION', 'val_CENTER_PROJECT_NAME', 'val_TITLE', 'val_TAXON_ID', 'val_TAXON_SCIENTIFIC_NAME' ]  ).drop_duplicates( )
     df_metadata = df_metadata.set_index( 'Run' ).join( df_meta_xml.set_index( 'id_sra' ) ).reset_index( drop = False ) # join data from XML to data from the Run table 
+
     return df_metadata
+
+
 
 ''' PIP functions ''' 
 
