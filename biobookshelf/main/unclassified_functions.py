@@ -9156,7 +9156,7 @@ def Pearsonr( x, y, xm = None, ym = None, normxm = None, normym = None, xm_divid
     
 # functions related to the command line interface
 def Parse_Printed_Table( str_output ) :
-    ''' # 2022-04-05 19:55:37 
+    ''' # 2022-08-08 11:39:01 
     Parse printed table by identifying the position of columns and inferring datatypes using pandas module
     '''
     l_line = str_output.split( '\n' )
@@ -9164,6 +9164,9 @@ def Parse_Printed_Table( str_output ) :
     int_max_characters_in_each_line = max( len( line ) for line in l_line ) # retrieve the maximum number of characters a line contains
     arr_space_counter = np.zeros( int_max_characters_in_each_line, dtype = int )
     for line in l_line :
+        # add padding containing ' ' to the end of the sentence for accurate detection of columns
+        if len( line ) < int_max_characters_in_each_line :
+            line += ' ' * ( int_max_characters_in_each_line - len( line ) )
         for i, c in enumerate( line ) :
             if c == ' ' :
                 arr_space_counter[ i ] += 1 
@@ -9291,3 +9294,11 @@ def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
     df_meta_xml = pd.DataFrame( l_l, columns = [ 'id_sra', 'id_sra_title', 'val_RUN_SAMPLE_TITLE', 'val_SAMPLE_ATTRIBUTES', 'val_exp_accession', 'val_study_accession', 'val_sample_accession', 'val_LIBRARY_STRATEGY', 'val_LIBRARY_SOURCE', 'val_LIBRARY_SELECTION', 'val_LIBRARY_LAYOUT', 'val_LIBRARY_CONSTRUCTION_PROTOCOL', 'val_STUDY_TITLE', 'val_STUDY_ABSTRACT', 'val_STUDY_DESCRIPTION', 'val_CENTER_PROJECT_NAME', 'val_TITLE', 'val_TAXON_ID', 'val_TAXON_SCIENTIFIC_NAME' ]  ).drop_duplicates( )
     df_metadata = df_metadata.set_index( 'Run' ).join( df_meta_xml.set_index( 'id_sra' ) ).reset_index( drop = False ) # join data from XML to data from the Run table 
     return df_metadata
+
+''' PIP functions ''' 
+
+def PIP_List_Packages( ) :
+    """ # 2022-08-08 11:32:04 
+    list installed packages 
+    """
+    return Parse_Printed_Table( os.popen( 'pip list' ).read( ).strip( ) ).drop( index = [ 0 ] ).set_index( 'Package' ) 
