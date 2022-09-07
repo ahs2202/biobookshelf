@@ -156,7 +156,7 @@ def COUNTER( l_values, dict_counter = None, ignore_float = True ) : # 2020-07-29
     return dict_counter
 
 def detect_boolean_mask( ba ) :
-    """ # 2022-08-02 19:48:52 
+    """ # 2022-08-10 23:29:06 
     detect boolean mask by looking up to 10 values
     """
     # extract the first row from the ndarray data
@@ -164,6 +164,10 @@ def detect_boolean_mask( ba ) :
         for i in range( len( ba.shape ) - 1 ) :
             ba = ba[ 0 ]
     if not hasattr( ba, '__iter__' ) : # 'ba' should be iterable to be a boolean mask
+        return False
+    ba = ba[ : 10 ]
+    # if the length of array of interest is <= 2 and only consists of 0, 1, consider it as an integer array, not boolean array
+    if len( ba ) <= 2 and set( COUNTER( ba[ : 10 ] ) ).issubset( { 0, 1 } ) :
         return False
     return set( COUNTER( ba[ : 10 ] ) ).issubset( { 0, 1, True, False } )
 

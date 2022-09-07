@@ -71,9 +71,6 @@ np_str = np.core.defchararray
 from IPython.core.display import display, HTML
 
 
-
-
-
 # network
 import requests # for retriving HTML documents
 from ftplib import FTP # for interacting with ftp server
@@ -5573,9 +5570,10 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
 # In[ ]:
 
 def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
-    """ # 2022-07-04 01:16:29 
+    """ # 2022-09-05 17:33:52 
     perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (1) and (3) will be run in the main process, while (2) will be offloaded to worker processes. 
     the 'batch' and result returned by 'process_batch' will be communicated through pipes.
+    if int_num_threads is 1, run all processes in the main process
     
     'gen_batch' : a generator object returning batches
     'process_batch( batch, pipe_sender )' : a function that can process batch. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
@@ -5583,6 +5581,8 @@ def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, 
     'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used.
     'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
     """
+    flag_multiprocessing = int_num_threads >= 2 # retrieve a flag for multiprocessing
+        
     q_batch = collections.deque( ) # initialize queue of batchs
     flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
     dict_running_process = dict( ) # dictionary of running processes
@@ -5613,22 +5613,108 @@ def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, 
                     res = dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].recv( ) # retrieve result
                     post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
                     del res
-                dict_running_process[ str_uuid_process ][ 'process' ].join( ) # dismiss the worker process
+                if flag_multiprocessing :
+                    dict_running_process[ str_uuid_process ][ 'process' ].join( ) # dismiss the worker process
                 dict_running_process.pop( str_uuid_process ) # remove the completed worker process from the dictionary
 
         ''' if the number of currently running processes is smaller than the number of threads and there are remaining batchs to be processed, open and run a process until jobs are given to all threads '''
-        while len( q_batch ) > 0 and len( dict_running_process ) < int_num_threads - 1 : # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function
+        while len( q_batch ) > 0 and ( len( dict_running_process ) < int_num_threads - 1 or not flag_multiprocessing ) : # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function # if single-process mode is active, process batch every time it is available
             ''' open a process to analyze reads for a region in a batch '''
             str_uuid_process = UUID( ) # retrieve uuid of the process
             # retrieve a batch
             batch = q_batch.pop( )
             # open a pipe to communicate with the new process once the analysis is completed
             pipe_sender, pipe_receiver = mp.Pipe( )
+            p = None
             # open and run a process
-            p = mp.Process( target = process_batch, args = ( batch, pipe_sender ) ) # run 'process_batch' fuction in the 'WORKER PROCESS'
-            p.start( ) # start the process
+            if flag_multiprocessing :
+                p = mp.Process( target = process_batch, args = ( batch, pipe_sender ) ) # run 'process_batch' fuction in the 'WORKER PROCESS'
+                p.start( ) # start the process
+            else :
+                # process batch in the main process
+                process_batch( batch, pipe_sender )
             dict_running_process[ str_uuid_process ] = { 'process' : p, 'pipe_receiver' : pipe_receiver }  # add the process to the dictionary
 
+def Multiprocessing_Batch_Generator_and_Workers( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
+    """ # 2022-09-06 16:49:30 
+    'Multiprocessing_Batch_Generator_and_Workers' : multiprocessing using batch generator and workers.
+    all worker process will be started using the default ('fork' in UNIX) method.
+    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (3) will be run in the main process, while (1) and (2) will be offloaded to worker processes. 
+    the 'batch' and result returned by 'process_batch' will be communicated to batch processing workers through pipes.
+    
+    'gen_batch' : a generator object returning batches
+    'process_batch( pipe_receiver, pipe_sender )' : a function that can process batch from 'pipe_receiver'. should terminate itself when None is received. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
+    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
+    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used. one thread is reserved for batch generation.
+    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
+    """
+    def __batch_generating_worker( gen_batch, l_pipe_sender_input, l_pipe_receiver_output, pipe_sender_output_to_main_process ) :
+        """ # 2022-09-06 15:16:29 
+        define a worker for generating batch and distributing batches across the workers, receives results across the workers, and send result back to the main process
+        """
+        # hard coded setting
+        int_max_num_batches_in_a_queue_for_each_worker = 2
+        
+        q_batch = collections.deque( ) # initialize queue of batchs
+        int_num_batch_processing_workers = len( l_pipe_sender_input )
+        flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
+        arr_num_batch_being_processed = np.zeros( int_num_batch_processing_workers, dtype = int ) # retrieve the number of batches currently being processed in each worker. if this number becomes 0, assumes the worker is available
+        index_worker = 0 # initialize the index of the worker
+        while True :
+            ''' retrieve batch (if available) '''
+            if not flag_batch_generation_completed :
+                try :
+                    batch = next( gen_batch ) # retrieve the next barcode
+                    q_batch.appendleft( batch ) # append batch
+                except StopIteration : 
+                    flag_batch_generation_completed = True
+            else :
+                # if all batches have been distributed and processed, exit the loop
+                if len( q_batch ) == 0 and arr_num_batch_being_processed.sum( ) == 0 :
+                    break
+                # if batch generation has been completed, sleep for a while
+                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop ) # sleep 
+                
+            ''' collect completed works '''
+            for index_worker in range( int_num_batch_processing_workers ) :
+                while l_pipe_receiver_output[ index_worker ].poll( ) : # until results are available
+                    pipe_sender_output_to_main_process.send( l_pipe_receiver_output[ index_worker ].recv( ) ) # retrieve result, and send the result back to the main process
+                    arr_num_batch_being_processed[ index_worker ] -= 1 # update the number of batches being processed by the worker
+            
+            ''' if workers are available and there are remaining works to be distributed, distribute works '''
+            while len( q_batch ) > 0 and ( arr_num_batch_being_processed < int_max_num_batches_in_a_queue_for_each_worker ).sum( ) > 0 : # if there is remaining batch to be distributed or at least at least one worker should be available
+                if arr_num_batch_being_processed[ index_worker ] < int_max_num_batches_in_a_queue_for_each_worker : # if current worker is available
+                    l_pipe_sender_input[ index_worker ].send( q_batch.pop( ) )
+                    arr_num_batch_being_processed[ index_worker ] += 1
+                index_worker = ( 1 + index_worker ) % int_num_batch_processing_workers # retrieve index_worker of the next worker
+                
+        # notify batch-processing workers that all workers are completed
+        for pipe_s in l_pipe_sender_input :
+            pipe_s.send( None )
+        # notify the main process that all batches have been processed
+        pipe_sender_output_to_main_process.send( None )
+        return
+        
+    int_num_batch_processing_workers = max( 1, int_num_threads - 2 ) # retrieve the number of workers for processing batches # minimum number of worker is 1
+    # compose pipes
+    l_pipes_input = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
+    l_pipes_output = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
+    pipe_sender_output_to_main_process, pipe_receiver_output_to_main_process = mp.Pipe( )
+    # compose workers
+    l_batch_processing_workers = list( mp.Process( target = process_batch, args = ( l_pipes_input[ i ][ 1 ], l_pipes_output[ i ][ 0 ] ) ) for i in range( int_num_batch_processing_workers ) ) # compose a list of batch processing workers
+    p_batch_generating_worker = mp.Process( target = __batch_generating_worker, args = ( gen_batch, list( s for s, r in l_pipes_input ), list( r for s, r in l_pipes_output ), pipe_sender_output_to_main_process ) )
+    # start workers
+    for p in l_batch_processing_workers :
+        p.start( )
+    p_batch_generating_worker.start( )
+
+    # post-process batches
+    while True :
+        res = pipe_receiver_output_to_main_process.recv( )
+        if res is None :
+            break
+        if post_process_batch is not None :
+            post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
 
 def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
     """ # 2022-02-23 10:55:34 
