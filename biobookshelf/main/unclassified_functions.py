@@ -1,3 +1,4 @@
+from typing import Union, List, Literal, Dict
 import biobookshelf.STR as STR
 import biobookshelf.MAP as MAP
 
@@ -1587,9 +1588,9 @@ def DF_Transform_without_loading_in_memory( path_file_dataframe, path_file_dataf
             flag_header_was_written = True # set the flag indicating the header has been written
         df_chunk_transformed.to_csv( newfile, sep = sep_output, header = None, index = index )
 
-def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dataframe_deduplicated, l_col_for_identifying_duplicates, flag_header_is_present = True, str_delimiter = '\t', flag_collect_the_number_of_processed_lines = False ) :
+def DF_Deduplicate_without_loading_in_memory( path_file_dataframe : str, path_file_dataframe_deduplicated : str, l_col_for_identifying_duplicates : Union[ int, str, list[ str ] ], flag_header_is_present : bool = True, str_delimiter : str = '\t', flag_collect_the_number_of_processed_lines : bool = False ) :
     """
-    # 2022-06-01 20:20:28 
+    # 2023-01-06 22:43:43 
     (Assumes the given dataframe is gzipped.)
     similar to pandas.DataFrame.drop_duplicates, except that the dataframe will not be loaded into the memory. duplicates are identified and redundant records will be dropped with keep = 'first' setting
     
@@ -1597,11 +1598,15 @@ def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dat
     inputs:
     'path_file_dataframe' directory of the dataframe to remove duplicates
     'path_file_dataframe_deduplicated' : an output file directory containing unique records
-    'l_col_for_identifying_duplicates' : list of column names (should be all string types) if 'flag_header_is_present' is True else list of column indices (should be all integer types)
+    'l_col_for_identifying_duplicates' : list of column names (should be all string types) if 'flag_header_is_present' is True else list of column indices (should be all integer types). a single column name/index can be also given.
     
-    returns:
+    returns: { 'int_num_lines' : int_num_lines, 'dict_t_val_count' : dict_t_val_count }
     int_num_lines: collect the number of processed lines
+    dict_t_val_count: the counts of each unique combination of values.
     """
+    flag_deduplicate_using_a_single_column = isinstance( l_col_for_identifying_duplicates, ( str, int ) ) # retrieve a flag indicating the de-duplication will be performed using a single column
+    if flag_deduplicate_using_a_single_column :
+        l_col_for_identifying_duplicates = [ l_col_for_identifying_duplicates ] # wrap a single column name/index in a list
     
     ''' open an output file '''
     newfile = gzip.open( path_file_dataframe_deduplicated, 'wb' )
@@ -1619,19 +1624,20 @@ def DF_Deduplicate_without_loading_in_memory( path_file_dataframe, path_file_dat
             
         ''' check whether each record is redundant and write only unique record to the output file '''
         int_num_lines = 0
-        set_t_val = set( ) # a set that will record the occurrence of a unique set of values
+        dict_t_val_count = dict( ) # a dict that will record the number of occurrences of a unique set of values
         while True :
             line = file.readline( ) # read line
             if len( line ) == 0 :
                 break
             int_num_lines += 1
             l_val = line.decode( ).strip( ).split( str_delimiter ) # parse the current line
-            t_val = tuple( l_val[ int_index ] for int_index in l_int_index_col_for_identifying_duplicates ) # retrieve a tuple of values containined in the line
-            if t_val not in set_t_val :
+            t_val = l_val[ l_int_index_col_for_identifying_duplicates[ 0 ] ] if flag_deduplicate_using_a_single_column else tuple( l_val[ int_index ] for int_index in l_int_index_col_for_identifying_duplicates ) # retrieve a single value / a tuple of values containined in the line
+            if t_val not in dict_t_val_count :
                 newfile.write( line )  # write line if the line contain a unqiue set of values
-                set_t_val.add( t_val ) # add a unique set of values to the set
+                dict_t_val_count[ t_val ] = 0 # initialize the count
+            dict_t_val_count[ t_val ] += 1 # increase the count
     newfile.close( )
-    return int_num_lines
+    return { 'int_num_lines' : int_num_lines, 'dict_t_val_count' : dict_t_val_count }
     
 def DF_Sort_without_loading_in_memory( path_file, path_file_sorted, l_col_for_sorting, delimiter = '\t', key_function_for_sorting = None, l_type = None, int_num_lines_for_a_chunk = 1000000, flag_header_line_exists = True ) :
     """ # 2021-12-26 20:44:17 
@@ -1975,7 +1981,7 @@ def PD_Search( df, query_AND_operation = True, is_negative_query = False, ignore
 # In[ ]:
 
 
-def PD_Display( df, max_rows = 1000, max_columns = 35, max_colwidth = 200 ) :
+def PD_Display( df, max_rows = 1000, max_columns = 200, max_colwidth = 200 ) :
     """ display more rows and columns of pandas objects. Also, display more column widths """
     with pd.option_context( 'display.max_rows', max_rows, 'display.max_columns', max_columns, 'display.max_colwidth', max_colwidth ) :
         display( df )
@@ -5564,234 +5570,6 @@ def Parse_Line( str_line, l_type, delimiter = '\t', set_str_representing_nan = s
                     val_converted = np.nan
         l_val_converted.append( val_converted )
     return l_val_converted # return parsed values
-
-# ### Functions using Multiprocessing librarys
-
-# In[ ]:
-
-def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
-    """ # 2022-09-05 17:33:52 
-    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (1) and (3) will be run in the main process, while (2) will be offloaded to worker processes. 
-    the 'batch' and result returned by 'process_batch' will be communicated through pipes.
-    if int_num_threads is 1, run all processes in the main process
-    
-    'gen_batch' : a generator object returning batches
-    'process_batch( batch, pipe_sender )' : a function that can process batch. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
-    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
-    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used.
-    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
-    """
-    flag_multiprocessing = int_num_threads >= 2 # retrieve a flag for multiprocessing
-        
-    q_batch = collections.deque( ) # initialize queue of batchs
-    flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
-    dict_running_process = dict( ) # dictionary of running processes
-    while True :
-        ''' retrieve batch (if available) '''
-        if not flag_batch_generation_completed :
-            try :
-                batch = next( gen_batch ) # retrieve the next barcode
-                q_batch.appendleft( batch ) # append batch
-            except StopIteration : 
-                flag_batch_generation_completed = True
-
-        ''' when all batchs were retrieved, exit or wait '''
-        if flag_batch_generation_completed :
-            ''' if all batchs were retrieved and processed, exit the loop '''
-            if len( q_batch ) == 0 and len( dict_running_process ) == 0 : # define exit condition
-                break
-            else :
-                ''' if there are some remaining batchs to be retrieved or processed, wait before checking the results produced by the processes  '''
-                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop )
-
-        ''' identify completed processes and remove the completed process from the dictionary of processes '''
-        for str_uuid_process in list( dict_running_process ) : # for the current list of processes
-            if dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].poll( ) : # check whether the current process has been completed
-                # if 'post_process_batch' function has been given.
-                if post_process_batch is not None :
-                    ''' collect the result of a completed process, and run 'post_process_batch' function using the result in the main process '''
-                    res = dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].recv( ) # retrieve result
-                    post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
-                    del res
-                if flag_multiprocessing :
-                    dict_running_process[ str_uuid_process ][ 'process' ].join( ) # dismiss the worker process
-                dict_running_process.pop( str_uuid_process ) # remove the completed worker process from the dictionary
-
-        ''' if the number of currently running processes is smaller than the number of threads and there are remaining batchs to be processed, open and run a process until jobs are given to all threads '''
-        while len( q_batch ) > 0 and ( len( dict_running_process ) < int_num_threads - 1 or not flag_multiprocessing ) : # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function # if single-process mode is active, process batch every time it is available
-            ''' open a process to analyze reads for a region in a batch '''
-            str_uuid_process = UUID( ) # retrieve uuid of the process
-            # retrieve a batch
-            batch = q_batch.pop( )
-            # open a pipe to communicate with the new process once the analysis is completed
-            pipe_sender, pipe_receiver = mp.Pipe( )
-            p = None
-            # open and run a process
-            if flag_multiprocessing :
-                p = mp.Process( target = process_batch, args = ( batch, pipe_sender ) ) # run 'process_batch' fuction in the 'WORKER PROCESS'
-                p.start( ) # start the process
-            else :
-                # process batch in the main process
-                process_batch( batch, pipe_sender )
-            dict_running_process[ str_uuid_process ] = { 'process' : p, 'pipe_receiver' : pipe_receiver }  # add the process to the dictionary
-
-def Multiprocessing_Batch_Generator_and_Workers( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
-    """ # 2022-09-06 16:49:30 
-    'Multiprocessing_Batch_Generator_and_Workers' : multiprocessing using batch generator and workers.
-    all worker process will be started using the default ('fork' in UNIX) method.
-    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (3) will be run in the main process, while (1) and (2) will be offloaded to worker processes. 
-    the 'batch' and result returned by 'process_batch' will be communicated to batch processing workers through pipes.
-    
-    'gen_batch' : a generator object returning batches
-    'process_batch( pipe_receiver, pipe_sender )' : a function that can process batch from 'pipe_receiver'. should terminate itself when None is received. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
-    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
-    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used. one thread is reserved for batch generation.
-    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
-    """
-    def __batch_generating_worker( gen_batch, l_pipe_sender_input, l_pipe_receiver_output, pipe_sender_output_to_main_process ) :
-        """ # 2022-09-06 15:16:29 
-        define a worker for generating batch and distributing batches across the workers, receives results across the workers, and send result back to the main process
-        """
-        # hard coded setting
-        int_max_num_batches_in_a_queue_for_each_worker = 2
-        
-        q_batch = collections.deque( ) # initialize queue of batchs
-        int_num_batch_processing_workers = len( l_pipe_sender_input )
-        flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
-        arr_num_batch_being_processed = np.zeros( int_num_batch_processing_workers, dtype = int ) # retrieve the number of batches currently being processed in each worker. if this number becomes 0, assumes the worker is available
-        index_worker = 0 # initialize the index of the worker
-        while True :
-            ''' retrieve batch (if available) '''
-            if not flag_batch_generation_completed :
-                try :
-                    batch = next( gen_batch ) # retrieve the next barcode
-                    q_batch.appendleft( batch ) # append batch
-                except StopIteration : 
-                    flag_batch_generation_completed = True
-            else :
-                # if all batches have been distributed and processed, exit the loop
-                if len( q_batch ) == 0 and arr_num_batch_being_processed.sum( ) == 0 :
-                    break
-                # if batch generation has been completed, sleep for a while
-                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop ) # sleep 
-                
-            ''' collect completed works '''
-            for index_worker in range( int_num_batch_processing_workers ) :
-                while l_pipe_receiver_output[ index_worker ].poll( ) : # until results are available
-                    pipe_sender_output_to_main_process.send( l_pipe_receiver_output[ index_worker ].recv( ) ) # retrieve result, and send the result back to the main process
-                    arr_num_batch_being_processed[ index_worker ] -= 1 # update the number of batches being processed by the worker
-            
-            ''' if workers are available and there are remaining works to be distributed, distribute works '''
-            while len( q_batch ) > 0 and ( arr_num_batch_being_processed < int_max_num_batches_in_a_queue_for_each_worker ).sum( ) > 0 : # if there is remaining batch to be distributed or at least at least one worker should be available
-                if arr_num_batch_being_processed[ index_worker ] < int_max_num_batches_in_a_queue_for_each_worker : # if current worker is available
-                    l_pipe_sender_input[ index_worker ].send( q_batch.pop( ) )
-                    arr_num_batch_being_processed[ index_worker ] += 1
-                index_worker = ( 1 + index_worker ) % int_num_batch_processing_workers # retrieve index_worker of the next worker
-                
-        # notify batch-processing workers that all workers are completed
-        for pipe_s in l_pipe_sender_input :
-            pipe_s.send( None )
-        # notify the main process that all batches have been processed
-        pipe_sender_output_to_main_process.send( None )
-        return
-        
-    int_num_batch_processing_workers = max( 1, int_num_threads - 2 ) # retrieve the number of workers for processing batches # minimum number of worker is 1
-    # compose pipes
-    l_pipes_input = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
-    l_pipes_output = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
-    pipe_sender_output_to_main_process, pipe_receiver_output_to_main_process = mp.Pipe( )
-    # compose workers
-    l_batch_processing_workers = list( mp.Process( target = process_batch, args = ( l_pipes_input[ i ][ 1 ], l_pipes_output[ i ][ 0 ] ) ) for i in range( int_num_batch_processing_workers ) ) # compose a list of batch processing workers
-    p_batch_generating_worker = mp.Process( target = __batch_generating_worker, args = ( gen_batch, list( s for s, r in l_pipes_input ), list( r for s, r in l_pipes_output ), pipe_sender_output_to_main_process ) )
-    # start workers
-    for p in l_batch_processing_workers :
-        p.start( )
-    p_batch_generating_worker.start( )
-
-    # post-process batches
-    while True :
-        res = pipe_receiver_output_to_main_process.recv( )
-        if res is None :
-            break
-        if post_process_batch is not None :
-            post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
-
-def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
-    """ # 2022-02-23 10:55:34 
-    split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
-    By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
-    
-    'Function_PostProcessing' : if given, Run the function before removing temporary files at the given temp folder. uuid of the current session and directory of the temporary folder are given as arguments to the function.
-    'global_arguments' : a sort of environment variables (read only) given to each process as a list of additional arguments in addition to the directory of the input file. should be used to use local variables inside main( ) function if this function is called inside the main( ) function.
-                         'global_arguments' will be passed to 'Function_PostProcessing', too.
-    'col_split_load' : a name of column or a list of column names (or integer index of column or list of integer indices of columns if 'arr' is not a dataframe) for grouping given inputs when spliting the inputs into 'n_threads' number of dataframes. Each unique tuple in the column(s) will be present in only one of split dataframes.
-    'n_threads' : if 'n_threads' is 1, does not use multiprocessing module, but simply run the function with the given input. This behavior is for enabiling using functions running Multiprocessing in another function using Multiprocessing, since multiprocessing.Pool module does not allow nested pooling.
-    """
-    if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
-        arr = np.array( arr )
-    str_uuid = UUID( ) # create a identifier for making temporary files
-    l_path_file = list( ) # split inputs given by 'arr' into 'n_threads' number of temporary files
-    if col_split_load is not None : # (only valid when 'arr' is dataframe) a name of column for spliting a given dataframe into 'n_threads' number of dataframes. Each unique value in the column will be present in only one split dataframe.
-        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
-            if isinstance( col_split_load, ( str ) ) : # if only single column name is given, put it in a list
-                col_split_load = [ col_split_load ]    
-
-            # randomly distribute distinct tuples into 'n_threads' number of lists
-            dict_index = DF_Build_Index_Using_Dictionary( arr, col_split_load ) # retrieve index according to the tuple contained by 'col_split_load'
-            l_t = list( dict_index )
-            n_t = len( l_t ) # retrieve number of tuples
-            if n_t < n_threads : # if the given number of thread is larger than the existing number of tuples, set the number of tuples as the number of threads
-                n_threads = n_t
-            np.random.shuffle( l_t )
-            l_l_t = list( l_t[ i : : n_threads ] for i in range( n_threads ) )
-
-            arr_df = arr.values
-            l_col = arr.columns.values
-
-            for index_chunk in range( n_threads ) :
-                l_t_for_the_chunk = l_l_t[ index_chunk ]
-                # retrieve integer indices of the original array for composing array of the curreht chunk
-                l_index = [ ]
-                for t in l_t_for_the_chunk :
-                    l_index.extend( dict_index[ t ] )
-                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-                pd.DataFrame( arr_df[ np.sort( l_index ) ], columns = l_col ).to_csv( path_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
-                l_path_file.append( path_file_temp )
-        else :
-            print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
-            return -1
-    else :
-        # if number of entries is larger than the number of threads, reduce the n_threads
-        if len( arr ) < n_threads :
-            n_threads = len( arr )
-        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
-            for index_chunk in range( n_threads ) :
-                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
-                arr.iloc[ index_chunk : : n_threads ].to_csv( path_file_temp, sep = '\t', index = False )
-                l_path_file.append( path_file_temp )
-        else : # if arr is 1d or 2d array, the temporary file will be tsv file without header
-            l_chunk = LIST_Split( arr, n_threads )
-            for index, arr in enumerate( l_chunk ) : # save temporary files containing inputs
-                path_file_temp = path_temp + str_uuid + '_' + str( index ) + '.tsv'
-                if len( arr.shape ) == 1 : df = pd.DataFrame( arr.reshape( arr.shape[ 0 ], 1 ) )
-                elif len( arr.shape ) == 2 : df = pd.DataFrame( arr )
-                else : print( 'invalid inputs: input array should be 1D or 2D' ); return -1
-                df.to_csv( path_file_temp, sep = '\t', header = None, index = False )
-                l_path_file.append( path_file_temp )
-
-    if n_threads > 1 :
-        with Pool( n_threads ) as p : 
-            l = p.starmap( Function, list( [ path_file ] + list( global_arguments ) for path_file in l_path_file ) ) # use multiple process to run the given function
-    else :
-        ''' if n_threads == 1, does not use multiprocessing module '''
-        l = [ Function( l_path_file[ 0 ], * list( global_arguments ) ) ]
-        
-    if Function_PostProcessing is not None :
-        Function_PostProcessing( str_uuid, path_temp, * global_arguments ) 
-        
-    for path_file in glob.glob( path_temp + str_uuid + '*' ) : os.remove( path_file ) # remove temporary files
-        
-    return l # return mapped results
 
 
 # ### Numpy Utility Functions
@@ -9396,3 +9174,363 @@ def PIP_List_Packages( ) :
     list installed packages 
     """
     return Parse_Printed_Table( os.popen( 'pip list' ).read( ).strip( ) ).drop( index = [ 0 ] ).set_index( 'Package' ) 
+
+"""
+Functions and Classes for Multiprocessing 
+"""
+
+# ### Functions using Multiprocessing librarys
+
+# In[ ]:
+
+def Multiprocessing_Batch( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
+    """ # 2022-09-05 17:33:52 
+    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (1) and (3) will be run in the main process, while (2) will be offloaded to worker processes. 
+    the 'batch' and result returned by 'process_batch' will be communicated through pipes.
+    if int_num_threads is 1, run all processes in the main process
+    
+    'gen_batch' : a generator object returning batches
+    'process_batch( batch, pipe_sender )' : a function that can process batch. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
+    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
+    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used.
+    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
+    """
+    flag_multiprocessing = int_num_threads >= 2 # retrieve a flag for multiprocessing
+        
+    q_batch = collections.deque( ) # initialize queue of batchs
+    flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
+    dict_running_process = dict( ) # dictionary of running processes
+    while True :
+        ''' retrieve batch (if available) '''
+        if not flag_batch_generation_completed :
+            try :
+                batch = next( gen_batch ) # retrieve the next barcode
+                q_batch.appendleft( batch ) # append batch
+            except StopIteration : 
+                flag_batch_generation_completed = True
+
+        ''' when all batchs were retrieved, exit or wait '''
+        if flag_batch_generation_completed :
+            ''' if all batchs were retrieved and processed, exit the loop '''
+            if len( q_batch ) == 0 and len( dict_running_process ) == 0 : # define exit condition
+                break
+            else :
+                ''' if there are some remaining batchs to be retrieved or processed, wait before checking the results produced by the processes  '''
+                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop )
+
+        ''' identify completed processes and remove the completed process from the dictionary of processes '''
+        for str_uuid_process in list( dict_running_process ) : # for the current list of processes
+            if dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].poll( ) : # check whether the current process has been completed
+                # if 'post_process_batch' function has been given.
+                if post_process_batch is not None :
+                    ''' collect the result of a completed process, and run 'post_process_batch' function using the result in the main process '''
+                    res = dict_running_process[ str_uuid_process ][ 'pipe_receiver' ].recv( ) # retrieve result
+                    post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
+                    del res
+                if flag_multiprocessing :
+                    dict_running_process[ str_uuid_process ][ 'process' ].join( ) # dismiss the worker process
+                dict_running_process.pop( str_uuid_process ) # remove the completed worker process from the dictionary
+
+        ''' if the number of currently running processes is smaller than the number of threads and there are remaining batchs to be processed, open and run a process until jobs are given to all threads '''
+        while len( q_batch ) > 0 and ( len( dict_running_process ) < int_num_threads - 1 or not flag_multiprocessing ) : # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function # if single-process mode is active, process batch every time it is available
+            ''' open a process to analyze reads for a region in a batch '''
+            str_uuid_process = UUID( ) # retrieve uuid of the process
+            # retrieve a batch
+            batch = q_batch.pop( )
+            # open a pipe to communicate with the new process once the analysis is completed
+            pipe_sender, pipe_receiver = mp.Pipe( )
+            p = None
+            # open and run a process
+            if flag_multiprocessing :
+                p = mp.Process( target = process_batch, args = ( batch, pipe_sender ) ) # run 'process_batch' fuction in the 'WORKER PROCESS'
+                p.start( ) # start the process
+            else :
+                # process batch in the main process
+                process_batch( batch, pipe_sender )
+            dict_running_process[ str_uuid_process ] = { 'process' : p, 'pipe_receiver' : pipe_receiver }  # add the process to the dictionary
+
+def Multiprocessing_Batch_Generator_and_Workers( gen_batch, process_batch, post_process_batch = None, int_num_threads = 15, int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop = 0.2 ) :
+    """ # 2022-09-06 16:49:30 
+    'Multiprocessing_Batch_Generator_and_Workers' : multiprocessing using batch generator and workers.
+    all worker process will be started using the default ('fork' in UNIX) method.
+    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (3) will be run in the main process, while (1) and (2) will be offloaded to worker processes. 
+    the 'batch' and result returned by 'process_batch' will be communicated to batch processing workers through pipes.
+    
+    'gen_batch' : a generator object returning batches
+    'process_batch( pipe_receiver, pipe_sender )' : a function that can process batch from 'pipe_receiver'. should terminate itself when None is received. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed. sending 'None' through 'pipe_sender' will terminate the block and the main process will be unblocked (however, the works will be continued to be distributed and performed by the child processes).
+    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
+    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used. one thread is reserved for batch generation.
+    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
+    """
+    def __batch_generating_worker( gen_batch, l_pipe_sender_input, l_pipe_receiver_output, pipe_sender_output_to_main_process ) :
+        """ # 2022-09-06 15:16:29 
+        define a worker for generating batch and distributing batches across the workers, receives results across the workers, and send result back to the main process
+        """
+        # hard coded setting
+        int_max_num_batches_in_a_queue_for_each_worker = 2
+        
+        q_batch = collections.deque( ) # initialize queue of batchs
+        int_num_batch_processing_workers = len( l_pipe_sender_input )
+        flag_batch_generation_completed = False # flag indicating whether generating batchs for the current input sam file was completed
+        arr_num_batch_being_processed = np.zeros( int_num_batch_processing_workers, dtype = int ) # retrieve the number of batches currently being processed in each worker. if this number becomes 0, assumes the worker is available
+        while True :
+            ''' retrieve batch (if available) '''
+            if not flag_batch_generation_completed :
+                try :
+                    batch = next( gen_batch ) # retrieve the next barcode
+                    q_batch.appendleft( batch ) # append batch
+                except StopIteration : 
+                    flag_batch_generation_completed = True
+            else :
+                # if all batches have been distributed and processed, exit the loop
+                if len( q_batch ) == 0 and arr_num_batch_being_processed.sum( ) == 0 :
+                    break
+                # if batch generation has been completed, sleep for a while
+                time.sleep( int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop ) # sleep 
+                
+            ''' collect completed works '''
+            for index_worker in range( int_num_batch_processing_workers ) :
+                while l_pipe_receiver_output[ index_worker ].poll( ) : # until results are available
+                    pipe_sender_output_to_main_process.send( l_pipe_receiver_output[ index_worker ].recv( ) ) # retrieve result, and send the result back to the main process
+                    arr_num_batch_being_processed[ index_worker ] -= 1 # update the number of batches being processed by the worker
+            
+            ''' if workers are available and there are remaining works to be distributed, distribute works '''
+            index_worker = 0 # initialize the index of the worker
+            while len( q_batch ) > 0 and ( arr_num_batch_being_processed < int_max_num_batches_in_a_queue_for_each_worker ).sum( ) > 0 : # if there is remaining batch to be distributed or at least at least one worker should be available
+                if arr_num_batch_being_processed[ index_worker ] <= arr_num_batch_being_processed.mean( ) and arr_num_batch_being_processed[ index_worker ] < int_max_num_batches_in_a_queue_for_each_worker : # the load of the current worker should be below the threshold # if the load for the current worker is below the pool average, assign the work to the process (load-balancing)
+                    l_pipe_sender_input[ index_worker ].send( q_batch.pop( ) )
+                    arr_num_batch_being_processed[ index_worker ] += 1
+                index_worker = ( 1 + index_worker ) % int_num_batch_processing_workers # retrieve index_worker of the next worker
+                
+        # notify batch-processing workers that all workers are completed
+        for pipe_s in l_pipe_sender_input :
+            pipe_s.send( None )
+        # notify the main process that all batches have been processed
+        pipe_sender_output_to_main_process.send( None )
+        return
+        
+    int_num_batch_processing_workers = max( 1, int_num_threads - 2 ) # retrieve the number of workers for processing batches # minimum number of worker is 1
+    # compose pipes
+    l_pipes_input = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
+    l_pipes_output = list( mp.Pipe( ) for i in range( int_num_batch_processing_workers ) )
+    pipe_sender_output_to_main_process, pipe_receiver_output_to_main_process = mp.Pipe( )
+    # compose workers
+    l_batch_processing_workers = list( mp.Process( target = process_batch, args = ( l_pipes_input[ i ][ 1 ], l_pipes_output[ i ][ 0 ] ) ) for i in range( int_num_batch_processing_workers ) ) # compose a list of batch processing workers
+    p_batch_generating_worker = mp.Process( target = __batch_generating_worker, args = ( gen_batch, list( s for s, r in l_pipes_input ), list( r for s, r in l_pipes_output ), pipe_sender_output_to_main_process ) )
+    # start workers
+    for p in l_batch_processing_workers :
+        p.start( )
+    p_batch_generating_worker.start( )
+
+    # post-process batches
+    while True :
+        res = pipe_receiver_output_to_main_process.recv( )
+        if res is None :
+            break
+        if post_process_batch is not None :
+            post_process_batch( res ) # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
+            
+def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Function_PostProcessing = None, global_arguments = [ ], col_split_load = None ) : 
+    """ # 2022-02-23 10:55:34 
+    split a given iterable (array, dataframe) containing inputs for a large number of jobs given by 'arr' into 'n_threads' number of temporary files, and folks 'n_threads' number of processes running a function given by 'Function' by givning a directory of each temporary file as an argument. if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names, and if arr is 1d or 2d array, the temporary file will be tsv file without header 
+    By default, given inputs will be randomly distributed into multiple files. In order to prevent separation of a set of inputs sharing common input variable(s), use 'col_split_load' to group such inputs together. 
+    
+    'Function_PostProcessing' : if given, Run the function before removing temporary files at the given temp folder. uuid of the current session and directory of the temporary folder are given as arguments to the function.
+    'global_arguments' : a sort of environment variables (read only) given to each process as a list of additional arguments in addition to the directory of the input file. should be used to use local variables inside main( ) function if this function is called inside the main( ) function.
+                         'global_arguments' will be passed to 'Function_PostProcessing', too.
+    'col_split_load' : a name of column or a list of column names (or integer index of column or list of integer indices of columns if 'arr' is not a dataframe) for grouping given inputs when spliting the inputs into 'n_threads' number of dataframes. Each unique tuple in the column(s) will be present in only one of split dataframes.
+    'n_threads' : if 'n_threads' is 1, does not use multiprocessing module, but simply run the function with the given input. This behavior is for enabiling using functions running Multiprocessing in another function using Multiprocessing, since multiprocessing.Pool module does not allow nested pooling.
+    """
+    if isinstance( arr, ( list ) ) : # if a list is given, convert the list into a numpy array
+        arr = np.array( arr )
+    str_uuid = UUID( ) # create a identifier for making temporary files
+    l_path_file = list( ) # split inputs given by 'arr' into 'n_threads' number of temporary files
+    if col_split_load is not None : # (only valid when 'arr' is dataframe) a name of column for spliting a given dataframe into 'n_threads' number of dataframes. Each unique value in the column will be present in only one split dataframe.
+        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
+            if isinstance( col_split_load, ( str ) ) : # if only single column name is given, put it in a list
+                col_split_load = [ col_split_load ]    
+
+            # randomly distribute distinct tuples into 'n_threads' number of lists
+            dict_index = DF_Build_Index_Using_Dictionary( arr, col_split_load ) # retrieve index according to the tuple contained by 'col_split_load'
+            l_t = list( dict_index )
+            n_t = len( l_t ) # retrieve number of tuples
+            if n_t < n_threads : # if the given number of thread is larger than the existing number of tuples, set the number of tuples as the number of threads
+                n_threads = n_t
+            np.random.shuffle( l_t )
+            l_l_t = list( l_t[ i : : n_threads ] for i in range( n_threads ) )
+
+            arr_df = arr.values
+            l_col = arr.columns.values
+
+            for index_chunk in range( n_threads ) :
+                l_t_for_the_chunk = l_l_t[ index_chunk ]
+                # retrieve integer indices of the original array for composing array of the curreht chunk
+                l_index = [ ]
+                for t in l_t_for_the_chunk :
+                    l_index.extend( dict_index[ t ] )
+                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                pd.DataFrame( arr_df[ np.sort( l_index ) ], columns = l_col ).to_csv( path_file_temp, sep = '\t', index = False ) # split a given dataframe containing inputs with groupping with a given list of 'col_split_load' columns
+                l_path_file.append( path_file_temp )
+        else :
+            print( "'col_split_load' option is only valid when the given 'arr' is dataframe, exiting" )
+            return -1
+    else :
+        # if number of entries is larger than the number of threads, reduce the n_threads
+        if len( arr ) < n_threads :
+            n_threads = len( arr )
+        if isinstance( arr, pd.DataFrame ) : # if arr is DataFrame, the temporary file will be split DataFrame (tsv format) with column names
+            for index_chunk in range( n_threads ) :
+                path_file_temp = path_temp + str_uuid + '_' + str( index_chunk ) + '.tsv.gz'
+                arr.iloc[ index_chunk : : n_threads ].to_csv( path_file_temp, sep = '\t', index = False )
+                l_path_file.append( path_file_temp )
+        else : # if arr is 1d or 2d array, the temporary file will be tsv file without header
+            l_chunk = LIST_Split( arr, n_threads )
+            for index, arr in enumerate( l_chunk ) : # save temporary files containing inputs
+                path_file_temp = path_temp + str_uuid + '_' + str( index ) + '.tsv'
+                if len( arr.shape ) == 1 : df = pd.DataFrame( arr.reshape( arr.shape[ 0 ], 1 ) )
+                elif len( arr.shape ) == 2 : df = pd.DataFrame( arr )
+                else : print( 'invalid inputs: input array should be 1D or 2D' ); return -1
+                df.to_csv( path_file_temp, sep = '\t', header = None, index = False )
+                l_path_file.append( path_file_temp )
+
+    if n_threads > 1 :
+        with Pool( n_threads ) as p : 
+            l = p.starmap( Function, list( [ path_file ] + list( global_arguments ) for path_file in l_path_file ) ) # use multiple process to run the given function
+    else :
+        ''' if n_threads == 1, does not use multiprocessing module '''
+        l = [ Function( l_path_file[ 0 ], * list( global_arguments ) ) ]
+        
+    if Function_PostProcessing is not None :
+        Function_PostProcessing( str_uuid, path_temp, * global_arguments ) 
+        
+    for path_file in glob.glob( path_temp + str_uuid + '*' ) : os.remove( path_file ) # remove temporary files
+        
+    return l # return mapped results
+
+
+
+class Offload_Works( ) :
+    """ # 2023-01-07 12:13:13 
+    a class for offloading works in a separate server process without blocking the main process. similar to async. methods, but using processes instead of threads.
+
+    int_max_num_workers : Union[ int, None ] = None # maximum number of worker processes. if the maximum number of works are offloaded, submitting a new work will fail. By default, there will be no limit of the number of worker processes
+    """
+    def __init__( 
+        self, 
+        int_max_num_workers : Union[ int, None ] = None,
+    ) :
+        """ # 2023-01-07 12:13:22 
+        """
+        # handle default arguments
+        if not isinstance( int_max_num_workers, int ) or int_max_num_workers <= 0 :
+            int_max_num_workers = None # by default, there will be no limit of the number of worker processes
+        self._int_max_num_workers = int_max_num_workers
+
+        # initialize
+        self._dict_worker = dict( ) # a dictionary that store the list of active workers
+        self._dict_res = dict( ) # a dictionary that store the completed results of submitted works until it is retrieved.
+    @property
+    def int_num_active_workers( self ) :
+        """ # 2023-01-07 12:30:24 
+        return the number of active worker processes that are actively doing the works
+        """
+        self.collect_results( ) # collect completed results 
+        return len( self._dict_worker )
+    @property
+    def int_num_completed_results( self ) :
+        """ # 2023-01-07 12:30:31 
+        return the number of completed results
+        """
+        self.collect_results( ) # collect completed results 
+        return len( self._dict_res )
+    @property
+    def int_max_num_workers( self ) :
+        """ # 2023-01-07 12:17:17 
+        'int_max_num_workers' is read only property
+        """
+        return self._int_max_num_workers
+    def collect_results( self ) :
+        """ # 2023-01-07 12:37:00 
+        collect completed results of the submitted works to the current object and store the results internally.
+        
+        return the number of collected results
+        """
+        int_num_collected_results = 0 # count the number of collected works
+        for str_uuid_work in list( self._dict_worker ) :
+            worker = self._dict_worker[ str_uuid_work ]
+            if worker[ 'pipe_receiver' ].poll( ) :
+                self._dict_res[ str_uuid_work ] = worker[ 'pipe_receiver' ].recv( ) # collect and store the result
+                worker[ 'process' ].join( ) # dismiss the worker process
+                del self._dict_worker[ str_uuid_work ] # delete the record of the worker
+                int_num_collected_results += 1
+            del worker
+        return int_num_collected_results 
+    def submit_work( self, func, args : tuple = (), kwargs : dict = dict( ) ) :
+        """ # 2023-01-07 12:21:23 
+        submit a work
+
+        return a 'str_uuid_work' that identify the submitted work. the id will be used to check the status of the work and retrieve the result of the work
+        """
+        # raise error when already the maximum number of workers are working
+        if self.int_max_num_workers is not None and self.int_num_active_workers >= self.int_max_num_workers :
+            raise RuntimeError( f'maximum number of workers are working. an addtional work cannot be received.' )
+            
+        import multiprocessing as mp
+        import uuid
+        
+        # initialize a worker process
+        worker = dict( )
+        # create a pipe for communication
+        pipe_sender, pipe_receiver = mp.Pipe( )
+        worker[ 'pipe_receiver' ] = pipe_receiver
+        def __worker( pipe_sender ) :
+            res = func( * args, ** kwargs ) # run the work
+            pipe_sender.send( res ) # send the result
+        worker[ 'process' ] = mp.Process( target = __worker, args = ( pipe_sender, ) )
+        worker[ 'process' ].start( ) # start the work
+        
+        str_uuid_work = uuid.uuid4( ).hex # assign uuid to the current work
+        self._dict_worker[ str_uuid_work ] = worker
+        return str_uuid_work # return the id of the work
+    def check_status( self, str_uuid_work : str ) :
+        """ # 2023-01-07 12:19:45 
+        check the status of a submitted work using the 'str_uuid_work' of the work that has been given when the work was submitted.
+
+        checking the result of unfinished work will not block
+        
+        return True if the work has been completed. return False if the work has not been completed.
+        """
+        self.collect_results( ) # collect the completed results
+        return str_uuid_work in self._dict_res
+    def wait( self, str_uuid_work : str ) :
+        """ # 2023-01-07 13:24:14 
+        wait until the given work has been completed.
+        """
+        self.collect_results( ) # collect the completed results
+        
+        # if the work currently active, wait until the work is completed and collect the result
+        if str_uuid_work in self._dict_worker : 
+            worker = self._dict_worker[ str_uuid_work ] # retrieve the worker
+            self._dict_res[ str_uuid_work ] = worker[ 'pipe_receiver' ].recv( ) # wait until the result become available and collect and store the result
+            worker[ 'process' ].join( ) # dismiss the worker process
+            del self._dict_worker[ str_uuid_work ] # delete the record of the worker
+    def retrieve_result( self, str_uuid_work : str ) :
+        """ # 2023-01-07 12:20:02 
+        retrieving the result of unfinished work will block until the result become available.
+        once a result is retrieved, all the information about the submitted work will be deleted from the object.
+        
+        if the work cannot be identified, None will be returned.
+        """
+        self.wait( str_uuid_work ) # wait until the work is completed
+
+        # if a result is available, return the result and delete from the internal storage
+        if str_uuid_work in self._dict_res :
+            return self._dict_res.pop( str_uuid_work )
+    def wait_all( self ) :
+        """ # 2023-01-07 13:26:58 
+        wait all works to be completed.
+        """
+        self.collect_results( ) # collect the completed results
+        
+        for str_uuid_work in list( self._dict_worker ) : # for each uncompleted work
+            self.wait( str_uuid_work ) # wait until the work is completed

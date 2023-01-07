@@ -128,18 +128,18 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
         
         ''' combine fastq.gz output files of guppy_basecaller output '''
         if flag_barcoding_was_used :
-            for path_folder_barcode in glob.glob( path_folder_guppy_output + '*/*/' ) :
+            for path_folder_barcode in glob.glob( path_folder_guppy_output + 'pass/*/' ) + glob.glob( path_folder_guppy_output + 'fail/*/' ) :
                 name_barcode = path_folder_barcode.rsplit( '/', 2 )[ 1 ] # retrieve barcode name from the path
                 path_file_fastq_gz = f"{path_folder_guppy_output}{name_barcode}.fastq.gz"
-                OS_Run( [ 'cat' ] + list( glob.glob( f"{path_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ) ), path_file_stdout = path_file_fastq_gz, stdout_binary = True ) # combine fastq files
+                OS_FILE_Combine_Files_in_order( list( glob.glob( f"{path_folder_guppy_output}*/{name_barcode}/*" + '*fastq.gz' ) ), path_file_fastq_gz, flag_bgzip_output = False ) # combine fastq files
                 set_path_file_fastq_gz.add( path_file_fastq_gz )
         else :
             path_file_fastq_gz = f"{path_folder_guppy_output}guppy_basecalled.fastq.gz"
-            OS_Run( [ 'cat' ] + list( glob.glob( path_folder_guppy_output + '*fastq.gz' ) ), path_file_stdout = path_file_fastq_gz, stdout_binary = True ) # combine fastq files
+            OS_FILE_Combine_Files_in_order( list( glob.glob( path_folder_guppy_output + '*fastq.gz' ) ), path_file_fastq_gz, flag_bgzip_output = False ) # combine fastq files
             set_path_file_fastq_gz.add( path_file_fastq_gz )
     ''' copy and combine output fastq files to the output directory '''
     if path_folder_output_fastq is not None : # if output folder of fastq files was given
-        # group 'path_file_fastq_gz' based on 'name_file'
+        # group 'path_file_fastq_gz' based on 'name_file' 
         
         dict_name_file_to_dir = dict( )
         for d in set_path_file_fastq_gz :
@@ -147,10 +147,24 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
             if name_file not in dict_name_file_to_dir :
                 dict_name_file_to_dir[ name_file ] = [ ]
             dict_name_file_to_dir[ name_file ].append( d )
-        for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
-            OS_Run( [ 'cat' ] + dict_name_file_to_dir[ name_file ], path_file_stdout = f"{path_folder_output_fastq}{name_file}", stdout_binary = True ) # combine fastq files
-
         
+        for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
+            OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{path_folder_output_fastq}{name_file}", flag_bgzip_output = False ) # combine fastq files
+            
+# l_path_folder_guppy_output = [
+#     '/home/project/Single_Cell_Full_Length_Atlas/data/nanopore_data/sc_long_read/220923_split_seq_MT11_depletion/220923_split_seq_MT11_depletio2/20220923_1727_MN35000_FAT95306_8b96172c/guppy_out/',
+#     '/home/project/Single_Cell_Full_Length_Atlas/data/nanopore_data/sc_long_read/220923_split_seq_MT11_depletion/220923_split_seq_MT11_depletion/20220923_1349_MN35000_FAT95306_ff4853f4/guppy_out/'
+# ]
+# path_folder_output_fastq = '/home/project/Single_Cell_Full_Length_Atlas/data/pipeline/20220331_Ouroboros_Project/pipeline/20220923_SPLiT_Seq_pilot_OuroDep_MT11_depletion/'
+
+# # collect pathes of the fastq files
+# df_file = pd.concat( [ GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_guppy_output}*.fastq.gz" ) for path_folder_guppy_output in l_path_folder_guppy_output ] )
+# for name_barcode in df_file.wildcard_0.unique( ) :
+#     df = PD_Select( df_file, wildcard_0 = name_barcode )
+#     str_content1 = " ".join( df.path.values )
+#     str_content2 = f"{path_folder_output_fastq}{name_barcode}.fastq.gz"
+#     !cat {str_content1} > {str_content2}
+            
 # def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20 ) :
 #     """ 
 #     # 2021-06-15 23:42:30 
@@ -189,15 +203,16 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
 #     # build index for the output bam file
 #     run = subprocess.run( [ 'samtools', 'index', path_file_bam ], capture_output = False )
         
-def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False, n_threads_for_sort = 1 ) :
+def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False, n_threads_for_sort = 1, flag_use_split_prefix : bool = False ) :
     """ 
-    # 2022-05-06 21:48:57 
+    # 2022-09-24 19:15:33 
     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
     'path_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
     'path_file_minimap2_index' : minimap2 index file
     'path_folder_minimap2_output' : minimap2 output folder
     'drop_unaligned' : a flag indicating whether reads not aligned to the reference ('SAM flag == 4') are included in the output bam file
     'return_bash_shellscript' : return shellscript instead of running minimap2 using the subprocess module
+    'flag_use_split_prefix' = False # for large index, split-prefix should be used
     """
     path_folder_fastq, name_file_fastq = path_file_fastq.rsplit( '/', 1 )
     if path_folder_minimap2_output is None : # default output folder is a subdirectory of the folder containing the input fastq file
@@ -213,6 +228,11 @@ def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/sh
     
     ''' perform minimap2 alignment '''
     l_arg = [ 'minimap2', '-t', str( int( n_threads ) ), '-ax', 'splice', "-o", path_file_sam ] 
+    
+    # for large index, split-prefix should be used
+    if flag_use_split_prefix :
+        l_arg += [ f'--split-prefix={path_folder_minimap2_output}{UUID( )}' ]
+    
     if drop_unaligned :
         l_arg += [ '--sam-hit-only' ]
     l_arg += [ path_file_minimap2_index, path_file_fastq ]

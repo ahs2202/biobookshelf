@@ -137,8 +137,7 @@ def Generate_Base_and_Qual( r ) :
                 str_base_read, str_qual_read = r.seq[ pos_read ], r.query_qualities[ pos_read ]
                 yield r.reference_start + pos_ref, str_base_read, str_qual_read
                 pos_ref += 1
-                pos_read += 1
-                
+                pos_read += 1           
                 
 def Retrive_List_of_Mapped_Segments( cigartuples, pos_start, return_1_based_coordinate = False, flag_pos_start_0_based_coord = True, flag_return_splice_junction = False, flag_is_cigartuples_from_mappy = False ) :
     ''' # 2022-01-28 01:51:16 
@@ -549,6 +548,131 @@ def Bookmark_Generator( path_file_bam, int_min_mapq_unique_mapped, int_num_sam_r
     l_bookmark.append( [ '', -1, int_index_chunk ] )
     yield __l_bookmark_to_df_bookmark__( l_bookmark ), int_n_sam_record_count # yield the bookmark for the final chunk
 
+def Call_Variant( 
+    r, 
+    dict_fasta_genome, 
+    function_for_processing_reference_name = None
+) :
+    ''' # 2023-01-07 18:58:43 
+    perform vcf-style variant calling of a single aligned read (pysam read object) using a given genome
+    return a list of mutations and corrected read sequence
+    
+    'r' : AlignedSegment object returned by pysam
+    'dict_fasta_genome' : dictionary of genome sequences
+    'function_for_processing_reference_name' : a function that can be applied to reference name to make reference_name used in r consistent with those used in 'dict_fasta_genome' and the id_mut that will be returned by the current function. (e.g. a function that can remove 'chr' prefix from the reference name, if chromosome name without the 'chr' prefix is being used)
+
+    --- returns ---
+    'l_mut' : list of variants with the following nomenclature
+    {refname}:{refpos}:{ref}>{alt}, where refpos, ref, alt follows nomenclature of VCF file
+    '''
+    pos_read, pos_ref = 0, 0 # current position in the extracted reference sequence and the current read
+    
+    # parse a sam record
+    arr_qual = r.query_qualities
+    seq = r.seq
+    ref_name = r.reference_name
+    if function_for_processing_reference_name is not None :
+        ref_name = function_for_processing_reference_name( ref_name )
+    ref_start = r.reference_start
+    cigartuples = r.cigartuples
+    alen = r.alen
+    
+    # retrieve a part of the reference sequence where the current read was aligned
+    seq_ref = dict_fasta_genome[ ref_name ][ ref_start : ref_start + alen ] 
+    
+    l_mut = [ ]
+
+    """
+    # define interger representation of the CIGAR operations used in BAM files
+    
+    M 0 alignment match (can be a sequence match or mismatch)
+    I 1 insertion to the reference
+    D 2 deletion from the reference
+    N 3 skipped region from the reference
+    S 4 soft clipping (clipped sequences present in SEQ)
+    H 5 hard clipping (clipped sequences NOT present in SEQ)
+    P 6 padding (silent deletion from padded reference)
+    = 7 sequence match
+    X 8 sequence mismatch
+    """
+    int_cigarop_M = 0
+    int_cigarop_I = 1
+    int_cigarop_D = 2
+    int_cigarop_N = 3
+    int_cigarop_S = 4
+    int_cigarop_H = 5
+    int_cigarop_P = 6
+    int_cigarop_equal = 7
+    int_cigarop_X = 8
+
+    ns = dict( ) # create a namespace
+    # initialilze the namespace
+    ns[ 'pos_ref_variant_start' ] = None # 0-based coordinate of the start of the alternative allele on the reference
+    ns[ 'pos_ref_variant_end' ] = None # 0-based coordinate of the end of the alternative allele on the reference
+    ns[ 'alt' ] = ''
+    def __update_alt( pos_ref : int, len_bases_ref : int = 0, bases_alt : str = '' ) :
+        """ # 2023-01-07 17:51:14 
+        """
+        # initialize variant
+        if ns[ 'pos_ref_variant_start' ] is None :
+            ns[ 'pos_ref_variant_start' ] = pos_ref
+            ns[ 'pos_ref_variant_end' ] = pos_ref
+            ns[ 'alt' ] = ''
+        ns[ 'pos_ref_variant_end' ] += len_bases_ref
+        ns[ 'alt' ] += bases_alt
+    def __flush_alt( ) :
+        """ # 2023-01-07 17:24:20 
+        flush variant allele
+        """
+        if ns[ 'pos_ref_variant_start' ] is not None :
+            if len( ns[ 'alt' ] ) == 0 or ns[ 'pos_ref_variant_end' ] == ns[ 'pos_ref_variant_start' ] : # for simple insertion/deletion variants, add a single base pair of the reference before insertion or deletion to record the variant
+                ns[ 'pos_ref_variant_start' ] -= 1
+                ns[ 'alt' ] = seq_ref[ ns[ 'pos_ref_variant_start' ] ] + ns[ 'alt' ]
+            l_mut.append( f"{ref_name}:{ref_start + 1 + ns[ 'pos_ref_variant_start' ]}:{seq_ref[ ns[ 'pos_ref_variant_start' ] : ns[ 'pos_ref_variant_end' ] ]}>{ns[ 'alt' ]}" ) # append the variant
+            ns[ 'pos_ref_variant_start' ] = None
+            ns[ 'pos_ref_variant_end' ] = None
+            ns[ 'alt' ] = ''
+    for int_oper, n_bases in cigartuples :
+        if int_oper == int_cigarop_M :
+            for _ in range( n_bases ) :
+                str_base_read, str_base_ref, str_qual_read = seq[ pos_read ], seq_ref[ pos_ref ], arr_qual[ pos_read ]
+                if str_base_read == str_base_ref :
+                    __flush_alt( ) # flush a variant
+                else :
+                    __update_alt( pos_ref, len_bases_ref = 1, bases_alt = str_base_read )
+                pos_ref += 1
+                pos_read += 1
+        elif int_oper == int_cigarop_N :
+            __flush_alt( ) # flush a variant
+            pos_ref += n_bases
+        elif int_oper == int_cigarop_S :
+            __flush_alt( ) # flush a variant
+            pos_read += n_bases
+        elif int_oper == int_cigarop_I :
+            __update_alt( pos_ref, bases_alt = seq[ pos_read : pos_read + n_bases ] )
+            pos_read += n_bases
+        elif int_oper == int_cigarop_D :
+            __update_alt( pos_ref, len_bases_ref = n_bases )
+            pos_ref += n_bases
+        elif int_oper == int_cigarop_H :
+            __flush_alt( ) # flush a variant
+            pass
+        elif int_oper == int_cigarop_P :
+            __flush_alt( ) # flush a variant
+            pass
+        elif int_oper == int_cigarop_equal :
+            __flush_alt( ) # flush a variant
+            pos_ref += n_bases
+            pos_read += n_bases
+        elif int_oper == int_cigarop_X :
+            for _ in range( n_bases ) :
+                str_base_read, str_qual_read = seq[ pos_read ], arr_qual[ pos_read ]
+                __update_alt( pos_ref, 1, str_base_read )
+                pos_ref += 1
+                pos_read += 1
+    __flush_alt( ) # flush a variant
+    return l_mut
+    
 def Retrieve_Variant( r, dict_fasta_genome, set_mut_filtered = None, return_corrected_read_sequence = False, flag_ignore_indel = False, flag_return_as_string = True, flag_return_matched = False, function_for_processing_reference_name = None ) :
     ''' # 2022-01-15 00:37:28 
     perform variant calling of a single aligned read (pysam read object) using a given genome
