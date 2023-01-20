@@ -25,7 +25,7 @@ setup(
     install_requires=[
         'ipython>=7.19.0',
         'plotly>=4.11.0',
-        'plotnine>=0.7.1',
+        'plotnine>=0.10.1',
         'pandas>=1.1.4',
         'numpy>=1.18.5',
         'pysam>=0.16.0.1',

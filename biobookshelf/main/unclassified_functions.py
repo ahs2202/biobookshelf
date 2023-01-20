@@ -154,6 +154,23 @@ import seqfold
 # for searching files recursively
 import pathlib
 
+# define version
+_version_ = '0.1.41'
+_scelephant_version_ = _version_
+_last_modified_time_ = '2023-01-10 14:15:02'
+
+str_release_note = [
+    """
+    # %% RELEASE NOTE %%
+    
+    ##### Future implementations #####
+
+    # 2023-01-11 14:30:41 
+    Offload_Works that are safe to use in multiprocessing manager version (with locks) will be implemented.
+    """
+]
+
+
 def Wide( int_percent_html_code_cell_width = 95 ) :
     """ 
     # 20210224
@@ -9407,8 +9424,6 @@ def Multiprocessing( arr, Function, n_threads = 12, path_temp = '/tmp/', Functio
         
     return l # return mapped results
 
-
-
 class Offload_Works( ) :
     """ # 2023-01-07 12:13:13 
     a class for offloading works in a separate server process without blocking the main process. similar to async. methods, but using processes instead of threads.
@@ -9534,3 +9549,73 @@ class Offload_Works( ) :
         
         for str_uuid_work in list( self._dict_worker ) : # for each uncompleted work
             self.wait( str_uuid_work ) # wait until the work is completed
+    
+"""
+classes and functions for sharing data across multiple forked processes
+"""
+from multiprocessing.managers import BaseManager
+class ManagerReadOnly( BaseManager ):
+    pass
+    
+class HostedDict( ):
+    """ # 2023-01-08 23:00:20 
+    A class intended for sharing large read-only object using multiprocessing Manager
+    Hosted Dictionary (Read-Only)
+    """
+    # constructor
+    def __init__( self, path_file_pickle ) :
+        # read the pickle object
+        self._path_file_pickle = path_file_pickle
+        with open( path_file_pickle, 'rb' ) as handle : 
+            self._data = pickle.load( handle )
+    def get_keys( self ) :
+        """ # 2023-01-08 23:05:40 
+        return the list of keys
+        """
+        return list( self._data )
+    def getitem( self, key ) :
+        """ # 2023-01-08 23:02:10 
+        get item of a given key
+        """
+        return self._data[ key ] if key in self._data else None
+    def subset( self, keys ) :
+        """ # 2023-01-08 23:00:59 
+        return a subset of a dictionary for a given list of keys
+        """
+        dict_subset = dict( )
+        for key in keys :
+            if key in self._data :
+                dict_subset[ key ] = self._data[ key ]
+        return dict_subset
+    
+class HostedDictIntervalTree( ):
+    """ # 2023-01-08 23:00:20 
+    A class intended for sharing large read-only object using multiprocessing Manager
+    Hosted Dictionary of Interval Trees (Read-Only)
+    """
+    def __init__( self, path_file_pickle ) :
+        # read the pickle object
+        self._path_file_pickle = path_file_pickle
+        with open( path_file_pickle, 'rb' ) as handle : 
+            self._data = pickle.load( handle )
+    def search_query( self, seqname : str, query ) :
+        """ # 2023-01-08 23:03:44 
+        perform interval search for a given query
+        """
+        if seqname not in self._data :
+            return [ ]
+        return [ [ st, en, values ] for st, en, values in self._data[ seqname ][ query ] ] # 
+    def search_queries( self, seqname : str, queries ) :
+        """ # 2023-01-08 23:01:05 
+        perform interval search for a given queries
+        
+        queries # should be iterable
+        """
+        n_queries = len( queries )
+        if seqname not in self._data :
+            return [ [ ] for _ in range( n_queries ) ]
+        return [ [ [ st, en, values ] for st, en, values in self._data[ seqname ][ query ] ] for query in queries ]
+
+# register
+ManagerReadOnly.register( 'HostedDict', HostedDict )
+ManagerReadOnly.register( 'HostedDictIntervalTree', HostedDictIntervalTree )
