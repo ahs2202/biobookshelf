@@ -4,7 +4,7 @@ import biobookshelf.PKG as PKG
 
 def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, path_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = False ) :
     """
-    # 2021-11-10 16:26:32 
+    # 2023-01-27 23:38:33 
     Run Guppy basecaller on the nanopore sequencing datafiles in the given folder 
     Automatically detect 'id_flowcell' and 'id_lib_prep' from the metadata saved in the folder (they can be manually set through arguments)
     
@@ -90,8 +90,12 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
             l = glob.glob( f"{path_folder_nanopore_sequencing_data}final_summary_*.txt" )
             if len( l ) > 0 : 
                 with open( l[ 0 ] ) as file :
-                    l_line = file.read( ).strip( ).split( '\n' )
-                _, id_flowcell, id_lib_prep = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
+                    content = file.read( ).strip( )
+                    l_line = content.split( '\n' )
+                if 'FLO-MIN114' in content : # 10.4.1 moter speed option
+                    _, id_flowcell, id_lib_prep, str_moter_speed = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
+                else :
+                    _, id_flowcell, id_lib_prep = list( line.split( 'protocol=' )[ 1 ].split( ':' ) for line in l_line if 'protocol=' == line[ : len( 'protocol=' ) ] )[ 0 ] # retrieve flowcell type and library preperation method using summary file inside the directory
             
             if id_flowcell is None or id_lib_prep is None :
                 l = glob.glob( f"{path_folder_nanopore_sequencing_data}report_*.md" ) # retry
@@ -149,59 +153,11 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
             dict_name_file_to_dir[ name_file ].append( d )
         
         for name_file in dict_name_file_to_dir : # for each output 'name_file' (barcodes), combine and copy the file to the given output folder
-            OS_FILE_Combine_Files_in_order( dict_name_file_to_dir[ name_file ], f"{path_folder_output_fastq}{name_file}", flag_bgzip_output = False ) # combine fastq files
-            
-# l_path_folder_guppy_output = [
-#     '/home/project/Single_Cell_Full_Length_Atlas/data/nanopore_data/sc_long_read/220923_split_seq_MT11_depletion/220923_split_seq_MT11_depletio2/20220923_1727_MN35000_FAT95306_8b96172c/guppy_out/',
-#     '/home/project/Single_Cell_Full_Length_Atlas/data/nanopore_data/sc_long_read/220923_split_seq_MT11_depletion/220923_split_seq_MT11_depletion/20220923_1349_MN35000_FAT95306_ff4853f4/guppy_out/'
-# ]
-# path_folder_output_fastq = '/home/project/Single_Cell_Full_Length_Atlas/data/pipeline/20220331_Ouroboros_Project/pipeline/20220923_SPLiT_Seq_pilot_OuroDep_MT11_depletion/'
-
-# # collect pathes of the fastq files
-# df_file = pd.concat( [ GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_guppy_output}*.fastq.gz" ) for path_folder_guppy_output in l_path_folder_guppy_output ] )
-# for name_barcode in df_file.wildcard_0.unique( ) :
-#     df = PD_Select( df_file, wildcard_0 = name_barcode )
-#     str_content1 = " ".join( df.path.values )
-#     str_content2 = f"{path_folder_output_fastq}{name_barcode}.fastq.gz"
-#     !cat {str_content1} > {str_content2}
-            
-# def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20 ) :
-#     """ 
-#     # 2021-06-15 23:42:30 
-#     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
-#     reads not aligned to the reference ('SAM flag == 4') are not included in the output bam file
-    
-#     'path_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
-#     'path_file_minimap2_index' : minimap2 index file
-#     'path_folder_minimap2_output' : minimap2 output folder
-#     'drop_unaligned' : a flag indicating whether reads not aligned to the reference ('SAM flag == 4') are included in the output bam file
-#     """
-#     path_file_fastq = os.path.abspath( path_file_fastq ) # retrieve an absolute path
-#     path_folder_fastq, name_file_fastq = path_file_fastq.rsplit( '/', 1 )
-#     if path_folder_minimap2_output is None : # default output folder is a subdirectory of the folder containing the input fastq file
-#         path_folder_minimap2_output = f'{path_folder_fastq}/minimap2/'
-#     path_folder_minimap2_output = os.path.abspath( path_folder_minimap2_output ) # retrieve an absolute path
-#     if path_folder_minimap2_output[ -1 ] != '/' : # add '/' at the end of the output directory if it does not exist
-#         path_folder_minimap2_output += '/'
-#     os.makedirs( path_folder_minimap2_output, exist_ok = True ) # create folder if it does not exist
-
-#     # define output file
-#     path_file_bam = f"{path_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.bam"
-    
-#     # run minimap2 
-#     p_minimap2 = subprocess.Popen( [ 'minimap2', '-L', '-t', str( int( n_threads ) ), '-ax', 'splice', path_file_minimap2_index, path_file_fastq ], stdout = subprocess.PIPE, shell = False )
-#     # filter reads not aligned to reference
-#     p_samtools_filter = subprocess.Popen( [ 'samtools', 'view', '-h', '-F', '4' ], stdin = p_minimap2.stdout, stdout = subprocess.PIPE, shell = False )
-#     # sort output by coordinates
-#     p_samtools_sort = subprocess.Popen( [ 'samtools', 'sort', '-@', str( int( min( n_threads, 10 ) ) ), '-O', "BAM", '-o', path_file_bam ], stdin = p_samtools_filter.stdout, stdout = subprocess.PIPE, shell = False )
-
-#     p_minimap2.stdout.close( )
-#     p_samtools_filter.communicate( )
-#     p_samtools_filter.stdout.close( )
-#     p_samtools_sort.communicate( )
-
-#     # build index for the output bam file
-#     run = subprocess.run( [ 'samtools', 'index', path_file_bam ], capture_output = False )
+            l_path_file = dict_name_file_to_dir[ name_file ] # retrieve list of file path of the current barcode
+            if len( l_path_file ) == 1 : # when only single file exist for the current barcode , simply copy the file to the output 
+                OS_Run( [ 'cp', l_path_file[ 0 ], f"{path_folder_output_fastq}{name_file}" ] )
+            else : # combine files 
+                OS_FILE_Combine_Files_in_order( l_path_file, f"{path_folder_output_fastq}{name_file}", flag_bgzip_output = False ) # 
         
 def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False, n_threads_for_sort = 1, flag_use_split_prefix : bool = False ) :
     """ 
