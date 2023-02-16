@@ -1391,6 +1391,14 @@ def get_data__tumor_grades( gene_id, df = None ) :
 
 # In[ ]:
 
+def GENE_SET_Read_GMT( path_file ) :
+    """ # 2023-02-15 14:44:16 
+    read GMT formatted gene set file
+    """
+    with open( path_file, 'rt' ) as file :
+        l_line = file.read( ).strip( ).split( '\n' )
+    dict_gene_sets = dict( ( e[ 0 ], e[ 2 : ] ) for e in list( line.split( '\t' ) for line in l_line ) )
+    return dict_gene_sets # return dict_gene_sets
 
 def FIND_Gene_Sets__with_Gene_or_Gene_Set_Name( dict_Gene_Sets, Gene = None, Gene_Set_Name = None) :
     '''  Find and return a list of Gene_Sets in a dictionary of Gene_Sets that include a given Gene  '''
