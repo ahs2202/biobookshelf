@@ -84,13 +84,13 @@ import argparse, getopt
 
 
 # python modules that requires independent anaconda install
-# import module for interactive plotting (with hover tool)
-from bokeh.plotting import figure, output_file, show, output_notebook
-# import module for opening URL by clicking entries
-from bokeh.models import OpenURL, TapTool, ColumnDataSource, CustomJS, Rect, LabelSet, Label, Range1d, BoxAnnotation, LogColorMapper, LogTicker, ColorBar, Whisker
-from bokeh.layouts import row, gridplot, widgetbox
-from bokeh.transform import jitter
-from bokeh.io import reset_output
+# # import module for interactive plotting (with hover tool)
+# from bokeh.plotting import figure, output_file, show, output_notebook
+# # import module for opening URL by clicking entries
+# from bokeh.models import OpenURL, TapTool, ColumnDataSource, CustomJS, Rect, LabelSet, Label, Range1d, BoxAnnotation, LogColorMapper, LogTicker, ColorBar, Whisker
+# from bokeh.layouts import row, gridplot, widgetbox
+# from bokeh.transform import jitter
+# from bokeh.io import reset_output
 
 # from bioservices.kegg import KEGG # module for KEGG REST service
 # from Bio import SeqIO
