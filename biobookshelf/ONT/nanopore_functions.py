@@ -1,6 +1,191 @@
 # load internal module
 from biobookshelf.main import *
+import biobookshelf as bk
 import biobookshelf.PKG as PKG
+from typing import Union, List, Literal, Dict, Callable, Set, Iterable, Tuple
+
+def create_gene_count_from_fast5( 
+    l_path_folder_nanopore_sequencing_data : Union[ str, list ], # list of folders containing nanopore sequencing data
+    l_name_config : Union[ str, List ], # a name of config or a list of name_config 
+    l_barcoding_kit : Union[ str, List, None ], # a name of config or a list of name_config 
+    path_folder_output : str, # a path to the output folder
+    dict_name_bc_to_name_sample : Union[ dict, None ], # barcode to name_sample
+    dict_name_sample_to_organism : Union[ dict, None ], # define organism for each sample
+    dict_anno : Union[ dict, None ], # a dictionary containing annotation information for each organism
+    int_num_cpus : int = 22, # the number of cpus to use
+    flag_include_failed : bool = True, # include the failed reads into the fastq output
+    int_max_num_reads_for_drawing_size_distribution : int = 100000, # the maximum number of reads to use to draw a size distribution
+    int_max_size_for_displaying_size_distribution : int = 2000, # max molecule length to display in the histogram
+    int_num_binds_for_displaying_size_distribution : int = 200, # number of bins for drawing histogram
+) :
+    """ # 2023-04-02 16:52:05 
+    l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
+    l_name_config : Union[ str, List ], # a name of config or a list of name_config 
+    path_folder_output : str, # a path to the output folder
+    dict_name_bc_to_name_sample : Union[ dict, None ], # barcode to name_sample. if not given, exit after combining fastq files.
+    dict_name_sample_to_organism : Union[ dict, None ], # define organism for each sample. if not given, does not align reads to genome and transcriptomes
+    dict_anno : Union[ dict, None ], # a dictionary containing annotation information for each organism. if not given, does not align reads to genome and transcriptomes
+    flag_include_failed : bool = True # include the failed reads into the fastq output
+    int_max_num_reads_for_drawing_size_distribution : int = 100000 # the maximum number of reads to use to draw a size distribution
+    int_max_size_for_displaying_size_distribution : int = 2000 # max molecule length to display in the histogram
+    int_num_binds_for_displaying_size_distribution : int = 200 # number of bins for drawing histogram
+
+    """
+
+    # convert to list
+    if isinstance( l_path_folder_nanopore_sequencing_data, str ) :
+        l_path_folder_nanopore_sequencing_data = [ l_path_folder_nanopore_sequencing_data ]
+    int_num_samples = len( l_path_folder_nanopore_sequencing_data ) # retrieve the number of samples
+    if isinstance( l_name_config, str ) :
+        l_name_config = [ l_name_config ] * int_num_samples
+    if isinstance( l_barcoding_kit, str ) :
+        l_barcoding_kit = [ l_barcoding_kit ] * int_num_samples
+
+    # correct inputs
+    l_path_folder_nanopore_sequencing_data = list( e + '/' if e[ -1 ] != '/' else e for e in l_path_folder_nanopore_sequencing_data )
+    l_name_config = list( e + '.cfg' if e[ -4 : ] != '.cfg' else e for e in l_name_config )
+    # match length
+
+    for path_folder_nanopore_data, name_config, id_barcoding_kit in zip( l_path_folder_nanopore_sequencing_data, l_name_config, l_barcoding_kit ) :
+        # create folders
+        path_folder_fast5 = f"{path_folder_nanopore_data}fast5_all/"
+        path_folder_guppy_output = f"{path_folder_nanopore_data}guppy_out/"
+        for path_folder in [ path_folder_fast5, path_folder_guppy_output ] :
+            os.makedirs( path_folder, exist_ok = True )
+
+        # collect fast5 files
+        for path_file in glob.glob( f"{path_folder_nanopore_data}fast5_skip/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_fail/*/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_pass/*/*.fast5" ) :
+            os.rename( path_file, f"{path_folder_fast5}{path_file.rsplit( '/', 1 )[ 1 ]}" )
+
+        # run guppy
+        l_args = [ 'guppy_basecaller', '-c', name_config, "--input_path", path_folder_fast5, "--save_path", path_folder_guppy_output, '--require_barcodes_both_ends', '--device', 'auto', "--barcode_kits", id_barcoding_kit, "--compress_fastq" ]
+        print( " ".join( l_args ) )
+        if not os.path.exists( f"{path_folder_guppy_output}sequencing_summary.txt" ) : # if the guppy output already exist, skip running guppy
+            subprocess.run( l_args, capture_output = False )
+
+    # collect fastq files
+    df_fq = pd.concat( list( bk.GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_nanopore_data}guppy_out/*/" + ( '*/' if id_barcoding_kit is not None else '' ) + '*.fastq.gz' ) for path_folder_nanopore_data in l_path_folder_nanopore_sequencing_data ) )
+
+    # filter fastq files
+    if not flag_include_failed :
+        df_fq = PD_Select( df_fq, wildcard_0 = 'pass' ) # use only passed reads. 
+
+    # create output folder
+    path_folder_pipeline = path_folder_output
+    path_folder_graph = f'{path_folder_pipeline}graph/'
+    path_folder_processed_data = f"{path_folder_pipeline}processed_data/"
+    for path_folder in [ path_folder_pipeline, path_folder_graph, path_folder_processed_data, f"{path_folder_pipeline}shellscript_archive/" ] :
+        os.makedirs( path_folder, exist_ok = True )
+
+    # combine fastq files
+    for name_bc in df_fq.wildcard_1.unique( ) :
+        df_fq_for_name_bc = bk.PD_Select( df_fq, wildcard_1 = name_bc )
+        bk.OS_Run( [ 'cat' ] + list( df_fq_for_name_bc.path.values ), path_file_stdout = f"{path_folder_output}{name_bc}.fastq.gz", stdout_binary = True )
+
+    # if 'dict_name_bc_to_name_sample' has not given given, stop the operations
+    if dict_name_bc_to_name_sample is None :
+        return
+
+    # rename fastq files and remove files that are not needed.
+    for path_file_fq in glob.glob( f"{path_folder_pipeline}*.fastq.gz" ) :
+        name_file = path_file_fq.rsplit( '/', 1 )[ 1 ].rsplit( '.fastq.gz', 1 )[ 0 ]
+        if name_file in dict_name_bc_to_name_sample : # if 'name_sample' is available for the barcode, rename the file
+            name_sample = dict_name_bc_to_name_sample[ name_file ]
+            os.rename( path_file_fq, f"{path_folder_pipeline}{name_sample}.fastq.gz" )
+        else : # if 'name_sample' is not available for the barcode, remove the file
+            os.remove( path_file_fq )
+
+    # draw molecule length distribution of each sample
+    for name_sample, path_file_fq in bk.GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_pipeline}*.fastq.gz' ).values :
+        df_fq = bk.FASTQ_Read( path_file_fq, int_num_reads = int_max_num_reads_for_drawing_size_distribution )
+        fig, ax = plt.subplots( 1, 1, )
+        arr_len = df_fq.seq.apply(len).values
+        arr_len = arr_len[ arr_len < int_max_size_for_displaying_size_distribution ]
+        arr_counts, arr_bins, _ = ax.hist( arr_len, bins = int_num_binds_for_displaying_size_distribution ) 
+        bk.MPL_basic_configuration( title = bk.STR.Insert_characters_every_n_characters( name_sample, 60 ) + '\nNumber of Reads', show_grid = True, x_label = 'Number of Reads' )
+        bk.MPL_SAVE( f"(Number of Reads) Length distribution of {name_sample}", folder = path_folder_graph )
+        plt.bar( arr_bins[ : -1 ], arr_counts * arr_bins[ : -1 ], width = arr_bins[ 1 ] - arr_bins[ 0 ] )
+        bk.MPL_basic_configuration( title = bk.STR.Insert_characters_every_n_characters( name_sample, 60 ) + '\nNumber of Base Pairs', show_grid = True, x_label = 'Number of Base Pairs' )
+        bk.MPL_SAVE( f"(Number of Base Pairs) Length distribution of {name_sample}", folder = path_folder_graph )
+
+    # if annotation is not given, exit
+    if dict_anno is None or dict_name_sample_to_organism is None :
+        return
+
+    # create the output folder for minimap2 alignments
+    for path_folder in [ f'{path_folder_pipeline}minimap2/genome/', f'{path_folder_pipeline}minimap2/transcriptome/' ] :
+        os.makedirs( path_folder, exist_ok = True )
+
+    # align and create gene count matrix for each sample
+    dict_name_organism_to_dict_it = dict( )
+    for name_sample, path_file_fq in bk.GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_pipeline}*.fastq.gz' ).values :
+        name_organism = dict_name_sample_to_organism[ name_sample ] # retrieve the name of the organism
+        dict_anno_for_sample = dict_anno[ name_organism ] # retrieve annotation for the sample
+        # align each sample for genome and transcriptome
+        for minimap2_index, path_folder_minimap2_output in zip(
+            [ dict_anno_for_sample[ 'index_genome' ], dict_anno_for_sample[ 'index_transcriptome' ] ],
+            [ f'{path_folder_pipeline}minimap2/genome/', f'{path_folder_pipeline}minimap2/transcriptome/' ]
+        ) : 
+            Minimap2_Align( 
+                flag_use_split_prefix = False, 
+                path_file_fastq = path_file_fq, 
+                path_file_minimap2_index = minimap2_index, 
+                path_folder_minimap2_output = path_folder_minimap2_output, 
+                n_threads = int_num_cpus, 
+                drop_unaligned = False, 
+                return_bash_shellscript = False
+            )
+
+        # retrieve interval tree for the gene annotations
+        if name_organism not in dict_name_organism_to_dict_it :
+            dict_name_organism_to_dict_it[ name_organism ] = bk.GTF_Interval_Tree(
+                dict_anno_for_sample[ 'gtf_ref' ],
+                feature = [ 'gene' ],
+                value = 'gene_name',
+            )
+        dict_it = dict_name_organism_to_dict_it[ name_organism ]
+
+        # calculate gene count, read length, and average mapping quality from the aligned reads
+        l_l = [ ]
+        with pysam.AlignmentFile( f'{path_folder_pipeline}minimap2/genome/{name_sample}.fastq.gz.minimap2_aligned.bam' ) as samfile :
+            for r in samfile.fetch( ) :
+                # skip invalid reads
+                if r.seq is None :
+                    continue
+                if r.mapq == 0 :
+                    continue
+                if r.reference_name not in dict_it :
+                    continue
+
+                l_name_gene_for_current_read = list( i[ 2 ] for i in dict_it[ r.reference_name ][ r.reference_start : r.reference_end ] ) # retrieve a list of matching gene_names
+
+                if len( l_name_gene_for_current_read ) == 0 : # if no gene were assigned, does not count the read
+                    continue
+                elif len( l_name_gene_for_current_read ) == 1 : # if a single gene is assigned.
+                    name_gene = l_name_gene_for_current_read[ 0 ]
+                else : # if more than one gene is assigned, randomly select one of the name_gene and assign it to the read
+                    name_gene = l_name_gene_for_current_read[ math.floor( np.random.random( ) * len( l_name_gene_for_current_read ) ) ]
+                l_l.append( [
+                    name_gene,
+                    len( r.seq ),
+                    r.mapq,
+                ] ) # collect the record
+
+        # compose dataframe of reads
+        df = pd.DataFrame( l_l, columns = [ 'gene_name', 'length_of_read', 'mapping_quality' ] )
+        df[ 'gene_count' ] = 1
+
+        # compose dataframe of genes
+        df = pd.DataFrame( {
+            'gene_count' : df[ [ 'gene_name', 'gene_count', ] ].groupby( 'gene_name' ).count( )[ 'gene_count' ], # calculate 'gene_count'
+            'average_length_of_read' : df[ [ 'gene_name', 'length_of_read', ] ].groupby( 'gene_name' ).mean( )[ 'length_of_read' ], # calculate 'average_length_of_read'
+            'average_mapping_quality' : df[ [ 'gene_name', 'mapping_quality', ] ].groupby( 'gene_name' ).mean( )[ 'mapping_quality' ], # calculate 'average_mapping_quality'
+        } )
+        df.sort_values( 'gene_count', ascending = False, inplace = True ) # sort by gene_count
+
+        # write result as files
+        df.to_excel( f"{path_folder_processed_data}{name_sample}.alignment_summary.gene_level.xlsx" ) # output excel file
+        df.to_csv( f"{path_folder_processed_data}{name_sample}.alignment_summary.gene_level.tsv.gz", sep = '\t' ) # output tsv file
 
 def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, path_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = False ) :
     """

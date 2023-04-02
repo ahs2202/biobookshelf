@@ -8171,10 +8171,11 @@ def FASTQ_Iterate( path_file, return_only_at_index = None ) :
             else : yield record
                     
                     
-def FASTQ_Read( path_file, return_only_at_index = None, flag_add_qname = True ) : # 2020-08-18 22:31:31 
+def FASTQ_Read( path_file, return_only_at_index = None, flag_add_qname = True, int_num_reads : Union[ int, None ] = None ) : # 2020-08-18 22:31:31 
     ''' # 2021-08-25 07:06:50 
     read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
     'flag_add_qname' : add a column containing qname in the bam file (space-split read name without '@' character at the start of the read name)
+    int_num_reads : Union[ int, None ] = None # the number of reads to include in the output, starting from the start. By default, include all reads. 
     '''
     if return_only_at_index is not None : return_only_at_index = return_only_at_index % 4 # 'return_only_at_index' value should be a value between 0 and 3
     bool_flag_file_gzipped = '.gz' in path_file[ - 3 : ] # set a flag indicating whether a file has been gzipped.
@@ -8182,11 +8183,15 @@ def FASTQ_Read( path_file, return_only_at_index = None, flag_add_qname = True ) 
     l_l_values = list( )
     ''' read fastq file '''
     file = gzip.open( path_file, 'rb' ) if bool_flag_file_gzipped else open( path_file )
+    int_read_count = 0 # count the number of reads parsed.
     while True :
         record = [ file.readline( ).decode( )[ : -1 ] for index in range( 4 ) ] if bool_flag_file_gzipped else [ file.readline( )[ : -1 ] for index in range( 4 ) ]
         if len( record[ 0 ] ) == 0 : break
         if return_only_at_index is not None : l_seq.append( record[ return_only_at_index ] )
         else : l_l_values.append( [ record[ 0 ], record[ 1 ], record[ 3 ] ] )  
+        int_read_count += 1 # increase the read count
+        if int_num_reads is not None and int_read_count >= int_num_reads : # if the number of parsed reads equal to the desired number of reads in the output, stop reading the file
+            break 
     file.close( )
     if return_only_at_index is not None :
         return l_seq 
@@ -9627,3 +9632,53 @@ class HostedDictIntervalTree( ):
 # register
 ManagerReadOnly.register( 'HostedDict', HostedDict )
 ManagerReadOnly.register( 'HostedDictIntervalTree', HostedDictIntervalTree )
+
+"""
+compare annotations using plotly
+"""
+
+def Shankey_Compare_Annotations( l_anno_1, l_anno_2, int_min_num_entries_for_an_overlap : int = 3, flag_show_label : bool = True, font_size : int = 10, title : str = '', color = 'blue' ) :
+    """ # 2023-03-05 16:32:49 
+    draw a Shankey diagram using Plotly for the given lists of annotations
+    
+    l_anno_1 # first list of annotations 
+    l_anno_2 # second list of annotations 
+    int_min_num_entries_for_an_overlap : int = 3 # the minmum number of entries for a link (overlaps between two annotations) to be valid.
+    title : Union[ None, str ] = None # the name of the figure. if None is given, no title will be shown
+    font_size : int = 10, # the font size of the title
+    color = 'blue' # argument for plotly.graph_objects.Sankey
+    """
+    def _map( arr_anno, start_pos : int = 0 ) :
+        """
+        return a dictionary for mapping annotation to its integer representation and a list of unique annotation labels
+        """
+        l_anno_unique = bk.LIST_COUNT( arr_anno, duplicate_filter = None ).index.values # retrieve a list of unique annotations
+        return dict( ( e, i + start_pos ) for i, e in enumerate( l_anno_unique ) ), l_anno_unique
+
+    dict_map_1, arr_anno_unique_1 = _map( l_anno_1, start_pos = 0 )
+    dict_map_2, arr_anno_unique_2 = _map( l_anno_2, start_pos = len( dict_map_1 ) )
+    label = list( arr_anno_unique_1 ) + list( arr_anno_unique_2 ) if flag_show_label else None # compose a list of unique labels # does not show labels if 'flag_show_label' is False
+
+    # retrieve values for drawing the diagram
+    source, target, value = bk.LIST_COUNT( np.array( [ list( dict_map_1[ e ] for e in l_anno_1 ), list( dict_map_2[ e ] for e in l_anno_2 ) ], dtype = int ).T, duplicate_filter = int_min_num_entries_for_an_overlap ).reset_index( drop = False ).values.T
+    # compose a dataframe
+    
+    # draw a plot
+    import plotly.graph_objects as go
+
+    fig = go.Figure( data = [ go.Sankey(
+        node = dict(
+          pad = 15,
+          thickness = 20,
+          line = dict( color = "black", width = 0.5 ),
+          label = label,
+          color = color
+        ),
+        link = dict(
+          source = source, 
+          target = target,
+          value = value
+      ))])
+    if title is not None :
+        fig.update_layout( title_text = title, font_size = font_size )
+    return fig
