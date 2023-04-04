@@ -18,7 +18,7 @@ def create_gene_count_from_fast5(
     int_max_size_for_displaying_size_distribution : int = 2000, # max molecule length to display in the histogram
     int_num_binds_for_displaying_size_distribution : int = 200, # number of bins for drawing histogram
 ) :
-    """ # 2023-04-02 16:52:05 
+    """ # 2023-04-04 20:57:35 
     l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
     l_name_config : Union[ str, List ], # a name of config or a list of name_config 
     path_folder_output : str, # a path to the output folder
@@ -145,6 +145,13 @@ def create_gene_count_from_fast5(
             )
         dict_it = dict_name_organism_to_dict_it[ name_organism ]
 
+        # summarize fastq files
+        int_read_count = 0
+        int_base_pair_count = 0
+        for name_record, seq, _, qual in bk.FASTQ_Iterate( path_file_fq ) :
+            int_read_count += 1
+            int_base_pair_count += len( seq )
+        
         # calculate gene count, read length, and average mapping quality from the aligned reads
         l_l = [ ]
         with pysam.AlignmentFile( f'{path_folder_pipeline}minimap2/genome/{name_sample}.fastq.gz.minimap2_aligned.bam' ) as samfile :
@@ -174,6 +181,9 @@ def create_gene_count_from_fast5(
         # compose dataframe of reads
         df = pd.DataFrame( l_l, columns = [ 'gene_name', 'length_of_read', 'mapping_quality' ] )
         df[ 'gene_count' ] = 1
+        # calculate unaligned read count and base count
+        int_read_count_unaligned = int_read_count - len( df )
+        int_base_pair_count_unaligned = int_base_pair_count - df.length_of_read.sum( )
 
         # compose dataframe of genes
         df = pd.DataFrame( {
@@ -181,6 +191,7 @@ def create_gene_count_from_fast5(
             'average_length_of_read' : df[ [ 'gene_name', 'length_of_read', ] ].groupby( 'gene_name' ).mean( )[ 'length_of_read' ], # calculate 'average_length_of_read'
             'average_mapping_quality' : df[ [ 'gene_name', 'mapping_quality', ] ].groupby( 'gene_name' ).mean( )[ 'mapping_quality' ], # calculate 'average_mapping_quality'
         } )
+        df.loc[ '__unaligned_reads__' ] = [ int_read_count_unaligned, int_base_pair_count_unaligned / int_read_count_unaligned, -1 ] # add record of unaligned reads
         df.sort_values( 'gene_count', ascending = False, inplace = True ) # sort by gene_count
 
         # write result as files
