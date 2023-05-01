@@ -4,23 +4,43 @@ import biobookshelf as bk
 import biobookshelf.PKG as PKG
 from typing import Union, List, Literal, Dict, Callable, Set, Iterable, Tuple
 
+def __create_gene_count_from_fast5__align( ins ) :
+    """ # 2023-04-24 05:32:41  
+    internal function of 'create_gene_count_from_fast5'
+    """
+    # parse input
+    path_file_fq, minimap2_index, path_folder_minimap2_output, int_num_cpus, path_file_splice_junc = ins
+    Minimap2_Align( 
+        flag_use_split_prefix = False, 
+        path_file_fastq = path_file_fq, 
+        path_file_minimap2_index = minimap2_index, 
+        path_folder_minimap2_output = path_folder_minimap2_output, 
+        n_threads = int_num_cpus, 
+        drop_unaligned = False, 
+        return_bash_shellscript = False,
+        path_file_junc_bed = path_file_splice_junc,
+    ) # perform alignment
+
 def create_gene_count_from_fast5( 
-    l_path_folder_nanopore_sequencing_data : Union[ str, list ], # list of folders containing nanopore sequencing data
-    l_name_config : Union[ str, List ], # a name of config or a list of name_config 
-    l_barcoding_kit : Union[ str, List, None ], # a name of config or a list of name_config 
-    path_folder_output : str, # a path to the output folder
-    dict_name_bc_to_name_sample : Union[ dict, None ], # barcode to name_sample
-    dict_name_sample_to_organism : Union[ dict, None ], # define organism for each sample
-    dict_anno : Union[ dict, None ], # a dictionary containing annotation information for each organism
-    int_num_cpus : int = 22, # the number of cpus to use
+    l_path_folder_nanopore_sequencing_data : Union[ str, list, None ] = None, # list of folders containing nanopore sequencing data
+    l_name_config : Union[ str, List ] = None, # a name of config or a list of name_config 
+    l_barcoding_kit : Union[ str, List, None ] = None, # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
+    path_folder_output : Union[ str, None ] = None, # a path to the output folder
+    dict_name_bc_to_name_sample : Union[ dict, None ] = None, # barcode to name_sample
+    dict_name_sample_to_organism : Union[ dict, None ] = None, # define organism for each sample
+    dict_anno : Union[ dict, None ] = None, # a dictionary containing annotation information for each organism
+    int_num_cpus : Union[ int, None ] = None, # the number of cpus to use. By default, use all the available cores
     flag_include_failed : bool = True, # include the failed reads into the fastq output
     int_max_num_reads_for_drawing_size_distribution : int = 100000, # the maximum number of reads to use to draw a size distribution
     int_max_size_for_displaying_size_distribution : int = 2000, # max molecule length to display in the histogram
-    int_num_binds_for_displaying_size_distribution : int = 200, # number of bins for drawing histogram
+    int_num_bins_for_displaying_size_distribution : int = 200, # number of bins for drawing histogram
+    flag_require_barcodes_both_ends : bool = True, # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
+    flag_rerun_guppy = False, # rename the the output folder (if it exists) and rerun guppy if the flag is True
 ) :
-    """ # 2023-04-04 20:57:35 
+    """ # 2023-04-22 23:54:01 
     l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
     l_name_config : Union[ str, List ], # a name of config or a list of name_config 
+    l_barcoding_kit : Union[ str, List, None ], # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
     path_folder_output : str, # a path to the output folder
     dict_name_bc_to_name_sample : Union[ dict, None ], # barcode to name_sample. if not given, exit after combining fastq files.
     dict_name_sample_to_organism : Union[ dict, None ], # define organism for each sample. if not given, does not align reads to genome and transcriptomes
@@ -28,80 +48,98 @@ def create_gene_count_from_fast5(
     flag_include_failed : bool = True # include the failed reads into the fastq output
     int_max_num_reads_for_drawing_size_distribution : int = 100000 # the maximum number of reads to use to draw a size distribution
     int_max_size_for_displaying_size_distribution : int = 2000 # max molecule length to display in the histogram
-    int_num_binds_for_displaying_size_distribution : int = 200 # number of bins for drawing histogram
-
+    int_num_bins_for_displaying_size_distribution : int = 200 # number of bins for drawing histogram
+    flag_require_barcodes_both_ends : bool = True, # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
     """
-
-    # convert to list
-    if isinstance( l_path_folder_nanopore_sequencing_data, str ) :
-        l_path_folder_nanopore_sequencing_data = [ l_path_folder_nanopore_sequencing_data ]
-    int_num_samples = len( l_path_folder_nanopore_sequencing_data ) # retrieve the number of samples
-    if isinstance( l_name_config, str ) :
-        l_name_config = [ l_name_config ] * int_num_samples
-    if isinstance( l_barcoding_kit, str ) :
-        l_barcoding_kit = [ l_barcoding_kit ] * int_num_samples
-
-    # correct inputs
-    l_path_folder_nanopore_sequencing_data = list( e + '/' if e[ -1 ] != '/' else e for e in l_path_folder_nanopore_sequencing_data )
-    l_name_config = list( e + '.cfg' if e[ -4 : ] != '.cfg' else e for e in l_name_config )
-    # match length
-
-    for path_folder_nanopore_data, name_config, id_barcoding_kit in zip( l_path_folder_nanopore_sequencing_data, l_name_config, l_barcoding_kit ) :
-        # create folders
-        path_folder_fast5 = f"{path_folder_nanopore_data}fast5_all/"
-        path_folder_guppy_output = f"{path_folder_nanopore_data}guppy_out/"
-        for path_folder in [ path_folder_fast5, path_folder_guppy_output ] :
+    # handle default values
+    if int_num_cpus is None :
+        int_num_cpus = os.cpu_count( ) # By default, use all the available cores
+    
+    if path_folder_output is not None : # if output folder has been given, initiate the output folders
+        path_folder_pipeline = path_folder_output
+        path_folder_graph = f'{path_folder_pipeline}graph/'
+        path_folder_processed_data = f"{path_folder_pipeline}processed_data/"
+        for path_folder in [ path_folder_pipeline, path_folder_graph, path_folder_processed_data, f"{path_folder_pipeline}shellscript_archive/" ] :
             os.makedirs( path_folder, exist_ok = True )
 
-        # collect fast5 files
-        for path_file in glob.glob( f"{path_folder_nanopore_data}fast5_skip/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_fail/*/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_pass/*/*.fast5" ) :
-            os.rename( path_file, f"{path_folder_fast5}{path_file.rsplit( '/', 1 )[ 1 ]}" )
+    
+    if l_path_folder_nanopore_sequencing_data is not None and l_name_config is not None : # if 'l_path_folder_nanopore_sequencing_data' and 'l_name_config' has been given, run guppy_basecaller and combine output fastq files
+        # convert to list
+        if isinstance( l_path_folder_nanopore_sequencing_data, str ) :
+            l_path_folder_nanopore_sequencing_data = [ l_path_folder_nanopore_sequencing_data ]
+        int_num_samples = len( l_path_folder_nanopore_sequencing_data ) # retrieve the number of samples
+        if isinstance( l_name_config, str ) :
+            l_name_config = [ l_name_config ] * int_num_samples
+        if isinstance( l_barcoding_kit, str ) or l_barcoding_kit is None : # detect single entry or a list of entries
+            l_barcoding_kit = [ l_barcoding_kit ] * int_num_samples
 
-        # run guppy
-        l_args = [ 'guppy_basecaller', '-c', name_config, "--input_path", path_folder_fast5, "--save_path", path_folder_guppy_output, '--require_barcodes_both_ends', '--device', 'auto', "--barcode_kits", id_barcoding_kit, "--compress_fastq" ]
-        print( " ".join( l_args ) )
-        if not os.path.exists( f"{path_folder_guppy_output}sequencing_summary.txt" ) : # if the guppy output already exist, skip running guppy
-            subprocess.run( l_args, capture_output = False )
+        # correct inputs
+        l_path_folder_nanopore_sequencing_data = list( e + '/' if e[ -1 ] != '/' else e for e in l_path_folder_nanopore_sequencing_data )
+        l_name_config = list( e + '.cfg' if e[ -4 : ] != '.cfg' else e for e in l_name_config )
+        # match length
 
-    # collect fastq files
-    df_fq = pd.concat( list( bk.GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_nanopore_data}guppy_out/*/" + ( '*/' if id_barcoding_kit is not None else '' ) + '*.fastq.gz' ) for path_folder_nanopore_data in l_path_folder_nanopore_sequencing_data ) )
+        for path_folder_nanopore_data, name_config, id_barcoding_kit in zip( l_path_folder_nanopore_sequencing_data, l_name_config, l_barcoding_kit ) :
+            # create folders
+            path_folder_fast5 = f"{path_folder_nanopore_data}fast5_all/"
+            path_folder_guppy_output = f"{path_folder_nanopore_data}guppy_out/"
+            for path_folder in [ path_folder_fast5, path_folder_guppy_output ] :
+                os.makedirs( path_folder, exist_ok = True )
 
-    # filter fastq files
-    if not flag_include_failed :
-        df_fq = PD_Select( df_fq, wildcard_0 = 'pass' ) # use only passed reads. 
+            # collect fast5 files
+            for path_file in glob.glob( f"{path_folder_nanopore_data}fast5_skip/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_fail/*/*.fast5" ) + glob.glob( f"{path_folder_nanopore_data}fast5_pass/*/*.fast5" ) :
+                os.rename( path_file, f"{path_folder_fast5}{path_file.rsplit( '/', 1 )[ 1 ]}" )
 
-    # create output folder
-    path_folder_pipeline = path_folder_output
-    path_folder_graph = f'{path_folder_pipeline}graph/'
-    path_folder_processed_data = f"{path_folder_pipeline}processed_data/"
-    for path_folder in [ path_folder_pipeline, path_folder_graph, path_folder_processed_data, f"{path_folder_pipeline}shellscript_archive/" ] :
-        os.makedirs( path_folder, exist_ok = True )
+            # run guppy
+            l_args = [ 'guppy_basecaller', '-c', name_config, "--input_path", path_folder_fast5, "--save_path", path_folder_guppy_output, '--device', 'auto', "--compress_fastq" ]
+            if flag_require_barcodes_both_ends : # if 'flag_require_barcodes_both_ends' is True
+                l_args += [ '--require_barcodes_both_ends' ]
+            if l_barcoding_kit is not None : # if valid 'l_barcoding_kit' has been given
+                l_args += [ "--barcode_kits", id_barcoding_kit ]
+            print( " ".join( l_args ) ) # print the guppy_basecaller command
 
-    # combine fastq files
-    for name_bc in df_fq.wildcard_1.unique( ) :
-        df_fq_for_name_bc = bk.PD_Select( df_fq, wildcard_1 = name_bc )
-        bk.OS_Run( [ 'cat' ] + list( df_fq_for_name_bc.path.values ), path_file_stdout = f"{path_folder_output}{name_bc}.fastq.gz", stdout_binary = True )
+            flag_output_exists = os.path.exists( f"{path_folder_guppy_output}sequencing_summary.txt" ) # retrieve a flag indicating that the guppy output folder already exists
+            if flag_rerun_guppy and flag_output_exists : # if 'flag_rerun_guppy' is True and the output folder exists
+                os.rename( path_folder_guppy_output, path_folder_guppy_output[ : -1 ] + '.' + bk.UUID( ) + '/' ) # rename the existing guppy output folder
+                os.makedirs( path_folder_guppy_output, exist_ok = True ) # create the output folder anew
+                flag_output_exists = False
+            if not flag_output_exists : # if the guppy output already exist, skip running guppy
+                subprocess.run( l_args, capture_output = False )
+                
+        # if output folder has not been given, exit
+        if path_folder_output is None :
+            return
 
-    # if 'dict_name_bc_to_name_sample' has not given given, stop the operations
-    if dict_name_bc_to_name_sample is None :
-        return
+        # collect fastq files
+        df_fq = pd.concat( list( bk.GLOB_Retrive_Strings_in_Wildcards( f"{path_folder_nanopore_data}guppy_out/*/" + ( '*/' if id_barcoding_kit is not None else '' ) + '*.fastq.gz' ) for path_folder_nanopore_data in l_path_folder_nanopore_sequencing_data ) )
 
-    # rename fastq files and remove files that are not needed.
-    for path_file_fq in glob.glob( f"{path_folder_pipeline}*.fastq.gz" ) :
-        name_file = path_file_fq.rsplit( '/', 1 )[ 1 ].rsplit( '.fastq.gz', 1 )[ 0 ]
-        if name_file in dict_name_bc_to_name_sample : # if 'name_sample' is available for the barcode, rename the file
-            name_sample = dict_name_bc_to_name_sample[ name_file ]
-            os.rename( path_file_fq, f"{path_folder_pipeline}{name_sample}.fastq.gz" )
-        else : # if 'name_sample' is not available for the barcode, remove the file
-            os.remove( path_file_fq )
+        # filter fastq files
+        if not flag_include_failed :
+            df_fq = PD_Select( df_fq, wildcard_0 = 'pass' ) # use only passed reads. 
+
+        # combine fastq files
+        for name_bc in df_fq.wildcard_1.unique( ) :
+            df_fq_for_name_bc = bk.PD_Select( df_fq, wildcard_1 = name_bc )
+            bk.OS_Run( [ 'cat' ] + list( df_fq_for_name_bc.path.values ), path_file_stdout = f"{path_folder_output}{name_bc}.fastq.gz", stdout_binary = True )        
+
+    # if 'dict_name_bc_to_name_sample' has given, rename fastq files and remove files that are not needed.
+    if dict_name_bc_to_name_sample is not None :
+        for path_file_fq in glob.glob( f"{path_folder_pipeline}*.fastq.gz" ) : # for each fastq file
+            name_file = path_file_fq.rsplit( '/', 1 )[ 1 ].rsplit( '.fastq.gz', 1 )[ 0 ]
+            if name_file in dict_name_bc_to_name_sample : # if 'name_sample' is available for the barcode, rename the file
+                name_sample = dict_name_bc_to_name_sample[ name_file ]
+                os.rename( path_file_fq, f"{path_folder_pipeline}{name_sample}.fastq.gz" )
+            else : # if 'name_sample' is not available for the barcode, remove the file
+                os.remove( path_file_fq )
 
     # draw molecule length distribution of each sample
-    for name_sample, path_file_fq in bk.GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_pipeline}*.fastq.gz' ).values :
+    df_fastq = bk.GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_pipeline}*.fastq.gz' ) # retrieve the paths of input fastq files
+    int_num_samples = len( df_fastq ) # retrieve the number of samples based on the number of fastq files
+    for name_sample, path_file_fq in df_fastq.values :
         df_fq = bk.FASTQ_Read( path_file_fq, int_num_reads = int_max_num_reads_for_drawing_size_distribution )
         fig, ax = plt.subplots( 1, 1, )
         arr_len = df_fq.seq.apply(len).values
         arr_len = arr_len[ arr_len < int_max_size_for_displaying_size_distribution ]
-        arr_counts, arr_bins, _ = ax.hist( arr_len, bins = int_num_binds_for_displaying_size_distribution ) 
+        arr_counts, arr_bins, _ = ax.hist( arr_len, bins = int_num_bins_for_displaying_size_distribution ) 
         bk.MPL_basic_configuration( title = bk.STR.Insert_characters_every_n_characters( name_sample, 60 ) + '\nNumber of Reads', show_grid = True, x_label = 'Number of Reads' )
         bk.MPL_SAVE( f"(Number of Reads) Length distribution of {name_sample}", folder = path_folder_graph )
         plt.bar( arr_bins[ : -1 ], arr_counts * arr_bins[ : -1 ], width = arr_bins[ 1 ] - arr_bins[ 0 ] )
@@ -116,26 +154,25 @@ def create_gene_count_from_fast5(
     for path_folder in [ f'{path_folder_pipeline}minimap2/genome/', f'{path_folder_pipeline}minimap2/transcriptome/' ] :
         os.makedirs( path_folder, exist_ok = True )
 
-    # align and create gene count matrix for each sample
-    dict_name_organism_to_dict_it = dict( )
-    for name_sample, path_file_fq in bk.GLOB_Retrive_Strings_in_Wildcards( f'{path_folder_pipeline}*.fastq.gz' ).values :
+    # align reads
+    import concurrent.futures       
+    l_task = [ ] # initialize the list of tasks
+    int_num_cpus_for_each_alignment = min( 1, int( int_num_cpus / int_num_samples / 2 ) ) # retrieve approximate number of cpus for each alignment
+    for name_sample, path_file_fq in df_fastq.values : # for each sample
         name_organism = dict_name_sample_to_organism[ name_sample ] # retrieve the name of the organism
         dict_anno_for_sample = dict_anno[ name_organism ] # retrieve annotation for the sample
         # align each sample for genome and transcriptome
-        for minimap2_index, path_folder_minimap2_output in zip(
-            [ dict_anno_for_sample[ 'index_genome' ], dict_anno_for_sample[ 'index_transcriptome' ] ],
-            [ f'{path_folder_pipeline}minimap2/genome/', f'{path_folder_pipeline}minimap2/transcriptome/' ]
-        ) : 
-            Minimap2_Align( 
-                flag_use_split_prefix = False, 
-                path_file_fastq = path_file_fq, 
-                path_file_minimap2_index = minimap2_index, 
-                path_folder_minimap2_output = path_folder_minimap2_output, 
-                n_threads = int_num_cpus, 
-                drop_unaligned = False, 
-                return_bash_shellscript = False
-            )
-
+        l_task.extend( [ 
+            [ path_file_fq, dict_anno_for_sample[ 'index_genome' ], f'{path_folder_pipeline}minimap2/genome/', int_num_cpus_for_each_alignment, dict_anno_for_sample[ 'splice_junc' ] ], # genome
+            [ path_file_fq, dict_anno_for_sample[ 'index_transcriptome' ], f'{path_folder_pipeline}minimap2/transcriptome/', int_num_cpus_for_each_alignment, None ], # transcriptome
+        ] )
+    with concurrent.futures.ProcessPoolExecutor( ) as executor : # create an executer 
+        for res in executor.map( __create_gene_count_from_fast5__align, l_task ) : # perform each task
+            pass
+            
+    # analyze the BAM files and create gene count matrix for each sample        
+    dict_name_organism_to_dict_it = dict( )
+    for name_sample, path_file_fq in df_fastq.values : # for each sample
         # retrieve interval tree for the gene annotations
         if name_organism not in dict_name_organism_to_dict_it :
             dict_name_organism_to_dict_it[ name_organism ] = bk.GTF_Interval_Tree(
@@ -197,7 +234,6 @@ def create_gene_count_from_fast5(
         # write result as files
         df.to_excel( f"{path_folder_processed_data}{name_sample}.alignment_summary.gene_level.xlsx" ) # output excel file
         df.to_csv( f"{path_folder_processed_data}{name_sample}.alignment_summary.gene_level.tsv.gz", sep = '\t' ) # output tsv file
-
 def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, flag_barcoding_was_used = False, path_folder_output_fastq = None, id_flowcell = None, id_lib_prep = None, id_barcoding_kit = None, flag_use_cpu = True, int_n_threads = 18, flag_read_splitting = False ) :
     """
     # 2023-01-27 23:38:33 
@@ -355,9 +391,21 @@ def Guppy_Run_and_Combine_Output( path_folder_nanopore_sequencing_data = None, f
             else : # combine files 
                 OS_FILE_Combine_Files_in_order( l_path_file, f"{path_folder_output_fastq}{name_file}", flag_bgzip_output = False ) # 
         
-def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', path_folder_minimap2_output = None, n_threads = 20, verbose = True, drop_unaligned = False, return_bash_shellscript = False, n_threads_for_sort = 1, flag_use_split_prefix : bool = False ) :
+def Minimap2_Align( 
+    path_file_fastq, 
+    path_file_minimap2_index = '/node210data/shared/ensembl/Mus_musculus/index/minimap2/Mus_musculus.GRCm38.dna.primary_assembly.k_14.idx', 
+    path_folder_minimap2_output = None, 
+    n_threads = 20, 
+    verbose = True, 
+    drop_unaligned = False, 
+    return_bash_shellscript = False, 
+    n_threads_for_sort = 10, 
+    flag_use_split_prefix : bool = False,
+    path_file_junc_bed : Union[ None, str ] = None, # if given, the bed file will be used for prioritizing known splice sites.
+    path_file_gtf : Union[ None, str ] = None, # path to gene and exon annotation files, required if 'path_file_junc_bed' is given but the file does not exist
+) :
     """ 
-    # 2022-09-24 19:15:33 
+    # 2023-04-23 01:18:58 
     align given fastq file of nanopore reads using minimap2 and write an output as a bam file 
     'path_file_fastq' : input fastq or fasta file (gzipped or uncompressed file is accepted)
     'path_file_minimap2_index' : minimap2 index file
@@ -384,6 +432,16 @@ def Minimap2_Align( path_file_fastq, path_file_minimap2_index = '/node210data/sh
     # for large index, split-prefix should be used
     if flag_use_split_prefix :
         l_arg += [ f'--split-prefix={path_folder_minimap2_output}{UUID( )}' ]
+        
+    if path_file_junc_bed is not None :
+        if not os.path.exists( path_file_junc_bed ) and path_file_gtf is not None : # if the bed file does not exist, create the bed file using paftools.js, packaged with the minimap2 executable
+            l_args_for_creating_junc_bed = [ 'paftools.js', 'gff2bed', path_file_gtf ]
+            if return_bash_shellscript : # perform minimap2 alignment using subprocess module
+                l_bash_shellscript.append( ' '.join( l_args_for_creating_junc_bed + [ '>', path_file_junc_bed ] ) )
+            else :
+                bk.OS_Run( l_args_for_creating_junc_bed, path_file_stdout = path_file_junc_bed, stdout_binary = False )
+        if os.path.exists( path_file_junc_bed ) :
+            l_arg += [ "--junc-bed", path_file_junc_bed ]
     
     if drop_unaligned :
         l_arg += [ '--sam-hit-only' ]
