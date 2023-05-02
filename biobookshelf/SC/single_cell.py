@@ -1431,7 +1431,9 @@ def MTX_10X_Summarize_Counts(
                     .iloc[:, 0]
                     .to_dict()
                 )
-            except pd.errors.EmptyDataError:  # handle when the current dictionary is empty
+            except (
+                pd.errors.EmptyDataError
+            ):  # handle when the current dictionary is empty
                 dict_dict[name_dict] = dict()
 
     # return summarized metrics
@@ -2416,6 +2418,7 @@ def __Merge_Sort_MTX_10X__(
         flag_output_is_file = False
         flag_output_binary = is_binary_stream(path_file_output)  # detect binary stream
         file_output = path_file_output
+
     # define a function for decorating mtx record
     def __decorate_mtx_file__(file):
         while True:

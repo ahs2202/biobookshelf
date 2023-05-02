@@ -272,6 +272,7 @@ known_reference_genes_including_predicted = [
     51699,
 ]
 
+
 # slice functions
 def Slice_to_Range(sl, length):
     """# 2022-06-28 21:47:51
@@ -545,7 +546,8 @@ def INT_Get_Ranges_from_List_of_Integers(l, flag_sorted=True):
 
 def BASE(number, base, n_numbers=None):  # 2020-07-25 16:08:23
     """return a list of integers representing the number in the given base system.
-    if 'n_numbers' is given and length of the output list is smaller than 'n_numbers', pad zeros and return a list of integers with the length of 'n_numbers'"""
+    if 'n_numbers' is given and length of the output list is smaller than 'n_numbers', pad zeros and return a list of integers with the length of 'n_numbers'
+    """
     if isinstance(number, float):
         number = int(number)
     l_value = list()
@@ -572,7 +574,8 @@ def Encode_List_of_Strings(
     arr, chr_separator=";", chr_representing_repeated_string="="
 ):  # 2020-08-08 23:47:49
     """Encode list of strings into a string.
-    'chr_representing_repeated_string': Reduce the size of string by representing repeating non-empty, valid string with single 'chr_representing_repeated_string' (default '=') character. To disable this behavior, set 'chr_representing_repeated_string' to None"""
+    'chr_representing_repeated_string': Reduce the size of string by representing repeating non-empty, valid string with single 'chr_representing_repeated_string' (default '=') character. To disable this behavior, set 'chr_representing_repeated_string' to None
+    """
     entry_previous = None
     l_value = list()
     for entry in arr:
@@ -707,7 +710,8 @@ def ASCII_Encode(
     """Encode list of 'list of values' of float datatype with one or more ascii character, and return list of strings (ascii format) (each list of values in the given input will be encoded into a single string). (two ascii characters can encode float value with ~8000 levels)
     ascii_min: (integer) minimum = 33
     ascii_max: (integer) maximum = 126. should be larger than 'ascii_min' + 1. The last value will be used to interpret invalid values
-    value_max: when encoded values are interger or floating number with regular intervalues, correct value_max should be the maximum integer value + step (1 for integer and amount of the regular interval for the float number), since values are floored down to an integer during the encoding process"""
+    value_max: when encoded values are interger or floating number with regular intervalues, correct value_max should be the maximum integer value + step (1 for integer and amount of the regular interval for the float number), since values are floored down to an integer during the encoding process
+    """
     if ascii_max <= 125:
         n_char = 1  # if not all ascii characters are used, use only one ascii character to encode/decode data
     elif n_char > 1:
@@ -921,7 +925,8 @@ def DICTIONARY_Find_Max(dict_value):  # 2020-07-29 23:55:58
 def DICTIONARY_Find_Min(dict_value):
     """
     # 2020-12-06 18:33:24
-    find key value with the maximum value in a given dictionary, and return 'key_min', 'value_min'"""
+    find key value with the maximum value in a given dictionary, and return 'key_min', 'value_min'
+    """
     if len(dict_value) == 0:
         return None, None  # if an empty dictionary is given, return None
     key_min = next(
@@ -938,7 +943,8 @@ def DICTIONARY_Find_Min(dict_value):
 
 def DICTIONARY_Find_keys_with_max_value(dict_value):
     """# 2021-11-24 20:44:07
-    find a list of key values with the maximum value in a given dictionary, and return 'l_key_max', 'value_max'"""
+    find a list of key values with the maximum value in a given dictionary, and return 'l_key_max', 'value_max'
+    """
     value_max = None  # initialize max value
     l_key_max = []  # list of key with max_values
     if len(dict_value) != 0:  # if the dictionary is not empty
@@ -961,7 +967,8 @@ def DICTIONARY_Find_keys_with_max_value(dict_value):
 
 def DICTIONARY_Find_keys_with_min_value(dict_value):
     """# 2022-04-20 18:28:51
-    find a list of key values with the minimum value in a given dictionary, and return 'l_key_min', 'value_min'"""
+    find a list of key values with the minimum value in a given dictionary, and return 'l_key_min', 'value_min'
+    """
     value_min = None  # initialize min value
     l_key_min = []  # list of key with min_values
     if len(dict_value) != 0:  # if the dictionary is not empty
@@ -1311,7 +1318,8 @@ def LIST_COUNT(
 ):
     """
     # 20210224
-    return a dictionary where key = each element in a given list, value = counts of the element in the list. if 'duplicate_filter' is not None, return entries that are duplicated 'duplicate_filter' times or more."""
+    return a dictionary where key = each element in a given list, value = counts of the element in the list. if 'duplicate_filter' is not None, return entries that are duplicated 'duplicate_filter' times or more.
+    """
     if dropna and isinstance(iterable, pd.Series):
         iterable = (
             iterable.dropna()
@@ -1431,7 +1439,8 @@ def Search_list_of_strings(
     return_location_matched=False,
 ):
     """search list of strings to find strings that contains query string and return the result as a list. if 'return_mask_matched' is True,
-    return list_mask for locations of matched entries (return np.array( search_result, dtype = object ), list_mask_matched)"""
+    return list_mask for locations of matched entries (return np.array( search_result, dtype = object ), list_mask_matched)
+    """
     search_result, list_mask_matched = list(), list()
     list_of_strings = (
         list_of_strings.values
@@ -1889,7 +1898,8 @@ def SEARCH_gene_symbol_name(
     df=None, query_Symbol=None, query_Name=None, negative_query=None
 ):
     """Using df (a subset of HGNC) or full HGNC df by default, search a given query and negative query, and return a DataFrame with genes that
-    have matching Gene_Symbol or Gene_Name to a given query. Give previous search result through an argument 'df' to refine search"""
+    have matching Gene_Symbol or Gene_Name to a given query. Give previous search result through an argument 'df' to refine search
+    """
     if df is None:  # set default df, which is a full HGNC table
         df = df_ID_Symbol
     if query_Symbol is not None:
@@ -2070,7 +2080,8 @@ def INTERVAL_Overlap(
     """Fast, basic function for retrieving overlap between two intervals.
     return number of overlapped length between two intervals (each interval is a tuple or list containing start and end position).
     'flag_0_based_coordinate_system': if interval contains float numbers, set 'flag_0_based_coordinate_system' to True.
-    'flag_sort_to_retrieve_start_and_end': if interval is always (start, end), set 'flag_sort_to_retrieve_start_and_end' to False to improve performance. (about 200ns faster)"""
+    'flag_sort_to_retrieve_start_and_end': if interval is always (start, end), set 'flag_sort_to_retrieve_start_and_end' to False to improve performance. (about 200ns faster)
+    """
     if flag_sort_to_retrieve_start_and_end:
         start_1, end_1 = sorted(interval_1)
         start_2, end_2 = sorted(interval_2)
@@ -2092,7 +2103,8 @@ def INTERVAL_Overlap(
 
 def OUTLIERS_GET_mask_for_outliers(arr, n_std_for_outliers, outlier_percentile_std=5):
     """for each row of a given numpy array, identify the outliers (outside n_std_for_outliers * std from mean) and return a boolean array
-    that indicates locations of outliers. if 'outlier_percentile_std' is not zero, calculate and mean and std excluding top and bottom 'outlier_percentile_std' percentile for defining outliers"""
+    that indicates locations of outliers. if 'outlier_percentile_std' is not zero, calculate and mean and std excluding top and bottom 'outlier_percentile_std' percentile for defining outliers
+    """
     if outlier_percentile_std == 0:
         arr_mean, arr_std = arr.mean(axis=1), arr.std(
             axis=1
@@ -2247,7 +2259,8 @@ def DF_Explore_Class(df, duplicate_filter=2):
 
 def DF_from_Anndata(adata):
     """# 2021-11-17 21:23:10
-    convert Anndata (both in sparse format and dense format) to DataFrame in respective format (either sparse or dense format)"""
+    convert Anndata (both in sparse format and dense format) to DataFrame in respective format (either sparse or dense format)
+    """
     if isinstance(adata.X, scipy.sparse.csr.csr_matrix):
         df = pd.DataFrame.sparse.from_spmatrix(
             adata.X, index=adata.obs.index.values, columns=adata.var.index.values
@@ -2613,7 +2626,8 @@ def DF_Count_and_Drop_Duplicates(
     dict_kw_drop_duplicates={"keep": "first"},
 ):  # 2020-08-08 19:58:43  # pandas >= 1.1
     """drop duplicates while counting duplicates. if a column for counting duplicates already exist in the given dataframe, sum values in the columns while dropping duplicates instead of counting duplicates.
-    'l_col_for_sorting_and_not_for_identifying_duplicates': if 'l_col_for_sorting_and_not_for_identifying_duplicates' is given, sort rows using columns given in the order in 'l_col_for_sorting_and_not_for_identifying_duplicates' before dropping duplicates"""
+    'l_col_for_sorting_and_not_for_identifying_duplicates': if 'l_col_for_sorting_and_not_for_identifying_duplicates' is given, sort rows using columns given in the order in 'l_col_for_sorting_and_not_for_identifying_duplicates' before dropping duplicates
+    """
     if not inplace:
         df = deepcopy(df)
     if l_col_for_sorting_and_not_for_identifying_duplicates is not None:
@@ -2773,7 +2787,8 @@ def Series_Subset(s, set_index):
 def PD_Threshold(df, AND_operation=True, **dict_thresholds):
     """Select rows of a given DataFrame or indices of Series based on a given threshold for each given column or the given series.
     Add 'b' or 'B' at the end of column_label to select rows below the threshold, or add 'a' or 'A' to select rows above the threshold.
-    If 'AND_operation' is true, filter generated from the given threshold will be combined with AND operation before filtering rows of a given dataframe"""
+    If 'AND_operation' is true, filter generated from the given threshold will be combined with AND operation before filtering rows of a given dataframe
+    """
     set_df_columns = set(df.columns.values) if type(df) is pd.DataFrame else set([""])
     mask_filter = (
         np.ones(len(df), dtype=bool) if AND_operation else np.zeros(len(df), dtype=bool)
@@ -2964,7 +2979,8 @@ def PD_Search(
     """# 2021-11-10 01:56:43
     to search index, put 'index' as the name of column in the 'dict_search' argument. To search values in a series, put 'values' as the name of column in the 'dict_search' argument
     To retrive entries matched with all queries, set 'query_AND_operation' to True (perform AND operation during searching), while set 'query_AND_operation' to False to retrive all entries
-    containing at least one of the given queries. Search with multiple columns are always performed with AND operation (will be improved)"""
+    containing at least one of the given queries. Search with multiple columns are always performed with AND operation (will be improved)
+    """
     for col, queries in dict_search.items():
         if type(df) is pd.DataFrame and col not in list(df.columns.values) + [
             "index",
@@ -3084,7 +3100,8 @@ def PD_Binary_Flag_Select(
 
 def PANDAS_Align_two(df_1, df_2, axis=1):
     """** There is a original method "pandas.align" Use it if possible. **
-    align two dataframe or series. by default, align by columns (axis = 1). if series is given as one of the inputs, align two objects by indices"""
+    align two dataframe or series. by default, align by columns (axis = 1). if series is given as one of the inputs, align two objects by indices
+    """
     if (
         type(df_1) is pd.Series or type(df_2) is pd.Series
     ):  # if series is given as one of the inputs, align two objects by indices
@@ -3120,7 +3137,8 @@ def PANDAS_relation_dataframe_make_symmetric(
 ):
     """For a given relation dataframe, copy data in lower triangle to upper triangle if 'data_is_in_lower_tri' is True (or copy data in upper triangle into lower triangle if 'data_is_in_lower_tri'
     is False). 'symmetry_relationship' = 'same' or '=' ; 'opposite_sign' or '-' ; 'inverse' or '1/' . 'diagonal_data' : data_value that will be used to the fill diagonal data. If None is given,
-    use the first diagonal value as 'diagonal_data' value ( df.iloc[ 0, 0 ] ). If 'diagonal_data' = 'retain', use the initial diagonal data"""
+    use the first diagonal value as 'diagonal_data' value ( df.iloc[ 0, 0 ] ). If 'diagonal_data' = 'retain', use the initial diagonal data
+    """
     n = len(df)
     if n < 1:
         return -1
@@ -3486,7 +3504,8 @@ def NORMALIZE_Relative_Log_Expression(
     if 'use_median_ratio' is False, use mean_ratio instead.
     return df and Series with median ratios to pseudoreference (log-averaged for 'sample_list_for_pseudoreference', default : all columns ) for the samples that has been set for normalization.
     When 'return_normalized_ratios' is True, return normalized relative_ratios to pseudoreference instead of normalized data.
-    When 'allow_nan_values' is set to True, use masked array to retrive scaling factors for each sample (if data contains a lot of NaN or zeros, it is better to set this argument to True)"""
+    When 'allow_nan_values' is set to True, use masked array to retrive scaling factors for each sample (if data contains a lot of NaN or zeros, it is better to set this argument to True)
+    """
     Gene_Set = (
         LIST_intersection_with_set(Gene_Set, df.index.values)
         if Gene_Set is not None
@@ -3622,7 +3641,8 @@ def GENE_SET_GET_Gene_Set_by_name(
     Gene_Set_name, return_Gene_Name_Symbol=False, gene_set_background=None
 ):
     """return a Gene_Set (set of Gene_IDs) of a given Gene_Set_name in All Gene_Sets. if 'return_Gene_Name_Symbol' is True, return sorted list of Gene_Name_Symbol of a gene_set. If a
-    background gene_set has been given through 'gene_set_background' argument, return genes that exist in the background gene_set"""
+    background gene_set has been given through 'gene_set_background' argument, return genes that exist in the background gene_set
+    """
     for Gene_Sets_Name in dict_GeneSets_ALL.keys():
         if Gene_Set_name in dict_GeneSets_ALL[Gene_Sets_Name]:
             Gene_Set = dict_GeneSets_ALL[Gene_Sets_Name][Gene_Set_name]
@@ -3838,7 +3858,8 @@ def ANALYSIS_GSEA__dict_Gene_Sets(
 ):
     """Perform GSEA using gene sets in a given dict_Gene_Sets and return results as two DataFrames
     Calculate adjusted p_value using fdr_bh method
-    filter out entries that have higher adjusted_p_values than a given threshold adj_p_val"""
+    filter out entries that have higher adjusted_p_values than a given threshold adj_p_val
+    """
     background_Gene_IDs = set(background_Gene_IDs)
     Gene_IDs = set(Gene_IDs)
     num_genes = len(Gene_IDs)
@@ -3886,7 +3907,8 @@ def ANALYSIS_GSEA__MSigDB_Gene_Sets(
 ):
     """Perform GSEA using all available MSigDB gene sets return results as DataFrames in a dictionary
     The list of Gene_Sets_Names can be given though an argument Gene_Sets_Names
-    filter out entries that have higher adjusted_p_values than a given threshold adj_p_val"""
+    filter out entries that have higher adjusted_p_values than a given threshold adj_p_val
+    """
     if background_Gene_IDs is None:
         background_Gene_IDs = PD_Select(
             df_ID_Symbol, Locus_Group="protein-coding gene"
@@ -4219,7 +4241,8 @@ def Calculate_Log2FC_p_value__dict_Gene_Sets__A_vs_B(
 ):
     """Calculate Log2FC, t-test p_values, and fdr-bh adjusted p_values for condition 'A' (default: Normal) and condition 'B' (default: Tumor)
     samples for Gene_Sets in 'dict_Gene_Sets' with a given Gene_IDs and return the result as a dataframe. Log2FC is log2( condition B average / condition A average )
-    dropna values to allow pair-wise comparison and calculation of Log2FC of genes in a Gene_Set"""
+    dropna values to allow pair-wise comparison and calculation of Log2FC of genes in a Gene_Set
+    """
     if Gene_IDs is None:  # if Gene_IDs was not given, set indices of df as Gene_IDs
         Gene_IDs = df.index.values
     else:  # if Gene_IDs has been given
@@ -4307,7 +4330,8 @@ def Calculate_Log2FC_p_value___dict_Gene_Sets_Name__Gene_Sets___A_vs_B(
     """Calculate Log2FC, t-test p_values, and fdr-bh adjusted p_values for condition 'A' (default: Normal) and condition 'B' (default: Tumor)
     samples for each Gene_Sets in 'dict_Gene_Sets_Name__Gene_Sets' (default : 'dict_GeneSets_ALL' ) with a given Gene_IDs and return the result as a dataframe.
     Log2FC is log2( condition B average / condition A average ). dropna values to allow pair-wise comparison and calculation of Log2FC of genes in a Gene_Set.
-    label columns according to given labels 'label_condition_A' and 'label_condition_B'."""
+    label columns according to given labels 'label_condition_A' and 'label_condition_B'.
+    """
     df = deepcopy(df)  # copy dataframe to avoid changing original content
     if Gene_IDs is None:  # if Gene_IDs was not given, set indices of df as Gene_IDs
         Gene_IDs = df.index.values
@@ -4582,7 +4606,8 @@ def CALCULATE_Factor_Analysis__df(df, sample_list, n_factors, Gene_Set=None):
 def GENE_Annotate_df_for_plot(df, gene_list_annotation):
     """gene_list_annotation : if a list of Gene is given through this argument and df is not a list (a single DataFrame), draw annotation of valid genes on the plot. If gene_list_annotation = 'all',
     annotate all genes in a given df. If 'gene_list_annotation' is integer, annotate every 'gene_list_annotation' number of genes in df. if 'gene_list_annotation' is list containing three
-    integers (the list should have at least two integers), annotate [ gene_list_annotation[ 0 ] : gene_list_annotation[ 1 ] : gene_list_annotation[ 2 ] (default : 1) ] genes in df."""
+    integers (the list should have at least two integers), annotate [ gene_list_annotation[ 0 ] : gene_list_annotation[ 1 ] : gene_list_annotation[ 2 ] (default : 1) ] genes in df.
+    """
     if (
         gene_list_annotation is not None
     ):  # if 'gene_list_annotation' is given, retrive valid Gene_IDs and Gene_Symbols from the given list, and retrive positions of the valid genes in the DataFrame
@@ -4731,7 +4756,8 @@ def Clustering(
     """Wrapper method of 'recursive_clustering' (recursively cluster and return subcluster-ordered entries) and 'hierarchical_clustering' method (return optimal ordering of entires).
     set 'clustering_type' to 'recursive' or 'rc' for the former method and 'optimal' or 'hc' for the latter
     if list of df is given through 'df' argument, merge the dataframes (DataFrames has to have same indices though they can be in different order) and Clustering the DataFrame
-    For asymmetric data (with different columns and indices), If 'axis' is 0, cluster columns. if 'axis' is 1, cluster indices."""
+    For asymmetric data (with different columns and indices), If 'axis' is 0, cluster columns. if 'axis' is 1, cluster indices.
+    """
     list_df = None  # set a default value of list_df, which will contain list of DataFrame if it has been given through df argument
     if type(df) is not pd.DataFrame:
         cluster_column_too = is_relation_matrix  # store the value of 'is_relation_matrix' separately so that it can be used when returning the clustered result
@@ -4818,7 +4844,8 @@ def CALCULATE_Correlation_Matrix(
     """Calculate Spearman Correlation Coefficient for each gene-gene pairs and return return df_correl_mat
     default Gene_Set : indices of df (df.index.values)
     correlation_type = { 'pearson', 'kendall', 'spearman' } or lambda function that receive two numpy array
-    it is expected to use require really long time computing when excluding outliers by using 'n_std_for_outliers' to calculate more robust correlation coefficients."""
+    it is expected to use require really long time computing when excluding outliers by using 'n_std_for_outliers' to calculate more robust correlation coefficients.
+    """
     if Gene_Set is None:  # set default Gene_Set
         Gene_Set = set(df.index.values)
     if sample_list is None:  # set default sample_list
@@ -5714,7 +5741,8 @@ def EXPLORE_Cluster(
     """interactive method that can be used to explore clusters of 'df_clus' in 'dict_tree_clus'
     'df_data' is for drawing Log2FC T/N along with the matrix
     it is better and faster to use %matplotlib inline instead of qt, to store all the plots that has been drawn
-    current_cluster_name can be saved and returned at the end of this method as a list"""
+    current_cluster_name can be saved and returned at the end of this method as a list
+    """
     current_tree_node = dict_tree_clus
     list_parent_tree_node = (
         list()
@@ -5804,7 +5832,8 @@ def PLOT_magnigfied_correl_matrix(
 ):
     """For clustered relation matrix (let's call ratio matrix or correlation matrix all together as relation matrix),
     Magnify the matrix from 'start' to 'end', and Add Log2FC data at the rightmost column (df_data should be given through an argument)
-    Also, return a DataFrame with indices, Gene_Name_Symbols, and Log2FC so that Two-gene plot can be subsequently drawn"""
+    Also, return a DataFrame with indices, Gene_Name_Symbols, and Log2FC so that Two-gene plot can be subsequently drawn
+    """
     end += 1
     n_genes = end - start  # retrive number of genes
     Gene_IDs = df.index.values[start:end]  # retrive Gene_IDs
@@ -6079,7 +6108,8 @@ def MPL_1D_Sort_Plot(
 ):
     """(1) Convert iterable data like series or list into np.ndarray using 'TYPE_Convert_NP_Array' (2) Sort, (3) Visualize on a plot using green and red colors
     to visualize deviation from the given threshold. if color_percentile_thres is not None, annotate upper and lower percentiles with the color given by color_percentile arguments
-    if 'data' is pandas.DataFrame with two columns, first sort values in the second column by the first column, visualize, and annotate unique_entries of the first column on the plot. The NaN values in the first column will be ignored."""
+    if 'data' is pandas.DataFrame with two columns, first sort values in the second column by the first column, visualize, and annotate unique_entries of the first column on the plot. The NaN values in the first column will be ignored.
+    """
     bool_flag_sort_using_two_columns = (
         isinstance(data, pd.DataFrame) and len(data.columns.values) == 2
     )  # 'sort_using_two_columns' if a DataFrame with two columns are given as a 'data'.
@@ -6381,7 +6411,8 @@ def PLOT_Scatter_Annotation(
     **dict_matplotlib_basic_setting,
 ):
     """'arr_coordinates' should be numpy array with 2 columns, x and y coordinates, and 'arr_labels' should be a list-like object containing labels.
-    If arr_labels contains np.nan and it is pd.Series, remove np.nan labels from the given arr_labels and entries with np.nan labels from arr_coordinates"""
+    If arr_labels contains np.nan and it is pd.Series, remove np.nan labels from the given arr_labels and entries with np.nan labels from arr_coordinates
+    """
     if NUMPY_UTIL_Does_contain_NaN(
         arr_labels
     ):  # if arr_labels contains np.nan and it is pd.Series, remove np.nan labels from the given arr_labels and entries with np.nan labels from arr_coordinates
@@ -6661,7 +6692,8 @@ def VERIFICATION_boxplot_distribution_of_ranks_of_genes_for_each_sample(
     name_sample_list="Unnamed",
 ):
     """Calculate Rank of data of samples for each gene, and calculate average rank for each sample, and draw a distribution of ranks of genes in a given set of genes for each sample as a boxplot
-    Return series containing data of arr_sample_ranks_median with sample_list as indices"""
+    Return series containing data of arr_sample_ranks_median with sample_list as indices
+    """
     if Gene_Set is not None:
         df = PANDAS_Subset(df, Gene_Set)
     df = df[sample_list]
@@ -6733,7 +6765,8 @@ def PLOT_GEL_BLOTs(
 ):
     """Plot Grey_scale heatmap of data of a given DataFrame with a given sample_list and Gene_Set, as if showing a image of gel blots (for example, Western Blot) 'data_label' is a label for colorbar label
     'method_data_heatmap' : method used to set colors of heatmap.  'max' = max value become the highest value and 0 becomes lowest value. 'std_positive' = log-average + 2 * std becomes max color
-            and 0 becomes lowest value. 'std_zero' = 2 * std and -2 *std becomes max and min color. A tuple of color limits can be alternatively given when data_heatmap == data"""
+            and 0 becomes lowest value. 'std_zero' = 2 * std and -2 *std becomes max and min color. A tuple of color limits can be alternatively given when data_heatmap == data
+    """
     if df is None:
         df = df_rna
     valid_sample_list = np.array(sample_list)[
@@ -7062,7 +7095,8 @@ def BOKEH_PLOT_interactive_scatter_plot_log2fc(
     The dataframe should have Gene_ID as its index, and all Gene_IDs has to be valid (that is, it should exist in dict_ID_Symbol)
     color of circle will be set by data of data_label given by 'color', and size of circle will be set by data of data_label given by 'size'
     'show_symbol_filter_kw' keyworded arguments for filtering entries for displaying Approved_Symboles using 'RESULT_filter'.
-    column labels of x_axis, y_axis are given thorugh arguments.    axis type, 'log' or 'linear', is also given thorugh arguments.    tap_callback : 'google' search"""
+    column labels of x_axis, y_axis are given thorugh arguments.    axis type, 'log' or 'linear', is also given thorugh arguments.    tap_callback : 'google' search
+    """
     if (
         x_axis is None
     ):  # if x_axis and y_axis values were not given, automatically set x and y axis values
@@ -7196,7 +7230,8 @@ def BOKEH_PLOT_interactive_volcano_plot(
     The dataframe should have Gene_ID as its index, and all Gene_IDs has to be valid (that is, it should exist in dict_ID_Symbol)
     column labels of x_axis, y_axis are given thorugh arguments.    axis type, log or linear, is also given thorugh arguments
     tap_callback : 'google' or 'ncbi' search of gene if clicked (default ncbi).
-    Also, annotate a given list of genes in 'show_symbol_gene_ids' if given (dafault is all genes) according to a filter given by 'show_symbol_filter_kw'"""
+    Also, annotate a given list of genes in 'show_symbol_gene_ids' if given (dafault is all genes) according to a filter given by 'show_symbol_filter_kw'
+    """
     dict_shorthand = dict(
         Log2_Fold_Change="Log2FC",
         adjusted_p_value="adj p",
@@ -7457,7 +7492,8 @@ def BOKEH_PLOT_Scatter_Annotation(
     **dict_attributes,
 ):
     """'arr_coordinates' should be numpy array with 2 columns, x and y coordinates, and 'arr_labels' should be a list-like object containing labels. Additional information can be given
-    through keyworded arguments, and will be displayed via Bokeh's hover tool. bokeh circle function's additional keywords can be given through 'dict_scatter'"""
+    through keyworded arguments, and will be displayed via Bokeh's hover tool. bokeh circle function's additional keywords can be given through 'dict_scatter'
+    """
     arr_labels = (
         arr_labels
         if isinstance(arr_labels, (np.ndarray))
@@ -7564,7 +7600,8 @@ def subplot_two_genes(
     If 'regression_intercept_zero', draw an regression line that go through an origin
     'show_correl' : if 'N' or 'normal', show correl. for normal samples, 'T' or 'tumor' for tumor, 'NT' or 'TN' or 'A' for all samples.
                     if 'show_correl' = None, do not show correlation coefficient
-    'regression_type' : set type of linear regression line. 'proj' for projection-based least square linear regression, 'th' for Theil-Sen regression, and 'ls' for normal least square linear regression, 0 for normal least linear regression passing the origin"""
+    'regression_type' : set type of linear regression line. 'proj' for projection-based least square linear regression, 'th' for Theil-Sen regression, and 'ls' for normal least square linear regression, 0 for normal least linear regression passing the origin
+    """
     if (
         gene_id_1 is None
     ):  # retrive data (pandas  Series) that will be used in plotting # if external data has been given, used the data
@@ -7756,7 +7793,8 @@ def Plot_two_genes__normal_vs_tumor(
     if df_2' is given, draw two plots using both 'df' and 'df_2' as subplots to allow comparison between two data
     'show_correl' : if 'N' or 'normal', show correl. for normal samples, 'T' or 'tumor' for tumor, 'NT' or 'TN' or 'A' for all samples. if 'show_correl' = None, do not show correlation
     if 'switch_genes' is True, another subplots with swithced genes will be drawn
-    'regression_type' : set type of linear regression line. 'proj' for projection-based least square linear regression, 'th' for Theil-Sen regression, and 'ls' for normal least square linear regression"""
+    'regression_type' : set type of linear regression line. 'proj' for projection-based least square linear regression, 'th' for Theil-Sen regression, and 'ls' for normal least square linear regression
+    """
     if df is None:
         df = df_proteome
         df_name = "Proteome"
@@ -8948,7 +8986,8 @@ def PLOT_NORMALIZE_boxplots_organelle_amount_along_with_Gene_data(
     """subset 'df' with 'Organelle_Gene_Set' to represent an organelle and RLE normalize the data
     With an estimated amount of organelle in each sample, plots boxplots of each samples, along with scatter plots using Gene data (set N_samples as pseudo_reference )
     if 'Gene' is given. If 'plot_normalized' is set to True, boxplots and the scatter plot are drawn using the normalized data
-    external data can be given through 'Gene' argument as a pandas series where index is Sample_ID"""
+    external data can be given through 'Gene' argument as a pandas series where index is Sample_ID
+    """
     df_all_input_genes = deepcopy(df)
     df_normalized, series_organelle_amount = NORMALIZE_Relative_Log_Expression(
         df,
@@ -9147,7 +9186,8 @@ def PLOT_paired_T_vs_N(
     series_data, list_patients=None, alpha=0.3, linewidth=5, color_by_change=True
 ):
     """Plot data in 'series_data' (where index is Sample_IDs of paired samples) on categorical plots (Normal, Tumor) so that change from
-    tumor to normal can be tracked for individual patients with paired samples. Return fig and ax returned by plt.subplot"""
+    tumor to normal can be tracked for individual patients with paired samples. Return fig and ax returned by plt.subplot
+    """
     if (
         list_patients is None
     ):  # set default list_patients as all patients with paired samples
@@ -9281,7 +9321,8 @@ def CORREL_df(
     if 'df_target' is given, calculate Spearman correlation between df and df_target (index = indices of df, columns = indices of df_target). DataFrame with NaN values are acceptable, but when
     number of valid samples for a var pair is smaller than 'thres_minimum_n_samples', data_value will be np.nan
     when there is no np.nan values in a dataframe and thus there is no need for masking np.nan values, scipy.stats methods are used for calculaating correlation coefficient and p_values
-    'method' : a function name in scipy.stats module. if None is given, a default built-in custum function 'NUMPY_spearman_correl' will be used, which is significantly faster if number of observation is below 100 due to smaller overhead"""
+    'method' : a function name in scipy.stats module. if None is given, a default built-in custum function 'NUMPY_spearman_correl' will be used, which is significantly faster if number of observation is below 100 due to smaller overhead
+    """
     flag_symmetric = (
         True if df_target is None else False
     )  # set a flag to compute only half of a matrix if only one dataframe was given and thus correlation matrix is symmetric
@@ -9603,7 +9644,8 @@ def LINREGRESS_make_dataframe_symmetric(
     method_xy_switch=lambda a, b: a,
 ):
     """a fuction intended to be used in linear regression analysis for selecting values using given masks and makes symmetrix matrix, while filling diagnal entries with 'fill_diagnal_value'
-    'method_xy_switch' is used for calculating values when xy axes are switched (for example, df_slope needs lambda a, b : 1 / a ) 'a' = df, 'b' = a flag that is True when 'a' is df_xy_switched and not selected, False when 'a' is not switched and selected"""
+    'method_xy_switch' is used for calculating values when xy axes are switched (for example, df_slope needs lambda a, b : 1 / a ) 'a' = df, 'b' = a flag that is True when 'a' is df_xy_switched and not selected, False when 'a' is not switched and selected
+    """
     df_xy_switched_tril, df_tril = GET_dataframe_lower_triangle(
         method_xy_switch(df.transpose(), True)
     ), GET_dataframe_lower_triangle(
@@ -9825,7 +9867,8 @@ def NUMPY_Log_Average(arr):
 
 def NUMPY_GET_mean_std(data):
     """calculate mean and standard deviation of a given array of data using np.dot, which involves vector calculation (very fast). when number of elements is small (~100), this method is
-    3 times faster than applying data.mean() and data.std() separately.  calculate sample standard deviation (divided by N - 1 instead of N). return  mean, std"""
+    3 times faster than applying data.mean() and data.std() separately.  calculate sample standard deviation (divided by N - 1 instead of N). return  mean, std
+    """
     N = data.size
     mean = np.dot(data, np.ones(N)) / N
     deviation = data - mean
@@ -9840,7 +9883,8 @@ def NUMPY_GET_mean_std(data):
 
 def NUMPY_spearman_correl(data_1, data_2):
     """Use np.argsort() and np.dot() to reduce computation time. When number of elements is small (~100), it is 50 times faster than scipy.stats.spearmanr method
-    Since np.argsort() give identical values distinct rank, this method can give incorrect spearman correlation coefficient if given data have identical values (for example, multiple zeros)"""
+    Since np.argsort() give identical values distinct rank, this method can give incorrect spearman correlation coefficient if given data have identical values (for example, multiple zeros)
+    """
     N = data_1.size
     rank_1 = (
         data_1.argsort().argsort()
@@ -9857,7 +9901,8 @@ def NUMPY_spearman_correl(data_1, data_2):
 
 def NUMPY_least_square_linear_regress(x, y):
     """Perform simple linear regression (least square linear regression), which is implemented in scipy.stats.linregress. When number of elements is moderate ( < 10,000 ),
-    this method is 10 ~ 20 times faster than linregress method. (when n_elements = 100, its 20 times faster than linregress)"""
+    this method is 10 ~ 20 times faster than linregress method. (when n_elements = 100, its 20 times faster than linregress)
+    """
     N = x.size
     arr_ones = np.ones(N)
     sum_x, sum_y, sum_x2, sum_xy = (
@@ -10007,7 +10052,8 @@ def DEVIATION_FROM_NORMAL_CORRELATION_calculation(
 ):
     """For each gene pair in Gene_Set (default : all genes in df), perform projection-based least square linear regression for normal data, while masking outliers outside 'n_std_for_outliers'
     from the mean, and calculate mean rejection (Tumor data only since mean rejection in Normal data is 0), standard deviation(std) of rejection, std of projection, correlation between rejections
-    and projections, correlation before projection (Correlation Matrix of df with Spearman's coefficient), and lastly, deviation from origin from the slope and intercept (same sign with intercept)."""
+    and projections, correlation before projection (Correlation Matrix of df with Spearman's coefficient), and lastly, deviation from origin from the slope and intercept (same sign with intercept).
+    """
     if Gene_Set is not None:
         df = PANDAS_Subset(df, Gene_Set)
     n_genes = len(df)
@@ -10198,7 +10244,8 @@ def DEVIATION_NORMAL_CORR_a_gene_pair_with_switching(
     gene_1, gene_2, df=None, n_std_for_outliers=3.5, mask_zero_with_nan=True
 ):
     """calculates 14 metrics for projection-based linear regression analysis for a given pair of genes on 'df' data using 'DEVIATION_NORMAL_CORR_a_gene_pair' method.
-    Return dataframe summarizing the results (swithced and not switched). If 'mask_zero_with_nan' is True, replace near-zero values with np.nan"""
+    Return dataframe summarizing the results (swithced and not switched). If 'mask_zero_with_nan' is True, replace near-zero values with np.nan
+    """
     s_gene_pair = DEVIATION_NORMAL_CORR_a_gene_pair(
         gene_1=gene_1, gene_2=gene_2, df=df, n_std_for_outliers=n_std_for_outliers
     )
@@ -10314,7 +10361,8 @@ def LINREGRESS_OPTIMIZE_search_slope_with_minumun_std_of_rejections(
 ):
     """by using double for loop, search a slope that gives minimal standard deviation of rejections for a given data ('x_y_centered').
     in a search space, 'num_probing' number of search points were searched, and magnify the search space, and repeat the search for 'num_repeat' times
-    about 3 times faster than Scipy.optimum.fmin function, though this function is less accurate than the function"""
+    about 3 times faster than Scipy.optimum.fmin function, though this function is less accurate than the function
+    """
     initial_slopes = (
         NUMPY_least_square_linear_regress(x, y)[0],
         1 / NUMPY_least_square_linear_regress(y, x)[0],
@@ -10581,7 +10629,8 @@ def TCGA_CALCULATE_KaplanMeierCurve_log_rank_p_value_of_all_genes_in_dataframe(
     df, Gene_Set=None, df_clinical=None, cut_ratio=0.25
 ):
     """For each genes in df (or a subset of df if a 'Gene_Set' is given), calculate log rang p_values for data of 'days_to_death' column in df_clinical (default : df_patients) between
-    two groups of patients, one group with upper n percent and another group with lower n percent of the data given by df"""
+    two groups of patients, one group with upper n percent and another group with lower n percent of the data given by df
+    """
     if df_clinical is None:  # set default df_clinical
         df_clinical = df_patients
     if Gene_Set is not None:  # if 'Gene_Set' is given, subset df with a given Gene_Set
@@ -10659,7 +10708,8 @@ def TCGA_PLOT_KaplanMeierCurve_for_a_gene(
     show_fig=False,
 ):
     """For a given gene, draw a KaplanMeierCurve between two groups of patients in df_clinical (default : df_patients), one group with upper n percent and another group with lower n percent of the data given by df
-    (default : df_rna). 'show_fig' : if both 'save_fig' and 'show_fig' are True, show the plot, and if 'save_fig' is False, always show the plot"""
+    (default : df_rna). 'show_fig' : if both 'save_fig' and 'show_fig' are True, show the plot, and if 'save_fig' is False, always show the plot
+    """
     if df_clinical is None:  # set default df_clinical
         df_clinical = df_patients
     if df is None:
@@ -11044,7 +11094,8 @@ def CCLE_Gene_Dependency_Score_Plot_Gene(
     show_legend=True,
 ):
     """Visualize Gene_Dependency data along with RNA data. bubble size indicates RNA amount (linear), and can be adjusted by 'size_factor'. Sort cell_line_set according to its median gene_dependency
-    value, while excluding cell_line_set if a subset contain less than 'thres_n_cell_line' entries, 'gene_for_rna' : Gene symbol for gene used for retriving RNA-Seq data. by default, the given gene for retriving GD Data"""
+    value, while excluding cell_line_set if a subset contain less than 'thres_n_cell_line' entries, 'gene_for_rna' : Gene symbol for gene used for retriving RNA-Seq data. by default, the given gene for retriving GD Data
+    """
     if dict_cell_line_set is None:
         dict_cell_line_set = dict_ccle__cell_line_sets
     df = (
@@ -11452,7 +11503,8 @@ def UBIQUITINATION_DATASET_barplot_proteins_for_pub(
 
 def CRBNPROT_Decompress_metadata(df=None, data_labels=None):
     """Decompress metadata and Create metadata dataframe from columns of the given dataframe containing CRBN_Proteomic profiling dataset. Also see CRBNPROT_Compress_metadata
-    Default data_labels : [ 'Value_Type', 'Data_Type', 'Experiment_System', 'Condition_A', 'Condition_B', 'Replicate', 'Data_Source' ]"""
+    Default data_labels : [ 'Value_Type', 'Data_Type', 'Experiment_System', 'Condition_A', 'Condition_B', 'Replicate', 'Data_Source' ]
+    """
     data_labels = (
         [
             "Value_Type",
@@ -11479,7 +11531,8 @@ def CRBNPROT_Decompress_metadata(df=None, data_labels=None):
 
 def CRBNPROT_Compress_metadata(df=None, data_labels=None):
     """Compress metadata in the given metadata dataframe (default, df_crbnprot_meta_assays) according to data_labels and return list of labels containing compressed metadata.
-    Default data_labels : [ 'Value_Type', 'Data_Type', 'Experiment_System', 'Condition_A', 'Condition_B', 'Replicate', 'Data_Source' ]. Also see CRBNPROT_Decompress_metadata"""
+    Default data_labels : [ 'Value_Type', 'Data_Type', 'Experiment_System', 'Condition_A', 'Condition_B', 'Replicate', 'Data_Source' ]. Also see CRBNPROT_Decompress_metadata
+    """
     data_labels = (
         [
             "Value_Type",
@@ -12192,7 +12245,8 @@ def GTF_Calculate_overlapping_percentage(start1, end1, start2, end2):
 
 def Substring_allow_mismatch(pattern, text):
     """Return True if pattern exist in text allowing upto one mismatch.
-    source : https://stackoverflow.com/questions/2420412/search-for-string-allowing-for-one-mismatch-in-any-location-of-the-string"""
+    source : https://stackoverflow.com/questions/2420412/search-for-string-allowing-for-one-mismatch-in-any-location-of-the-string
+    """
     m = len(pattern)
     S_table = defaultdict(int)
     for i, c in enumerate(pattern):
@@ -12999,7 +13053,8 @@ def NGS_SEQ_Translate(
     return_error_value_if_stop_codon_not_found=True,
 ):
     """Translate nucleotide sequence until the given seq is end or stop codons are encountered.
-    start = 0 : start position for potential protein sequence (for example, start of ATG start codon.)"""
+    start = 0 : start position for potential protein sequence (for example, start of ATG start codon.)
+    """
     if type(seq) is float:
         return np.nan  # if input is invalid, return np.nan
     length_seq = len(seq)  # it seems the time complexity of the len(str) method is O(1)
@@ -13074,7 +13129,8 @@ def NGS_SEQ_ORF_Find_All_Methionine_ORFs_on_Both_Strands(
     seq, use_1_based_coordinate=True
 ):
     """Find all ORFs start with methionine on both strand of the given sequence by using 'NGS_SEQ_ORF_Find_All_Methionine_ORFs'.
-    use 1-based-coordinate for start and end positions if 'use_1_based_coordinate' is set to True"""
+    use 1-based-coordinate for start and end positions if 'use_1_based_coordinate' is set to True
+    """
     df_plus = NGS_SEQ_ORF_Find_All_Methionine_ORFs(
         seq
     )  # find all ORFs in the sequence and the reverse complement of the sequence
@@ -13109,7 +13165,8 @@ def NGS_SEQ_Trim_PolyA(
     int_lookup_window=3,
 ):
     """Trim PolyA sequence from the 3' end of a given sequence (DNA sequence in upper characters) if 'from_3_prime_end' is True or trim polyA from 5' end of the sequence if 'from_3_prime_end' is False
-    if the program encounter base other than 'A', lookup next 'int_lookup_window' number of bases and check weather they are consecutive 'A' bases."""
+    if the program encounter base other than 'A', lookup next 'int_lookup_window' number of bases and check weather they are consecutive 'A' bases.
+    """
     if len(seq) == 0:  # if the given seq is empty
         if return_length_of_polyA:
             return 0
@@ -13392,7 +13449,8 @@ def FASTA_Assembly_Stats(
     dict_fasta=None, arr_length=None, flag_arr_length_is_sorted=False
 ):
     """# 2021-09-15 21:52:44
-    return assembly stats for the given fasta file (fasta file containing assembed contigs)"""
+    return assembly stats for the given fasta file (fasta file containing assembed contigs)
+    """
     if dict_fasta is not None:
         dict_fasta = (
             FASTA_Read(dict_fasta) if isinstance(dict_fasta, (str)) else dict_fasta
@@ -14338,7 +14396,8 @@ def FASTQ_Read(
 
 def FASTQ_Read_Generator(path_file, return_only_at_index=None):  # 2020-08-18 22:31:31
     """read a given fastq file into list of sequences or a dataframe (gzipped fastq file supported). 'return_only_at_index' is a value between 0 and 3 (0 = readname, 1 = seq, ...)
-    return a generator that return a tuple of 3 length (name, sequence, and quality) or a value at the index given by "return_only_at_index"."""
+    return a generator that return a tuple of 3 length (name, sequence, and quality) or a value at the index given by "return_only_at_index".
+    """
     if return_only_at_index is not None:
         return_only_at_index = (
             return_only_at_index % 4
@@ -14368,7 +14427,8 @@ def FASTQ_Read_Generator(path_file, return_only_at_index=None):  # 2020-08-18 22
 def FASTQ_Write(path_file, dict_seq=None, dict_quality=None, df_fastq=None):
     """
     # 2021-03-07 15:53:19
-    Write FASTQ file with given dataframe or a pair of dict_seq and dict_quality (keys of both dictionaries should be the same)"""
+    Write FASTQ file with given dataframe or a pair of dict_seq and dict_quality (keys of both dictionaries should be the same)
+    """
     if dict_seq is None or dict_quality is None:
         if df_fastq is None:
             print("required inputs are not given, exiting")
@@ -15085,7 +15145,8 @@ def HMMER_Read_nhmmscan_output_with_alignment(path_file):  # 2020-05-20 17:02:41
 
 def HMMER_Read_nhmmer_output_with_alignment(path_file):
     """# 2021-02-04 11:20:08
-    Read nhmmer output file with alignment information. read search summary, alignments, and return two dataframes containing the summary and alignment result"""
+    Read nhmmer output file with alignment information. read search summary, alignments, and return two dataframes containing the summary and alignment result
+    """
     bool_flag_new_alignment_start = False  # in case that there is no alignment
     with open(path_file) as file:
         l_l_value__search_result = list()
@@ -15978,7 +16039,8 @@ def CIF_Read(path_file):  # 2020-07-20 20:31:16
 
 def CIF_Write(path_file, dict_cif):  # 2020-07-13 23:05:05
     """write CIF file in the given 'dict_cif'.
-    *the output file closely resembles standard CIF file, but it does not have line length limit (no value spans multiple lines enclosed by semicolons ';'). This will prevent some CIF readers, such as mkdssp or chimera from reading the metadata (not 3D coordinate data). Therefore, saving only 'atom_site' category is recommended"""
+    *the output file closely resembles standard CIF file, but it does not have line length limit (no value spans multiple lines enclosed by semicolons ';'). This will prevent some CIF readers, such as mkdssp or chimera from reading the metadata (not 3D coordinate data). Therefore, saving only 'atom_site' category is recommended
+    """
     with open(path_file, "w") as file:
         for str_name_data_block in dict_cif:  # for each data block
             dict_data_block = dict_cif[str_name_data_block]

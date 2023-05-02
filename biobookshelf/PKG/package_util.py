@@ -38,7 +38,6 @@ def Gunzip_Data(path_file, name_package):
     if not os.path.exists(
         path_file_download_flag
     ):  # if gunzip has not been done or not completed
-
         path_file_zipped = pkg_resources.resource_filename(
             name_package, path_file
         )  # absolute directory of gzipped file

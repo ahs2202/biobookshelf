@@ -4,6 +4,7 @@ from io import StringIO
 import collections  # for external function
 from copy import deepcopy
 
+
 # import internal functions
 def PD_Select(df, deselect=False, **dict_select):
     """Select and filter rows of df according to the given dict_select. If 'deselect' is set to True, deselect rows according to the given dict_select  Usage example : PANDAS_Select( df_meta_imid_ubi, dict(  Data_Type = [ 'Proteome', 'Ubi_Profiling' ], Value_Type = 'log2fc' ) )"""
@@ -56,7 +57,8 @@ def LIST_COUNT(
 ):
     """
     # 20210224
-    return a dictionary where key = each element in a given list, value = counts of the element in the list. if 'duplicate_filter' is not None, return entries that are duplicated 'duplicate_filter' times or more."""
+    return a dictionary where key = each element in a given list, value = counts of the element in the list. if 'duplicate_filter' is not None, return entries that are duplicated 'duplicate_filter' times or more.
+    """
     if dropna and isinstance(iterable, pd.Series):
         iterable = (
             iterable.dropna()
@@ -174,7 +176,8 @@ df_amino_acids
 
 def Parse_ATOM_or_HETATM_line(line):
     """# 2021-04-27 11:12:31
-    parse a given line (should be ATOM or HETATM records) and return parsed data values as a numpy array (dtype = object) Parse only until xyz coordinates (because later columns are somewhat variable across different docking servers)"""
+    parse a given line (should be ATOM or HETATM records) and return parsed data values as a numpy array (dtype = object) Parse only until xyz coordinates (because later columns are somewhat variable across different docking servers)
+    """
     # parse optional fields based on the length of the entry
     value = "" if len(line) < 60 else line[54:60].strip()
     float_occupancy = np.nan if len(value) == 0 else float(value)
@@ -214,7 +217,8 @@ def Parse_ATOM_or_HETATM_line(line):
 
 def Compose_ATOM_or_HETATM_line(arr_values):
     """# 2020-12-14 00:08:19
-    compose a ATOM or HETATM line from the output of 'Parse_ATOM_or_HETATM_line' (it is essentially a reverse operation of 'Parse_ATOM_or_HETATM_line')"""
+    compose a ATOM or HETATM line from the output of 'Parse_ATOM_or_HETATM_line' (it is essentially a reverse operation of 'Parse_ATOM_or_HETATM_line')
+    """
     arr_values = deepcopy(arr_values)
     if len(df_meta_pdb_format) > len(df_meta_pdb_format):
         arr_values = arr_values[: len(df_meta_pdb_format)]
@@ -249,7 +253,8 @@ def Read_Single_Module(
     path_file, enable_automatic_correction=False, verbose=False
 ):  # 2020-07-07 15:59:00
     """# 2021-04-27 11:25:12
-    Read PDB file with a single module (one chain A and one chain B, etc), and return dataframes of ATOM and HETATM records. If missing chain identifiers are detected, reassign chain identifiers based on chain transitions inferred by residue_numbers"""
+    Read PDB file with a single module (one chain A and one chain B, etc), and return dataframes of ATOM and HETATM records. If missing chain identifiers are detected, reassign chain identifiers based on chain transitions inferred by residue_numbers
+    """
     if "/" in path_file:
         with open(path_file, "r") as file:
             l_lines = file.read().split("\n")
@@ -357,7 +362,8 @@ def Read_Multiple_Models(path_file):  # 2020-11-27 16:27:07
 
 def Split_Multiple_Models(path_file, path_folder_output=None):  # 2020-11-30 03:07:27
     """read pdb file of 'path_file' containing multiple models (CABS-Dock output 'clus' and 'replica' files) and split the file into individual models without parsing and composing data values.
-    'path_folder_output' : output directory of split files. by default, it is where the pdb file is located"""
+    'path_folder_output' : output directory of split files. by default, it is where the pdb file is located
+    """
     path_folder, name_file = path_file.rsplit("/", 1)
     if path_folder_output is None:
         path_folder_output = path_folder  # set default folder
@@ -449,7 +455,8 @@ def Retrive_Signatures_of_atoms(
 
 def Identify_Protein_and_Assign_Chain_identifier(df, **dict_identifiable_chains):
     """Input : output dataframe of 'Read_Single_Module' as 'df' and keyworded arguments for desired chain identifier for each identifiable protein (example input: A = { 'start' : { 'ILE' : 47 }, 323 : 'CYS', 326 : 'CYS', 391 : 'CYS', 394 : 'CYS' } )
-    Output : output dataframe of 'Read_Single_Module', but with modified chain identifiers for each identified proteins"""
+    Output : output dataframe of 'Read_Single_Module', but with modified chain identifiers for each identified proteins
+    """
     l_df_a_chain = list()
     for (
         char_chain_identifier

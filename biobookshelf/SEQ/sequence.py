@@ -64,7 +64,8 @@ def Translate(
     return_error_value_if_stop_codon_not_found=True,
 ):
     """Translate nucleotide sequence until the given seq is end or stop codons are encountered.
-    start = 0 : start position for potential protein sequence (for example, start of ATG start codon.)"""
+    start = 0 : start position for potential protein sequence (for example, start of ATG start codon.)
+    """
     if type(seq) is float:
         return np.nan  # if input is invalid, return np.nan
     length_seq = len(seq)  # it seems the time complexity of the len(str) method is O(1)
@@ -137,7 +138,8 @@ def ORF_Find_All_Methionine_ORFs(seq, return_list=False):
 # 2020-05-29 14:28:22
 def ORF_Find_All_Methionine_ORFs_on_Both_Strands(seq, use_1_based_coordinate=True):
     """Find all ORFs start with methionine on both strand of the given sequence by using 'ORF_Find_All_Methionine_ORFs'.
-    use 1-based-coordinate for start and end positions if 'use_1_based_coordinate' is set to True"""
+    use 1-based-coordinate for start and end positions if 'use_1_based_coordinate' is set to True
+    """
     df_plus = ORF_Find_All_Methionine_ORFs(
         seq
     )  # find all ORFs in the sequence and the reverse complement of the sequence
@@ -172,7 +174,8 @@ def Trim_PolyA(
     int_lookup_window=3,
 ):
     """Trim PolyA sequence from the 3' end of a given sequence (DNA sequence in upper characters) if 'from_3_prime_end' is True or trim polyA from 5' end of the sequence if 'from_3_prime_end' is False
-    if the program encounter base other than 'A', lookup next 'int_lookup_window' number of bases and check weather they are consecutive 'A' bases."""
+    if the program encounter base other than 'A', lookup next 'int_lookup_window' number of bases and check weather they are consecutive 'A' bases.
+    """
     if len(seq) == 0:  # if the given seq is empty
         if return_length_of_polyA:
             return 0
