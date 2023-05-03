@@ -276,7 +276,7 @@ def create_gene_count_from_fast5(
     import concurrent.futures
 
     l_task = []  # initialize the list of tasks
-    int_num_cpus_for_each_alignment = min(
+    int_num_cpus_for_each_alignment = max(
         1, int(int_num_cpus / int_num_samples / 2)
     )  # retrieve approximate number of cpus for each alignment
     for name_sample, path_file_fq in df_fastq.values:  # for each sample
