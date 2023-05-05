@@ -55,7 +55,7 @@ def create_gene_count_from_fast5(
     flag_require_barcodes_both_ends: bool = True,  # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
     flag_rerun_guppy=False,  # rename the the output folder (if it exists) and rerun guppy if the flag is True
 ):
-    """# 2023-05-05 17:16:59 
+    """# 2023-05-05 17:16:59
     l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
     l_name_config : Union[ str, List ], # a name of config or a list of name_config
     l_barcoding_kit : Union[ str, List, None ], # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
@@ -427,24 +427,39 @@ def create_gene_count_from_fast5(
             f"{path_folder_processed_data}{name_sample}.alignment_summary.gene_level.tsv.gz",
             sep="\t",
         )  # output tsv file
-        
+
         # calculate accumulated sequencing throughput to determine library diversity
-        s_sequencing_throughput = df_count.gene_count * df_count.average_length_of_read # retrieve total number of base pairs for each entry
-        s_sequencing_throughput_proportion = ( s_sequencing_throughput / s_sequencing_throughput.sum( ) ).sort_values( ascending = False )
-        df_accumulated_throughput = pd.concat( [ 
-            pd.DataFrame( { 
-                'accumulated proportions of sequencing throughput' : [ 0 ], 
-                'number of covered genes' : [ 0 ], 
-                'proportion of sequencing throughput' : [ 0 ], 
-                'gene name' : [ '-' ]
-            } ),
-            pd.DataFrame( { 
-                'accumulated proportions of sequencing throughput' : np.cumsum( s_sequencing_throughput_proportion.values ), 
-                'number of covered genes' : np.arange( len( s_sequencing_throughput_proportion ) ) + 1, 
-                'proportion of sequencing throughput' : s_sequencing_throughput_proportion.values, 
-                'gene name' : s_sequencing_throughput_proportion.index.values
-            } ),
-        ] )
+        s_sequencing_throughput = (
+            df_count.gene_count * df_count.average_length_of_read
+        )  # retrieve total number of base pairs for each entry
+        s_sequencing_throughput_proportion = (
+            s_sequencing_throughput / s_sequencing_throughput.sum()
+        ).sort_values(ascending=False)
+        df_accumulated_throughput = pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "accumulated proportions of sequencing throughput": [0],
+                        "number of covered genes": [0],
+                        "proportion of sequencing throughput": [0],
+                        "gene name": ["-"],
+                    }
+                ),
+                pd.DataFrame(
+                    {
+                        "accumulated proportions of sequencing throughput": np.cumsum(
+                            s_sequencing_throughput_proportion.values
+                        ),
+                        "number of covered genes": np.arange(
+                            len(s_sequencing_throughput_proportion)
+                        )
+                        + 1,
+                        "proportion of sequencing throughput": s_sequencing_throughput_proportion.values,
+                        "gene name": s_sequencing_throughput_proportion.index.values,
+                    }
+                ),
+            ]
+        )
         # write result as files
         df_accumulated_throughput.to_excel(
             f"{path_folder_processed_data}{name_sample}.(supplementary).accumulated_sequencing_throughput.gene_level.xlsx"
@@ -453,12 +468,27 @@ def create_gene_count_from_fast5(
             f"{path_folder_processed_data}{name_sample}.(supplementary).accumulated_sequencing_throughput.gene_level.tsv.gz",
             sep="\t",
         )  # output tsv file
-        
+
         # draw graph
-        float_area_under_the_curve = np.cumsum( s_sequencing_throughput_proportion.values ).mean( ) # calculate area under the curve, which indicates higher library diversity
-        fig = px.line( df_accumulated_throughput, y = 'accumulated proportions of sequencing throughput', x = 'number of covered genes', log_y = False, line_shape='vh', hover_data = [ 'gene name', 'proportion of sequencing throughput' ], title = f"Area Under the Curve (AUC) = {np.round( float_area_under_the_curve, 5 )}<br>(lower AUC indicates higher library diversity)" )
-        os.makedirs( f'{path_folder_graph}accumulated_sequencing_throughput/', exist_ok = True ) # create the output folder
-        fig.write_html( f'{path_folder_graph}accumulated_sequencing_throughput/{name_sample}.accumulated_sequencing_throughput.gene_level.html' ) # write the graph
+        float_area_under_the_curve = np.cumsum(
+            s_sequencing_throughput_proportion.values
+        ).mean()  # calculate area under the curve, which indicates higher library diversity
+        fig = px.line(
+            df_accumulated_throughput,
+            y="accumulated proportions of sequencing throughput",
+            x="number of covered genes",
+            log_y=False,
+            line_shape="vh",
+            hover_data=["gene name", "proportion of sequencing throughput"],
+            title=f"Area Under the Curve (AUC) = {np.round( float_area_under_the_curve, 5 )}<br>(lower AUC indicates higher library diversity)",
+        )
+        os.makedirs(
+            f"{path_folder_graph}accumulated_sequencing_throughput/", exist_ok=True
+        )  # create the output folder
+        fig.write_html(
+            f"{path_folder_graph}accumulated_sequencing_throughput/{name_sample}.accumulated_sequencing_throughput.gene_level.html"
+        )  # write the graph
+
 
 def Guppy_Run_and_Combine_Output(
     path_folder_nanopore_sequencing_data=None,
