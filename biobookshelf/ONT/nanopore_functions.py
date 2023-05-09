@@ -29,7 +29,6 @@ def __create_gene_count_from_fast5__align(ins):
     )  # perform alignment
 
 
-
 def create_gene_count_from_raw_ont_data(
     l_path_folder_nanopore_sequencing_data: Union[
         str, list, None
@@ -39,7 +38,9 @@ def create_gene_count_from_raw_ont_data(
         str, List, None
     ] = None,  # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
     path_folder_output: Union[str, None] = None,  # a path to the output folder
-    dict_name_bc_to_name_sample: Union[str, dict, None] = None,  # barcode to name_sample
+    dict_name_bc_to_name_sample: Union[
+        str, dict, None
+    ] = None,  # barcode to name_sample
     dict_name_sample_to_organism: Union[
         dict, None
     ] = None,  # define organism for each sample
@@ -56,7 +57,7 @@ def create_gene_count_from_raw_ont_data(
     flag_require_barcodes_both_ends: bool = True,  # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
     flag_rerun_guppy=False,  # rename the the output folder (if it exists) and rerun guppy if the flag is True
 ):
-    """# 2023-05-09 00:42:08 
+    """# 2023-05-09 00:42:08
     l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
     l_name_config : Union[ str, List ], # a name of config or a list of name_config
     l_barcoding_kit : Union[ str, List, None ], # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
@@ -122,27 +123,55 @@ def create_gene_count_from_raw_ont_data(
             # retrieve a flag indicating the barcoding kit was used.
             flag_barcoding = id_barcoding_kit is not None
             # automatically detect output file type
-            raw_data_type = 'fast5' if len( glob.glob(f"{path_folder_nanopore_data}fast5*/") ) > 0 else 'pod5'
+            raw_data_type = (
+                "fast5"
+                if len(glob.glob(f"{path_folder_nanopore_data}fast5*/")) > 0
+                else "pod5"
+            )
             # create folders
             path_folder_raw = f"{path_folder_nanopore_data}{raw_data_type}_all/"
             path_folder_guppy_output = f"{path_folder_nanopore_data}guppy_out/"
             for path_folder in [path_folder_raw, path_folder_guppy_output]:
                 os.makedirs(path_folder, exist_ok=True)
             # if skipped raw data does not exist, indicating all raw data has been analyzed by MinKNOW, search for fastq output files and move the fastq output files to the guppy_out folder
-            if not os.path.exists(f"{path_folder_nanopore_data}{raw_data_type}_skip/") and len( glob.glob(f"{path_folder_nanopore_data}fastq*/") ) > 0 : # if skipped raw data does not exist and fastq output files exist, move these files into the guppy_out folder
-                bk.OS_Run( ["mv", f"{path_folder_nanopore_data}fastq_fail/", f"{path_folder_nanopore_data}guppy_out/fail/" ] ) 
-                bk.OS_Run( ["mv", f"{path_folder_nanopore_data}fastq_pass/", f"{path_folder_nanopore_data}guppy_out/pass/" ] ) 
-                with open( f"{path_folder_guppy_output}sequencing_summary.txt", 'w' ) as newfile : # create a file that functions as a flag.
-                    newfile.write( 'minknow output' )
+            if (
+                not os.path.exists(f"{path_folder_nanopore_data}{raw_data_type}_skip/")
+                and len(glob.glob(f"{path_folder_nanopore_data}fastq*/")) > 0
+            ):  # if skipped raw data does not exist and fastq output files exist, move these files into the guppy_out folder
+                bk.OS_Run(
+                    [
+                        "mv",
+                        f"{path_folder_nanopore_data}fastq_fail/",
+                        f"{path_folder_nanopore_data}guppy_out/fail/",
+                    ]
+                )
+                bk.OS_Run(
+                    [
+                        "mv",
+                        f"{path_folder_nanopore_data}fastq_pass/",
+                        f"{path_folder_nanopore_data}guppy_out/pass/",
+                    ]
+                )
+                with open(
+                    f"{path_folder_guppy_output}sequencing_summary.txt", "w"
+                ) as newfile:  # create a file that functions as a flag.
+                    newfile.write("minknow output")
 
             # collect raw output files
             for path_file in (
-                glob.glob(f"{path_folder_nanopore_data}{raw_data_type}_skip/*.{raw_data_type}")
-                + glob.glob(f"{path_folder_nanopore_data}{raw_data_type}_fail/{'*/' if flag_barcoding else ''}*.{raw_data_type}")
-                + glob.glob(f"{path_folder_nanopore_data}{raw_data_type}_pass/{'*/' if flag_barcoding else ''}*.{raw_data_type}")
+                glob.glob(
+                    f"{path_folder_nanopore_data}{raw_data_type}_skip/*.{raw_data_type}"
+                )
+                + glob.glob(
+                    f"{path_folder_nanopore_data}{raw_data_type}_fail/{'*/' if flag_barcoding else ''}*.{raw_data_type}"
+                )
+                + glob.glob(
+                    f"{path_folder_nanopore_data}{raw_data_type}_pass/{'*/' if flag_barcoding else ''}*.{raw_data_type}"
+                )
             ):
                 os.rename(
-                    path_file, f"{path_folder_raw}{bk.UUID( )}.{path_file.rsplit( '/', 1 )[ 1 ]}" # add uuid to avoid collision
+                    path_file,
+                    f"{path_folder_raw}{bk.UUID( )}.{path_file.rsplit( '/', 1 )[ 1 ]}",  # add uuid to avoid collision
                 )
 
             # run guppy
@@ -162,7 +191,9 @@ def create_gene_count_from_raw_ont_data(
                 flag_require_barcodes_both_ends
             ):  # if 'flag_require_barcodes_both_ends' is True
                 l_args += ["--require_barcodes_both_ends"]
-            if id_barcoding_kit is not None:  # if valid 'id_barcoding_kit' has been given
+            if (
+                id_barcoding_kit is not None
+            ):  # if valid 'id_barcoding_kit' has been given
                 l_args += ["--barcode_kits", id_barcoding_kit]
             print(" ".join(l_args))  # print the guppy_basecaller command
 
@@ -206,30 +237,34 @@ def create_gene_count_from_raw_ont_data(
             df_fq = PD_Select(df_fq, wildcard_0="pass")  # use only passed reads.
 
         # combine fastq files
-        if flag_barcoding : # combine files for each barcode
+        if flag_barcoding:  # combine files for each barcode
             for name_bc in df_fq.wildcard_1.unique():
                 df_fq_for_name_bc = bk.PD_Select(df_fq, wildcard_1=name_bc)
-                path_file_output= f"{path_folder_output}{name_bc}.fastq.gz"
+                path_file_output = f"{path_folder_output}{name_bc}.fastq.gz"
                 path_file_temp = f"{path_folder_output}{name_bc}.fastq.gz.partial"
                 bk.OS_Run(
                     ["cat"] + list(df_fq_for_name_bc.path.values),
                     path_file_stdout=path_file_temp,
                     stdout_binary=True,
-                ) # combine fastq files into a single temorary file
-                os.rename( path_file_temp, path_file_output ) # rename the temporary file to the output file
-        else :
-            path_file_output= f"{path_folder_output}combined.fastq.gz"
+                )  # combine fastq files into a single temorary file
+                os.rename(
+                    path_file_temp, path_file_output
+                )  # rename the temporary file to the output file
+        else:
+            path_file_output = f"{path_folder_output}combined.fastq.gz"
             path_file_temp = f"{path_folder_output}combined.fastq.gz.partial"
             bk.OS_Run(
                 ["cat"] + list(df_fq.path.values),
                 path_file_stdout=path_file_temp,
                 stdout_binary=True,
-            ) # combine fastq files into a single temorary file
-            os.rename( path_file_temp, path_file_output ) # rename the temporary file to the output file
+            )  # combine fastq files into a single temorary file
+            os.rename(
+                path_file_temp, path_file_output
+            )  # rename the temporary file to the output file
 
     # if 'dict_name_bc_to_name_sample' has given, rename fastq files and remove files that are not needed.
     if dict_name_bc_to_name_sample is not None:
-        if flag_barcoding and isinstance( dict_name_bc_to_name_sample, dict ) :
+        if flag_barcoding and isinstance(dict_name_bc_to_name_sample, dict):
             for path_file_fq in glob.glob(
                 f"{path_folder_pipeline}*.fastq.gz"
             ):  # for each fastq file
@@ -238,11 +273,18 @@ def create_gene_count_from_raw_ont_data(
                     name_file in dict_name_bc_to_name_sample
                 ):  # if 'name_sample' is available for the barcode, rename the file
                     name_sample = dict_name_bc_to_name_sample[name_file]
-                    os.rename(path_file_fq, f"{path_folder_pipeline}{name_sample}.fastq.gz")
+                    os.rename(
+                        path_file_fq, f"{path_folder_pipeline}{name_sample}.fastq.gz"
+                    )
                 else:  # if 'name_sample' is not available for the barcode, remove the file
                     os.remove(path_file_fq)
-        elif not flag_barcoding and isinstance( dict_name_bc_to_name_sample, str ) : # if barcoding was not used.
-            os.rename(f"{path_folder_pipeline}combined.fastq.gz", f"{path_folder_pipeline}{dict_name_bc_to_name_sample}.fastq.gz")
+        elif not flag_barcoding and isinstance(
+            dict_name_bc_to_name_sample, str
+        ):  # if barcoding was not used.
+            os.rename(
+                f"{path_folder_pipeline}combined.fastq.gz",
+                f"{path_folder_pipeline}{dict_name_bc_to_name_sample}.fastq.gz",
+            )
 
     # draw molecule length distribution of each sample
     df_fastq = bk.GLOB_Retrive_Strings_in_Wildcards(
@@ -515,6 +557,8 @@ def create_gene_count_from_raw_ont_data(
         fig.write_html(
             f"{path_folder_graph}accumulated_sequencing_throughput/{name_sample}.accumulated_sequencing_throughput.gene_level.html"
         )  # write the graph
+
+
 create_gene_count_from_fast5 = create_gene_count_from_raw_ont_data
 
 
