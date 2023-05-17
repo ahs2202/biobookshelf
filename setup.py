@@ -22,7 +22,7 @@ setup(
     license="GPLv3",
     packages=find_packages(include=["biobookshelf", "biobookshelf.*"]),
     include_package_data=True,
-    python_requires='>=3.8, <4',
+    python_requires=">=3.8, <4",
     install_requires=[
         "ipython>=7.19.0",
         "plotly>=4.11.0",
