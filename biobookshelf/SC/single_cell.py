@@ -24,6 +24,110 @@ import scipy.sparse
 import io
 import concurrent.futures  # for multiprocessing
 
+# functions for various file system access
+def filesystem_operations(
+    method: Literal["exists", "rm", "glob", "mkdir", "mv", "cp", "isdir"],
+    path_src: str,
+    path_dest: Union[str, None] = None,
+    flag_recursive: bool = True,
+    dict_kwargs_credentials_s3: dict = dict(),
+    **kwargs,
+):
+    """# 2022-12-04 00:57:45
+    perform a file system operation (either Amazon S3 or local file system)
+
+    method : Literal[
+        'exists', # check whether a file or folder exists, given through 'path_src' arguments
+        'rm', # remove file or folder, given through 'path_src' arguments
+        'glob', # retrieve path of files matching the glob pattern, given through 'path_src' arguments
+        'mkdir', # create a directory, given through 'path_src' arguments
+        'mv', # move file or folder , given through 'path_src' and 'path_dest' arguments
+        'cp', # copy file or folder , given through 'path_src' and 'path_dest' arguments
+        'isdir', # check whether the given input is a file or directory
+    ]
+
+    kwargs :
+        exist_ok : for 'mkdir' operation
+
+    dict_kwargs_credentials_s3 : dict = dict( ) # the credentials for the Amazon S3 file system as keyworded arguments
+
+    """
+    if is_s3_url(path_src) or is_s3_url(
+        path_dest
+    ):  # if at least one path is s3 locations
+        # %% Amazon s3 file system %%
+        # load the file system
+        import s3fs
+
+        fs = s3fs.S3FileSystem(**dict_kwargs_credentials_s3)
+        if method == "exists":
+            return fs.exists(path_src, **kwargs)
+        elif method == "rm":
+            return fs.rm(path_src, recursive=flag_recursive, **kwargs)  # delete files
+        elif method == "glob":
+            return list(
+                "s3://" + e for e in fs.glob(path_src, **kwargs)
+            )  # 's3://' prefix should be added
+        elif method == "mkdir":
+            # use default 'exist_ok' value
+            if "exist_ok" not in kwargs:
+                kwargs["exist_ok"] = True
+            return fs.makedirs(path_src, **kwargs)
+        elif method == "mv":
+            if not fs.exists(
+                path_dest, **kwargs
+            ):  # avoid overwriting of the existing file
+                return fs.mv(path_src, path_dest, recursive=flag_recursive, **kwargs)
+            else:
+                return "destionation file already exists, exiting"
+        elif method == "cp":
+            if is_s3_url(path_src) and is_s3_url(path_dest):  # copy from s3 to s3
+                return fs.copy(path_src, path_dest, recursive=flag_recursive, **kwargs)
+            elif is_s3_url(path_src):  # copy from s3 to local
+                return fs.get(path_src, path_dest, recursive=flag_recursive, **kwargs)
+            elif is_s3_url(path_dest):  # copy from local to s3
+                return fs.put(path_src, path_dest, recursive=flag_recursive, **kwargs)
+        elif method == "isdir":
+            return fs.isdir(path_src)
+    elif is_http_url(path_src):  # for http
+        # %% HTTP server %%
+        if method == "exists":
+            return (
+                http_response_code(path_src) == 200
+            )  # check whether http file (not tested for directory) exists
+        else:
+            return "not implemented"
+    else:
+        # %% local file system %%
+        if method == "exists":
+            return os.path.exists(path_src)
+        elif method == "rm":
+            if flag_recursive and os.path.isdir(
+                path_src
+            ):  # when the recursive option is active
+                shutil.rmtree(path_src)
+            else:
+                os.remove(path_src)
+        elif method == "glob":
+            return glob.glob(path_src)
+        elif method == "mkdir":
+            # use default 'exist_ok' value
+            if "exist_ok" not in kwargs:
+                kwargs["exist_ok"] = True
+            os.makedirs(path_src, exist_ok=kwargs["exist_ok"])
+        elif method == "mv":
+            shutil.move(path_src, path_dest)
+        elif method == "cp":
+            if flag_recursive and os.path.isdir(
+                path_src
+            ):  # when the recursive option is active
+                shutil.copytree(path_src, path_dest)
+            else:
+                shutil.copyfile(path_src, path_dest)
+        elif method == "isdir":
+            return os.path.isdir(path_src)
+
+
 """ previosuly written for biobookshelf """
 
 
