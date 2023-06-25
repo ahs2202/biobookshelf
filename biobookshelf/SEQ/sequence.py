@@ -3,18 +3,20 @@ import pandas as pd
 import numpy as np
 from enum import Enum
 
+
 # define cigar operations
-class cigar_op( Enum ):
+class cigar_op(Enum):
     # Op BAM Description Consumes query Consumes reference
-    M = 0 # alignment match (can be a sequence match or mismatch) yes yes
-    I = 1 # insertion to the reference yes no
-    D = 2 # deletion from the reference no yes
-    N = 3 # skipped region from the reference no yes
-    S = 4 # soft clipping (clipped sequences present in SEQ) yes no
-    H = 5 # hard clipping (clipped sequences NOT present in SEQ) no no
-    P = 6 # padding (silent deletion from padded reference) no no
-    EQUAL = 7 # sequence match yes yes
-    X = 8 # sequence mismatch yes yes
+    M = 0  # alignment match (can be a sequence match or mismatch) yes yes
+    I = 1  # insertion to the reference yes no
+    D = 2  # deletion from the reference no yes
+    N = 3  # skipped region from the reference no yes
+    S = 4  # soft clipping (clipped sequences present in SEQ) yes no
+    H = 5  # hard clipping (clipped sequences NOT present in SEQ) no no
+    P = 6  # padding (silent deletion from padded reference) no no
+    EQUAL = 7  # sequence match yes yes
+    X = 8  # sequence mismatch yes yes
+
 
 def Generate_Kmer(seq, window_size):
     """
@@ -248,9 +250,10 @@ def Detect_PolyT_Length(
             int_len_internal_polyT += 1
     return int_len_internal_polyT
 
+
 def Detect_Homopolymer_Length(
     seq,
-    base_repeat = 'A',
+    base_repeat="A",
     int_len_window_internal_homopolymer=30,
     int_len_sliding_window_internal_homopolymer=10,
     float_min_homogeneity=0.8,
@@ -259,6 +262,7 @@ def Detect_Homopolymer_Length(
     Detect homopolymer length of sequencing reads from an internal polyA priming event using a sliding window of a given length.
     """
     from bitarray import bitarray
+
     ba = bitarray(len(seq))
     ba.setall(0)
 
@@ -273,7 +277,10 @@ def Detect_Homopolymer_Length(
     ):
         int_len_internal_homopolymer = int_len_sliding_window_internal_homopolymer
         for index in range(
-            1, int_len_window_internal_homopolymer - int_len_sliding_window_internal_homopolymer + 1
+            1,
+            int_len_window_internal_homopolymer
+            - int_len_sliding_window_internal_homopolymer
+            + 1,
         ):
             if (
                 ba[index : index + int_len_sliding_window_internal_homopolymer].count()

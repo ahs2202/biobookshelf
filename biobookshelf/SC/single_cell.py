@@ -25,7 +25,6 @@ import io
 import concurrent.futures  # for multiprocessing
 
 
-
 def is_s3_url(url):
     """# 2022-12-02 18:23:18
     check whether the given url is s3uri (s3url)
@@ -113,7 +112,6 @@ def s3_rm(s3url, recursive=False, **kwargs):
 
 
 """ method and class for handling file system """
-
 
 
 # functions for various file system access
