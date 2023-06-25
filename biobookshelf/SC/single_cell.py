@@ -25,6 +25,97 @@ import io
 import concurrent.futures  # for multiprocessing
 
 
+
+def is_s3_url(url):
+    """# 2022-12-02 18:23:18
+    check whether the given url is s3uri (s3url)
+    """
+    # handle None value
+    if url is None:
+        return False
+    return "s3://" == url[:5]
+
+
+def is_http_url(url):
+    """# 2022-12-02 18:23:18
+    check whether the given url is HTTP URL
+    """
+    return "https://" == url[:8] or "http://" == url[:7]
+
+
+def is_remote_url(url):
+    """# 2022-12-02 18:31:45
+    check whether a url is a remote resource
+    """
+    return is_s3_url(url) or is_http_url(url)
+
+
+""" remote files over HTTP """
+
+
+def http_response_code(url):
+    """# 2022-08-05 22:27:27
+    check http response code
+    """
+    import requests  # download from url
+
+    status_code = None  # by default, 'status_code' is None
+    try:
+        r = requests.head(url)
+        status_code = r.status_code  # record the status header
+    except requests.ConnectionError:
+        status_code = None
+    return status_code
+
+
+def http_download_file(url, path_file_local):
+    """# 2022-08-05 22:14:30
+    download file from the remote location to the local directory
+    """
+    import requests  # download from url
+
+    with requests.get(url, stream=True) as r:
+        with open(path_file_local, "wb") as f:
+            shutil.copyfileobj(r.raw, f)
+
+
+""" remote files over AWS S3 """
+
+
+def s3_exists(s3url):
+    """# 2022-12-02 18:15:49
+    check whether a path/file exists in AWS S3
+    """
+    import s3fs
+
+    fs = s3fs.S3FileSystem()
+    return fs.exists(s3url)
+
+
+def s3_download_file(s3url, path_file_local):
+    """# 2022-12-02 18:15:44
+    download file from the remote AWS S3 location to the local directory
+    """
+    import s3fs
+
+    fs = s3fs.S3FileSystem()
+    fs.download(s3url, path_file_local)
+
+
+def s3_rm(s3url, recursive=False, **kwargs):
+    """# 2022-12-03 23:48:26
+    delete file (or an entire folder) from a AWS S3 location
+    """
+    import s3fs
+
+    fs = s3fs.S3FileSystem()
+    fs.rm(s3url, recursive=recursive, **kwargs)  # delete files
+
+
+""" method and class for handling file system """
+
+
+
 # functions for various file system access
 def filesystem_operations(
     method: Literal["exists", "rm", "glob", "mkdir", "mv", "cp", "isdir"],

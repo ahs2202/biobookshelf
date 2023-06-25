@@ -5909,6 +5909,14 @@ def Get_random_hex_color():
         *list(int(np.random.random() * 256) for i in range(3))
     )
 
+def get_random_color( name_cmap : str = 'prism_r', keep_alpha : bool = False ) :
+    """ # 2023-06-12 19:48:12 
+    generate random color from cmap
+    """
+    import matplotlib
+    import numpy as np
+    cmap = matplotlib.cm.get_cmap( name_cmap )
+    return matplotlib.colors.to_hex( cmap( np.random.random( ) ), keep_alpha = keep_alpha )
 
 def MATPLOTLIB_savefig(title, dpi=200, folder=None, close_fig=True, format=".png"):
     if "." not in format:

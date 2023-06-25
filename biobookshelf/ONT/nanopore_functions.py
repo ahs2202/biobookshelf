@@ -23,6 +23,7 @@ def __create_gene_count_from_fast5__align(ins):
         path_file_minimap2_index=minimap2_index,
         path_folder_minimap2_output=path_folder_minimap2_output,
         n_threads=int_num_cpus,
+        n_threads_for_sort = min( int_num_cpus, 10 ), # max 'n_threads_for_sort' would be 10
         drop_unaligned=False,
         return_bash_shellscript=False,
         path_file_junc_bed=path_file_splice_junc,
@@ -50,6 +51,7 @@ def create_gene_count_from_raw_ont_data(
     int_num_cpus: Union[
         int, None
     ] = None,  # the number of cpus to use. By default, use all the available cores
+    int_num_worker_processes: Union[ None, int ] = None, # the number of worker processes to use for running multiple minimap2 alignments in parallel
     flag_include_failed: bool = True,  # include the failed reads into the fastq output
     int_max_num_reads_for_drawing_size_distribution: int = 100000,  # the maximum number of reads to use to draw a size distribution
     int_max_size_for_displaying_size_distribution: int = 2000,  # max molecule length to display in the histogram
@@ -57,7 +59,7 @@ def create_gene_count_from_raw_ont_data(
     flag_require_barcodes_both_ends: bool = True,  # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
     flag_rerun_guppy=False,  # rename the the output folder (if it exists) and rerun guppy if the flag is True
 ):
-    """# 2023-05-09 00:42:08
+    """# 2023-06-25 22:01:14 
     l_path_folder_nanopore_sequencing_data : list, # list of folders containing nanopore sequencing data
     l_name_config : Union[ str, List ], # a name of config or a list of name_config
     l_barcoding_kit : Union[ str, List, None ], # a name of barcoding kit or a list of barcoding kits. if barcoding kits were not used, use None
@@ -70,6 +72,8 @@ def create_gene_count_from_raw_ont_data(
     int_max_size_for_displaying_size_distribution : int = 2000 # max molecule length to display in the histogram
     int_num_bins_for_displaying_size_distribution : int = 200 # number of bins for drawing histogram
     flag_require_barcodes_both_ends : bool = True, # require barcodes for both ends. if unclassified are too large, consider turning of this option to recover barcodes from the unclassified reads.
+    int_num_cpus: Union[ int, None ] = None, # the number of cpus to use. By default, use all the available cores
+    int_num_worker_processes: Union[ None, int ] = None, # the number of worker processes to use for running multiple minimap2 alignments in parallel
     """
     # handle default values
     if int_num_cpus is None:
@@ -346,8 +350,8 @@ def create_gene_count_from_raw_ont_data(
 
     l_task = []  # initialize the list of tasks
     int_num_cpus_for_each_alignment = max(
-        1, int(int_num_cpus / int_num_samples / 2)
-    )  # retrieve approximate number of cpus for each alignment
+        1, int( int_num_cpus / ( ( int_num_samples * 2 ) if int_num_worker_processes is None else int_num_worker_processes ) )
+    )  # retrieve approximate number of cpus for each alignment according to according to the given setting ('int_num_worker_processes')
     for name_sample, path_file_fq in df_fastq.values:  # for each sample
         name_organism = dict_name_sample_to_organism[
             name_sample
@@ -374,7 +378,7 @@ def create_gene_count_from_raw_ont_data(
                 ],  # transcriptome
             ]
         )
-    with concurrent.futures.ProcessPoolExecutor() as executor:  # create an executer
+    with concurrent.futures.ProcessPoolExecutor( max_workers = int_num_worker_processes ) as executor:  # create an executer using 'int_num_worker_processes' number of processes
         for res in executor.map(
             __create_gene_count_from_fast5__align, l_task
         ):  # perform each task
