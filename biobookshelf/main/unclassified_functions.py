@@ -16783,11 +16783,11 @@ def Multiprocessing_Batch_Generator_and_Workers(
     gen_batch,
     process_batch,
     post_process_batch=None,
-    int_num_threads : int =15,
-    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop : float = 0.2,
-    flag_wait_for_a_response_from_worker_after_sending_termination_signal : bool = True, # wait until all worker exists before resuming works in the main process
+    int_num_threads: int = 15,
+    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop: float = 0.2,
+    flag_wait_for_a_response_from_worker_after_sending_termination_signal: bool = True,  # wait until all worker exists before resuming works in the main process
 ):
-    """# 2023-08-11 23:00:16 
+    """# 2023-08-11 23:00:16
     'Multiprocessing_Batch_Generator_and_Workers' : multiprocessing using batch generator and workers.
     all worker process will be started using the default ('fork' in UNIX) method.
     perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (3) will be run in the main process, while (1) and (2) will be offloaded to worker processes.
@@ -16914,11 +16914,12 @@ def Multiprocessing_Batch_Generator_and_Workers(
             post_process_batch(
                 res
             )  # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
-    
+
     # if 'flag_wait_for_a_response_from_worker_after_sending_termination_signal' is True, wait until a response is received from the worker
-    if flag_wait_for_a_response_from_worker_after_sending_termination_signal :
-        for s, r in l_pipes_output : # pipe receiving responses from batch workers
-            r.recv( )
+    if flag_wait_for_a_response_from_worker_after_sending_termination_signal:
+        for s, r in l_pipes_output:  # pipe receiving responses from batch workers
+            r.recv()
+
 
 def Multiprocessing(
     arr,
@@ -17043,7 +17044,7 @@ def Multiprocessing(
 
 
 class Offload_Works:
-    """# 2023-08-12 15:44:08 
+    """# 2023-08-12 15:44:08
     a class for offloading works in a separate server process without blocking the main process. similar to async. methods, but using processes instead of threads.
 
     int_max_num_workers : Union[ int, None ] = None # maximum number of worker processes. if the maximum number of works are offloaded, submitting a new work will fail. By default, there will be no limit of the number of worker processes
@@ -17066,12 +17067,12 @@ class Offload_Works:
         )  # a dictionary that store the completed results of submitted works until it is retrieved.
 
     @property
-    def is_worker_available(self) :
-        """ # 2023-08-12 15:42:56 
+    def is_worker_available(self):
+        """# 2023-08-12 15:42:56
         return a binary flag indicating whether a worker is available
         """
         return self.int_num_active_workers != self.int_max_num_workers
-        
+
     @property
     def int_num_active_workers(self):
         """# 2023-01-07 12:30:24
@@ -17188,8 +17189,8 @@ class Offload_Works:
         if str_uuid_work in self._dict_res:
             return self._dict_res.pop(str_uuid_work)
 
-    def wait_all(self, flag_return_results : bool = False):
-        """# 2023-08-12 15:54:11 
+    def wait_all(self, flag_return_results: bool = False):
+        """# 2023-08-12 15:54:11
         wait all works to be completed.
         flag_return_results : bool = False # wait for all submitted works, and return results as a dictionary
         """
@@ -17197,10 +17198,12 @@ class Offload_Works:
 
         for str_uuid_work in list(self._dict_worker):  # for each uncompleted work
             self.wait(str_uuid_work)  # wait until the work is completed
-            
-        if flag_return_results : # return the results
-            dict_result = self._dict_res # return all results
-            self._dict_res = dict( ) # initialize the internal container for saving dictionary results
+
+        if flag_return_results:  # return the results
+            dict_result = self._dict_res  # return all results
+            self._dict_res = (
+                dict()
+            )  # initialize the internal container for saving dictionary results
             return dict_result
 
 

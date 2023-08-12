@@ -1,13 +1,15 @@
 from biobookshelf.main import *
 import biobookshelf.SEQ as SEQ
 
-def Get_contig_names_from_bam_header( path_file_bam : str, mode : str = 'rb' ) : 
-    """ # 2023-08-10 22:13:00 
+
+def Get_contig_names_from_bam_header(path_file_bam: str, mode: str = "rb"):
+    """# 2023-08-10 22:13:00
     retrieve contig names from the BAM header. To read a SAM file, change 'mode' to 'r'
     """
-    with pysam.AlignmentFile( path_file_bam, mode ) as samfile :
-        l_contig_names = list( e[ 'SN' ] for e in samfile.header.to_dict( )[ 'SQ' ] )
+    with pysam.AlignmentFile(path_file_bam, mode) as samfile:
+        l_contig_names = list(e["SN"] for e in samfile.header.to_dict()["SQ"])
     return l_contig_names
+
 
 def combine_bam(
     path_file_bam_output,
