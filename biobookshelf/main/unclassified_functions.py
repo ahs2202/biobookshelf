@@ -16776,110 +16776,15 @@ Functions and Classes for Multiprocessing
 # In[ ]:
 
 
-def Multiprocessing_Batch(
-    gen_batch,
-    process_batch,
-    post_process_batch=None,
-    int_num_threads=15,
-    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop=0.2,
-):
-    """# 2022-09-05 17:33:52
-    perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (1) and (3) will be run in the main process, while (2) will be offloaded to worker processes.
-    the 'batch' and result returned by 'process_batch' will be communicated through pipes.
-    if int_num_threads is 1, run all processes in the main process
-
-    'gen_batch' : a generator object returning batches
-    'process_batch( batch, pipe_sender )' : a function that can process batch. 'pipe_sender' argument is to deliver the result to the main process, and should be used at the end of code to notify the main process that the work has been completed.
-    'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
-    'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used.
-    'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
-    """
-    flag_multiprocessing = int_num_threads >= 2  # retrieve a flag for multiprocessing
-
-    q_batch = collections.deque()  # initialize queue of batchs
-    flag_batch_generation_completed = False  # flag indicating whether generating batchs for the current input sam file was completed
-    dict_running_process = dict()  # dictionary of running processes
-    while True:
-        """retrieve batch (if available)"""
-        if not flag_batch_generation_completed:
-            try:
-                batch = next(gen_batch)  # retrieve the next barcode
-                q_batch.appendleft(batch)  # append batch
-            except StopIteration:
-                flag_batch_generation_completed = True
-
-        """ when all batchs were retrieved, exit or wait """
-        if flag_batch_generation_completed:
-            """if all batchs were retrieved and processed, exit the loop"""
-            if (
-                len(q_batch) == 0 and len(dict_running_process) == 0
-            ):  # define exit condition
-                break
-            else:
-                """if there are some remaining batchs to be retrieved or processed, wait before checking the results produced by the processes"""
-                time.sleep(
-                    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop
-                )
-
-        """ identify completed processes and remove the completed process from the dictionary of processes """
-        for str_uuid_process in list(
-            dict_running_process
-        ):  # for the current list of processes
-            if dict_running_process[str_uuid_process][
-                "pipe_receiver"
-            ].poll():  # check whether the current process has been completed
-                # if 'post_process_batch' function has been given.
-                if post_process_batch is not None:
-                    """collect the result of a completed process, and run 'post_process_batch' function using the result in the main process"""
-                    res = dict_running_process[str_uuid_process][
-                        "pipe_receiver"
-                    ].recv()  # retrieve result
-                    post_process_batch(
-                        res
-                    )  # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
-                    del res
-                if flag_multiprocessing:
-                    dict_running_process[str_uuid_process][
-                        "process"
-                    ].join()  # dismiss the worker process
-                dict_running_process.pop(
-                    str_uuid_process
-                )  # remove the completed worker process from the dictionary
-
-        """ if the number of currently running processes is smaller than the number of threads and there are remaining batchs to be processed, open and run a process until jobs are given to all threads """
-        while len(q_batch) > 0 and (
-            len(dict_running_process) < int_num_threads - 1 or not flag_multiprocessing
-        ):  # substract 1 from the number of available workers, considering the main thread generating batchs and processing results returned by the 'process_batch' function # if single-process mode is active, process batch every time it is available
-            """open a process to analyze reads for a region in a batch"""
-            str_uuid_process = UUID()  # retrieve uuid of the process
-            # retrieve a batch
-            batch = q_batch.pop()
-            # open a pipe to communicate with the new process once the analysis is completed
-            pipe_sender, pipe_receiver = mp.Pipe()
-            p = None
-            # open and run a process
-            if flag_multiprocessing:
-                p = mp.Process(
-                    target=process_batch, args=(batch, pipe_sender)
-                )  # run 'process_batch' fuction in the 'WORKER PROCESS'
-                p.start()  # start the process
-            else:
-                # process batch in the main process
-                process_batch(batch, pipe_sender)
-            dict_running_process[str_uuid_process] = {
-                "process": p,
-                "pipe_receiver": pipe_receiver,
-            }  # add the process to the dictionary
-
-
 def Multiprocessing_Batch_Generator_and_Workers(
     gen_batch,
     process_batch,
     post_process_batch=None,
-    int_num_threads=15,
-    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop=0.2,
+    int_num_threads : int =15,
+    int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop : float = 0.2,
+    flag_wait_for_a_response_from_worker_after_sending_termination_signal : bool = True, # wait until all worker exists before resuming works in the main process
 ):
-    """# 2022-09-06 16:49:30
+    """# 2023-08-11 23:00:16 
     'Multiprocessing_Batch_Generator_and_Workers' : multiprocessing using batch generator and workers.
     all worker process will be started using the default ('fork' in UNIX) method.
     perform batch-based multiprocessing using the three components, (1) gen_batch, (2) process_batch, (3) post_process_batch. (3) will be run in the main process, while (1) and (2) will be offloaded to worker processes.
@@ -16890,6 +16795,7 @@ def Multiprocessing_Batch_Generator_and_Workers(
     'post_process_batch( result )' : a function that can process return value from 'process_batch' function in the main process. operations that are not thread/process-safe can be done here, as these works will be serialized in the main thread.
     'int_num_threads' : the number of threads(actually processes) including the main process. For example, when 'int_num_threads' is 3, 2 worker processes will be used. one thread is reserved for batch generation.
     'int_num_seconds_to_wait_before_identifying_completed_processes_for_a_loop' : number of seconds to wait for each loop before checking which running processes has been completed
+    flag_wait_for_a_response_from_worker_after_sending_termination_signal : bool = True, # wait until all worker exists before resuming works in the main process
     """
 
     def __batch_generating_worker(
@@ -17005,7 +16911,11 @@ def Multiprocessing_Batch_Generator_and_Workers(
             post_process_batch(
                 res
             )  # process the result returned by the 'process_batch' function in the 'MAIN PROCESS', serializing potentially not thread/process-safe operations in the main thread.
-
+    
+    # if 'flag_wait_for_a_response_from_worker_after_sending_termination_signal' is True, wait until a response is received from the worker
+    if flag_wait_for_a_response_from_worker_after_sending_termination_signal :
+        for s, r in l_pipes_output : # pipe receiving responses from batch workers
+            r.recv( )
 
 def Multiprocessing(
     arr,
@@ -17130,7 +17040,7 @@ def Multiprocessing(
 
 
 class Offload_Works:
-    """# 2023-01-07 12:13:13
+    """# 2023-08-12 15:44:08 
     a class for offloading works in a separate server process without blocking the main process. similar to async. methods, but using processes instead of threads.
 
     int_max_num_workers : Union[ int, None ] = None # maximum number of worker processes. if the maximum number of works are offloaded, submitting a new work will fail. By default, there will be no limit of the number of worker processes
@@ -17152,6 +17062,13 @@ class Offload_Works:
             dict()
         )  # a dictionary that store the completed results of submitted works until it is retrieved.
 
+    @property
+    def is_worker_available(self) :
+        """ # 2023-08-12 15:42:56 
+        return a binary flag indicating whether a worker is available
+        """
+        return self.int_num_active_workers != self.int_max_num_workers
+        
     @property
     def int_num_active_workers(self):
         """# 2023-01-07 12:30:24
@@ -17268,14 +17185,20 @@ class Offload_Works:
         if str_uuid_work in self._dict_res:
             return self._dict_res.pop(str_uuid_work)
 
-    def wait_all(self):
-        """# 2023-01-07 13:26:58
+    def wait_all(self, flag_return_results : bool = False):
+        """# 2023-08-12 15:54:11 
         wait all works to be completed.
+        flag_return_results : bool = False # wait for all submitted works, and return results as a dictionary
         """
         self.collect_results()  # collect the completed results
 
         for str_uuid_work in list(self._dict_worker):  # for each uncompleted work
             self.wait(str_uuid_work)  # wait until the work is completed
+            
+        if flag_return_results : # return the results
+            dict_result = self._dict_res # return all results
+            self._dict_res = dict( ) # initialize the internal container for saving dictionary results
+            return dict_result
 
 
 """
