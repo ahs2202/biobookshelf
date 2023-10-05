@@ -6,40 +6,42 @@ import numpy as np
 from typing import Union, List, Dict
 import zarr
 
+
 class ManagerFileSystem(BaseManager):
     pass
 
 
 class FileSystemOperator:
-    """# 2023-09-24 14:50:47 
+    """# 2023-09-24 14:50:47
     A class intended for performing asynchronous file system operations in a separate, managed process. By using multiple managers, concurrent, asynchronous operations can be performed in multiple processes. These managers can be used multiple times.
-    
+
     dict_kwargs_s3 : dict = dict( ) # s3 credentials to use
     """
 
     # constructor
-    def __init__(self, dict_kwargs_s3 : dict = dict( )):
+    def __init__(self, dict_kwargs_s3: dict = dict()):
         import s3fs
+
         # save the settings
         self._dict_kwargs_s3 = dict_kwargs_s3
-        
-        # open async/sync version of s3fs
-        self._as3 = s3fs.S3FileSystem( asynchronous=True, **dict_kwargs_s3 )
-        self._s3 = s3fs.S3FileSystem( **dict_kwargs_s3 )
 
-    def exists(self, path_src : str, **kwargs):
+        # open async/sync version of s3fs
+        self._as3 = s3fs.S3FileSystem(asynchronous=True, **dict_kwargs_s3)
+        self._s3 = s3fs.S3FileSystem(**dict_kwargs_s3)
+
+    def exists(self, path_src: str, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
         return self._s3.exists(path_src, **kwargs)
 
-    def rm(self, path_src : str, flag_recursive: bool = True, **kwargs):
+    def rm(self, path_src: str, flag_recursive: bool = True, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
         return self._s3.rm(path_src, recursive=flag_recursive, **kwargs)  # delete files
-    
-    def glob(self, path_src : str, flag_recursive: bool = True, **kwargs):
+
+    def glob(self, path_src: str, flag_recursive: bool = True, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
@@ -47,7 +49,7 @@ class FileSystemOperator:
             "s3://" + e for e in self._s3.glob(path_src, **kwargs)
         )  # 's3://' prefix should be added
 
-    def mkdir(self, path_src : str, **kwargs):
+    def mkdir(self, path_src: str, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
@@ -56,7 +58,7 @@ class FileSystemOperator:
             kwargs["exist_ok"] = True
         return self._s3.makedirs(path_src, **kwargs)
 
-    def mv(self, path_src : str, path_dest : str, flag_recursive: bool = True, **kwargs):
+    def mv(self, path_src: str, path_dest: str, flag_recursive: bool = True, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
@@ -67,32 +69,35 @@ class FileSystemOperator:
         else:
             return "destionation file already exists, exiting"
 
-    def cp(self, path_src : str, path_dest : str, flag_recursive: bool = True, **kwargs):
+    def cp(self, path_src: str, path_dest: str, flag_recursive: bool = True, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
         if is_s3_url(path_src) and is_s3_url(path_dest):  # copy from s3 to s3
-            return self._s3.copy(path_src, path_dest, recursive=flag_recursive, **kwargs)
+            return self._s3.copy(
+                path_src, path_dest, recursive=flag_recursive, **kwargs
+            )
         elif is_s3_url(path_src):  # copy from s3 to local
             return self._s3.get(path_src, path_dest, recursive=flag_recursive, **kwargs)
         elif is_s3_url(path_dest):  # copy from local to s3
             return self._s3.put(path_src, path_dest, recursive=flag_recursive, **kwargs)
 
-    def isdir(self, path_src : str, **kwargs):
+    def isdir(self, path_src: str, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         """
         return self._s3.isdir(path_src)
-    
-    def get_zarr_metadata(self, path_src : str, **kwargs):
+
+    def get_zarr_metadata(self, path_src: str, **kwargs):
         """# 2023-01-08 23:05:40
         return the list of keys
         ❤️ test
         """
-        return dict( zarr.open( path_src ).attrs )
-    
+        return dict(zarr.open(path_src).attrs)
+
+
 class ZarrObject:
-    """# 2023-09-24 14:51:46 
+    """# 2023-09-24 14:51:46
     A class for hosting Zarr object in a spawned, managed process for accessing remote objects in forked processes
     API functions calls mimic those of a zarr object for seamless replacement of a zarr object.
 
@@ -101,17 +106,18 @@ class ZarrObject:
 
     path_process_synchronizer : Union[ str, None ] = None # path to the process synchronizer. if None is given, does not use any synchronizer
     """
+
     def __init__(
         self,
-        path_folder_zarr : str,
-        mode : str ="r",
-        shape : tuple =None,
-        chunks : tuple =None,
+        path_folder_zarr: str,
+        mode: str = "r",
+        shape: tuple = None,
+        chunks: tuple = None,
         dtype=np.int32,
-        fill_value = 0,
+        fill_value=0,
         path_process_synchronizer: Union[str, None] = None,
     ):
-        """# 2023-09-24 14:50:36 """
+        """# 2023-09-24 14:50:36"""
         # set attributes
         self.is_zarr_server = True  # for back-ward compatibility
         self._mode = mode
@@ -151,13 +157,13 @@ class ZarrObject:
                 None,
                 None,
             )
-            
+
     @property
-    def flag_hosted(self) :
-        """# 2023-09-24 14:58:37 
+    def flag_hosted(self):
+        """# 2023-09-24 14:58:37
         indicates that current object is hosted in a spawned process
         """
-        return True  
+        return True
 
     @property
     def path_folder(self):
@@ -194,7 +200,7 @@ class ZarrObject:
         # if the zarr object is already opened in the same mode, exit, unless 'reload' flag has been set to True.
         if not reload and path_folder_zarr == self.path_folder and self._mode == mode:
             return
-        
+
         # open a zarr object
         if mode != "r":  # create a new zarr object
             if (
@@ -325,7 +331,8 @@ class ZarrObject:
         a (possibly) fork-safe wrapper of the '__setitem__' zarr operation using a spawned process.
         """
         return self._za.__setitem__(args, values)
-    
+
+
 # register the manager
 ManagerFileSystem.register("FileSystemOperator", FileSystemOperator)
 ManagerFileSystem.register("ZarrObject", ZarrObject)

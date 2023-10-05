@@ -16758,125 +16758,243 @@ def SRA_Retrieve_Info(path_glob_SraRunTable, path_glob_xml):
     return df_metadata
 
 
-def SRA_Retrieve_Info( path_glob_SraRunTable, path_glob_xml ) :
-    """ # 2023-09-18 18:23:37 
+def SRA_Retrieve_Info(path_glob_SraRunTable, path_glob_xml):
+    """# 2023-09-18 18:23:37
     Authors: CM Lim & Hyunsu AN
     Retrieve informations from SRA downloaded files (SraRunTable and XML records) and combine them as a dataframe.
-    
+
     'path_glob_SraRunTable' a path (* wildcard can be used) for retrieving downloaded SraRunTable text files
     'path_glob_xml' a path (* wildcard can be used) for retrieving downloaded XML records
-    
+
     return:
     'df_metadata' : a composed dataframe containing parsed information from SraRunTable and XML files
     """
-    ''' read SRA records '''
-    df_metadata = pd.concat( list( pd.read_csv( path_file, low_memory = False ) for path_file in glob.glob( path_glob_SraRunTable ) ) ) # combine all sra tables
+    """ read SRA records """
+    df_metadata = pd.concat(
+        list(
+            pd.read_csv(path_file, low_memory=False)
+            for path_file in glob.glob(path_glob_SraRunTable)
+        )
+    )  # combine all sra tables
 
     """ 
     Retrieve additional Sample Information 
     """
     """ Read XML data """
 
-    # 2021-08-10 00:46:24 
+    # 2021-08-10 00:46:24
     # read SRA record from XML files
     import xml.etree.ElementTree as ET
     import xmltodict
     import json
 
-    l_record = [ ]
+    l_record = []
 
-    df_file = GLOB_Retrive_Strings_in_Wildcards( path_glob_xml )
-    for name_file, path_file in df_file.values :
+    df_file = GLOB_Retrive_Strings_in_Wildcards(path_glob_xml)
+    for name_file, path_file in df_file.values:
         # read XML as dictionary
-        tree = ET.parse( path_file )
-        xml_data = tree.getroot( )
-        xmlstr = ET.tostring( xml_data, encoding = 'utf-8', method = 'xml' )
-        data_dict = dict( xmltodict.parse( xmlstr ) )
-        l = list( data_dict[ 'EXPERIMENT_PACKAGE_SET' ][ 'EXPERIMENT_PACKAGE' ] if 'EXPERIMENT_PACKAGE_SET' in data_dict else data_dict[ 'EXPERIMENT_PACKAGE' ] )
-        print( name_file, f"{len( l )} records will be added from XML data" )
-        l_record.extend( l )
+        tree = ET.parse(path_file)
+        xml_data = tree.getroot()
+        xmlstr = ET.tostring(xml_data, encoding="utf-8", method="xml")
+        data_dict = dict(xmltodict.parse(xmlstr))
+        l = list(
+            data_dict["EXPERIMENT_PACKAGE_SET"]["EXPERIMENT_PACKAGE"]
+            if "EXPERIMENT_PACKAGE_SET" in data_dict
+            else data_dict["EXPERIMENT_PACKAGE"]
+        )
+        print(name_file, f"{len( l )} records will be added from XML data")
+        l_record.extend(l)
 
-
-    """ Extract useful sample information from XML data and save information as a tabular data """ # 2021-08-31 13:16:47 
-    l_l = [ ]
-    for r in l_record :
+    """ Extract useful sample information from XML data and save information as a tabular data """  # 2021-08-31 13:16:47
+    l_l = []
+    for r in l_record:
         # skip invalid record
-        if isinstance( r, str ) :
+        if isinstance(r, str):
             continue
-        ''' retrieve accessions '''
-        val_exp_accession = r[ 'EXPERIMENT' ][ '@accession' ]
-        val_study_accession = r[ 'STUDY' ][ '@accession' ]
-        val_sample_accession = ( r[ 'SAMPLE' ][ '@accession' ] if 'SAMPLE' in r else np.nan ) # SAMPLE might not exists
+        """ retrieve accessions """
+        val_exp_accession = r["EXPERIMENT"]["@accession"]
+        val_study_accession = r["STUDY"]["@accession"]
+        val_sample_accession = (
+            r["SAMPLE"]["@accession"] if "SAMPLE" in r else np.nan
+        )  # SAMPLE might not exists
 
-        ''' retrieve study descriptions '''
-        r_study = r[ 'STUDY' ][ 'DESCRIPTOR' ]
-        val_STUDY_TITLE = r_study[ 'STUDY_TITLE' ] if 'STUDY_TITLE' in r_study else np.nan
-        val_STUDY_ABSTRACT = r_study[ 'STUDY_ABSTRACT' ] if 'STUDY_ABSTRACT' in r_study else np.nan
-        val_STUDY_DESCRIPTION = r_study[ 'STUDY_DESCRIPTION' ] if 'STUDY_DESCRIPTION' in r_study else np.nan
-        val_CENTER_PROJECT_NAME = r_study[ 'CENTER_PROJECT_NAME' ] if 'CENTER_PROJECT_NAME' in r_study else np.nan
+        """ retrieve study descriptions """
+        r_study = r["STUDY"]["DESCRIPTOR"]
+        val_STUDY_TITLE = r_study["STUDY_TITLE"] if "STUDY_TITLE" in r_study else np.nan
+        val_STUDY_ABSTRACT = (
+            r_study["STUDY_ABSTRACT"] if "STUDY_ABSTRACT" in r_study else np.nan
+        )
+        val_STUDY_DESCRIPTION = (
+            r_study["STUDY_DESCRIPTION"] if "STUDY_DESCRIPTION" in r_study else np.nan
+        )
+        val_CENTER_PROJECT_NAME = (
+            r_study["CENTER_PROJECT_NAME"]
+            if "CENTER_PROJECT_NAME" in r_study
+            else np.nan
+        )
 
-        ''' retrieve experiment design '''
-        r_exp = r[ 'EXPERIMENT' ]
-        r_exp_lib = r_exp[ 'DESIGN' ][ 'LIBRARY_DESCRIPTOR' ]
-        val_LIBRARY_STRATEGY = r_exp_lib[ 'LIBRARY_STRATEGY' ]
-        val_LIBRARY_SOURCE = r_exp_lib[ 'LIBRARY_SOURCE' ]
-        val_LIBRARY_SELECTION = r_exp_lib[ 'LIBRARY_SELECTION' ]
-        val_LIBRARY_LAYOUT = list( r_exp_lib[ 'LIBRARY_LAYOUT' ] )[ 0 ]
-        val_LIBRARY_CONSTRUCTION_PROTOCOL = r_exp_lib[ 'LIBRARY_CONSTRUCTION_PROTOCOL' ] if 'LIBRARY_CONSTRUCTION_PROTOCOL' in r_exp_lib else np.nan
+        """ retrieve experiment design """
+        r_exp = r["EXPERIMENT"]
+        r_exp_lib = r_exp["DESIGN"]["LIBRARY_DESCRIPTOR"]
+        val_LIBRARY_STRATEGY = r_exp_lib["LIBRARY_STRATEGY"]
+        val_LIBRARY_SOURCE = r_exp_lib["LIBRARY_SOURCE"]
+        val_LIBRARY_SELECTION = r_exp_lib["LIBRARY_SELECTION"]
+        val_LIBRARY_LAYOUT = list(r_exp_lib["LIBRARY_LAYOUT"])[0]
+        val_LIBRARY_CONSTRUCTION_PROTOCOL = (
+            r_exp_lib["LIBRARY_CONSTRUCTION_PROTOCOL"]
+            if "LIBRARY_CONSTRUCTION_PROTOCOL" in r_exp_lib
+            else np.nan
+        )
 
-        val_STUDY_TITLE = r_study[ 'STUDY_TITLE' ] if 'STUDY_TITLE' in r_study else np.nan
-        val_STUDY_ABSTRACT = r_study[ 'STUDY_ABSTRACT' ] if 'STUDY_ABSTRACT' in r_study else np.nan
-        val_STUDY_DESCRIPTION = r_study[ 'STUDY_DESCRIPTION' ] if 'STUDY_DESCRIPTION' in r_study else np.nan
-        val_CENTER_PROJECT_NAME = r_study[ 'CENTER_PROJECT_NAME' ] if 'CENTER_PROJECT_NAME' in r_study else np.nan
+        val_STUDY_TITLE = r_study["STUDY_TITLE"] if "STUDY_TITLE" in r_study else np.nan
+        val_STUDY_ABSTRACT = (
+            r_study["STUDY_ABSTRACT"] if "STUDY_ABSTRACT" in r_study else np.nan
+        )
+        val_STUDY_DESCRIPTION = (
+            r_study["STUDY_DESCRIPTION"] if "STUDY_DESCRIPTION" in r_study else np.nan
+        )
+        val_CENTER_PROJECT_NAME = (
+            r_study["CENTER_PROJECT_NAME"]
+            if "CENTER_PROJECT_NAME" in r_study
+            else np.nan
+        )
 
-        ''' retrieve sample descriptions '''
+        """ retrieve sample descriptions """
         val_TITLE = np.nan
         val_TAXON_ID = np.nan
         val_TAXON_SCIENTIFIC_NAME = np.nan
         val_SAMPLE_ATTRIBUTES = np.nan
-        if 'SAMPLE' in r : 
-            r_sample = r[ 'SAMPLE' ]
-            val_TITLE = r_sample[ 'TITLE' ] if 'TITLE' in r_sample else np.nan
-            val_TAXON_ID = r_sample[ 'SAMPLE_NAME' ][ 'TAXON_ID' ]
-            val_TAXON_SCIENTIFIC_NAME = r_sample[ 'SAMPLE_NAME' ][ 'SCIENTIFIC_NAME' ]
-            ''' retrieve sample attribute '''
+        if "SAMPLE" in r:
+            r_sample = r["SAMPLE"]
+            val_TITLE = r_sample["TITLE"] if "TITLE" in r_sample else np.nan
+            val_TAXON_ID = r_sample["SAMPLE_NAME"]["TAXON_ID"]
+            val_TAXON_SCIENTIFIC_NAME = r_sample["SAMPLE_NAME"]["SCIENTIFIC_NAME"]
+            """ retrieve sample attribute """
 
-            if 'SAMPLE_ATTRIBUTES' in r_sample :
-                r_sample_attr = r_sample[ 'SAMPLE_ATTRIBUTES' ][ 'SAMPLE_ATTRIBUTE' ]
+            if "SAMPLE_ATTRIBUTES" in r_sample:
+                r_sample_attr = r_sample["SAMPLE_ATTRIBUTES"]["SAMPLE_ATTRIBUTE"]
                 # if only single attribute is available, put it in a list
-                if isinstance( r_sample_attr, ( collections.OrderedDict, dict ) ) :
-                    r_sample_attr = [ r_sample_attr ]
-                val_SAMPLE_ATTRIBUTES = '; '.join( list( f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr ) ) 
+                if isinstance(r_sample_attr, (collections.OrderedDict, dict)):
+                    r_sample_attr = [r_sample_attr]
+                val_SAMPLE_ATTRIBUTES = "; ".join(
+                    list(f'{od[ "TAG" ]}="{od[ "VALUE" ]}"' for od in r_sample_attr)
+                )
 
-        ''' retrieve list of id_sra for the given record '''
-        if 'RUN_SET' not in r :
-            print( f'no Runset information is available for the experiment {val_exp_accession}' )
+        """ retrieve list of id_sra for the given record """
+        if "RUN_SET" not in r:
+            print(
+                f"no Runset information is available for the experiment {val_exp_accession}"
+            )
             continue
-        if 'RUN' not in r['RUN_SET'] :
-            print( f'no Run information is available for the experiment {val_exp_accession}' ) # newly added by CM 💚
+        if "RUN" not in r["RUN_SET"]:
+            print(
+                f"no Run information is available for the experiment {val_exp_accession}"
+            )  # newly added by CM 💚
             continue
-        r_run = r[ 'RUN_SET' ][ 'RUN' ]
-        if '@accession' in r_run : # single id_sra
-            id_sra = r_run[ '@accession' ]
-            id_sra_title = r_run[ 'TITLE' ] if 'TITLE' in r_run else np.nan
+        r_run = r["RUN_SET"]["RUN"]
+        if "@accession" in r_run:  # single id_sra
+            id_sra = r_run["@accession"]
+            id_sra_title = r_run["TITLE"] if "TITLE" in r_run else np.nan
             val_RUN_SAMPLE_TITLE = np.nan
-            if 'Pool' in r_run and 'Member' in r_run[ 'Pool' ] and '@sample_title' in r_run[ 'Pool' ][ 'Member' ] :
-                val_RUN_SAMPLE_TITLE = r_run[ 'Pool' ][ 'Member' ][ '@sample_title' ]
-            l.append( True if 'Pool' in r_run else np.nan )
-            l_l.append( [ id_sra, id_sra_title, val_RUN_SAMPLE_TITLE, val_SAMPLE_ATTRIBUTES, val_exp_accession, val_study_accession, val_sample_accession, val_LIBRARY_STRATEGY, val_LIBRARY_SOURCE, val_LIBRARY_SELECTION, val_LIBRARY_LAYOUT, val_LIBRARY_CONSTRUCTION_PROTOCOL, val_STUDY_TITLE, val_STUDY_ABSTRACT, val_STUDY_DESCRIPTION, val_CENTER_PROJECT_NAME, val_TITLE, val_TAXON_ID, val_TAXON_SCIENTIFIC_NAME ] )
-        else : # multiple id_sra
-            for e in r_run :
-                id_sra = e[ '@accession' ]
-                id_sra_title = e[ 'TITLE' ] if 'TITLE' in e else np.nan
+            if (
+                "Pool" in r_run
+                and "Member" in r_run["Pool"]
+                and "@sample_title" in r_run["Pool"]["Member"]
+            ):
+                val_RUN_SAMPLE_TITLE = r_run["Pool"]["Member"]["@sample_title"]
+            l.append(True if "Pool" in r_run else np.nan)
+            l_l.append(
+                [
+                    id_sra,
+                    id_sra_title,
+                    val_RUN_SAMPLE_TITLE,
+                    val_SAMPLE_ATTRIBUTES,
+                    val_exp_accession,
+                    val_study_accession,
+                    val_sample_accession,
+                    val_LIBRARY_STRATEGY,
+                    val_LIBRARY_SOURCE,
+                    val_LIBRARY_SELECTION,
+                    val_LIBRARY_LAYOUT,
+                    val_LIBRARY_CONSTRUCTION_PROTOCOL,
+                    val_STUDY_TITLE,
+                    val_STUDY_ABSTRACT,
+                    val_STUDY_DESCRIPTION,
+                    val_CENTER_PROJECT_NAME,
+                    val_TITLE,
+                    val_TAXON_ID,
+                    val_TAXON_SCIENTIFIC_NAME,
+                ]
+            )
+        else:  # multiple id_sra
+            for e in r_run:
+                id_sra = e["@accession"]
+                id_sra_title = e["TITLE"] if "TITLE" in e else np.nan
                 val_RUN_SAMPLE_TITLE = np.nan
-                if 'Pool' in e and 'Member' in e[ 'Pool' ] and '@sample_title' in e[ 'Pool' ][ 'Member' ] :
-                    val_RUN_SAMPLE_TITLE = e[ 'Pool' ][ 'Member' ][ '@sample_title' ]
-                l_l.append( [ id_sra, id_sra_title, val_RUN_SAMPLE_TITLE, val_SAMPLE_ATTRIBUTES, val_exp_accession, val_study_accession, val_sample_accession, val_LIBRARY_STRATEGY, val_LIBRARY_SOURCE, val_LIBRARY_SELECTION, val_LIBRARY_LAYOUT, val_LIBRARY_CONSTRUCTION_PROTOCOL, val_STUDY_TITLE, val_STUDY_ABSTRACT, val_STUDY_DESCRIPTION, val_CENTER_PROJECT_NAME, val_TITLE, val_TAXON_ID, val_TAXON_SCIENTIFIC_NAME ] )
+                if (
+                    "Pool" in e
+                    and "Member" in e["Pool"]
+                    and "@sample_title" in e["Pool"]["Member"]
+                ):
+                    val_RUN_SAMPLE_TITLE = e["Pool"]["Member"]["@sample_title"]
+                l_l.append(
+                    [
+                        id_sra,
+                        id_sra_title,
+                        val_RUN_SAMPLE_TITLE,
+                        val_SAMPLE_ATTRIBUTES,
+                        val_exp_accession,
+                        val_study_accession,
+                        val_sample_accession,
+                        val_LIBRARY_STRATEGY,
+                        val_LIBRARY_SOURCE,
+                        val_LIBRARY_SELECTION,
+                        val_LIBRARY_LAYOUT,
+                        val_LIBRARY_CONSTRUCTION_PROTOCOL,
+                        val_STUDY_TITLE,
+                        val_STUDY_ABSTRACT,
+                        val_STUDY_DESCRIPTION,
+                        val_CENTER_PROJECT_NAME,
+                        val_TITLE,
+                        val_TAXON_ID,
+                        val_TAXON_SCIENTIFIC_NAME,
+                    ]
+                )
 
-    df_meta_xml = pd.DataFrame( l_l, columns = [ 'id_sra', 'id_sra_title', 'val_RUN_SAMPLE_TITLE', 'val_SAMPLE_ATTRIBUTES', 'val_exp_accession', 'val_study_accession', 'val_sample_accession', 'val_LIBRARY_STRATEGY', 'val_LIBRARY_SOURCE', 'val_LIBRARY_SELECTION', 'val_LIBRARY_LAYOUT', 'val_LIBRARY_CONSTRUCTION_PROTOCOL', 'val_STUDY_TITLE', 'val_STUDY_ABSTRACT', 'val_STUDY_DESCRIPTION', 'val_CENTER_PROJECT_NAME', 'val_TITLE', 'val_TAXON_ID', 'val_TAXON_SCIENTIFIC_NAME' ]  ).drop_duplicates( )
-    df_metadata = df_metadata.set_index( 'Run' ).join( df_meta_xml.set_index( 'id_sra' ) ).reset_index( drop = False ) # join data from XML to data from the Run table 
-    df_metadata.rename( columns = { 'index' : 'SRR_ID' }, inplace = True ) # rename the column used for indexing
+    df_meta_xml = pd.DataFrame(
+        l_l,
+        columns=[
+            "id_sra",
+            "id_sra_title",
+            "val_RUN_SAMPLE_TITLE",
+            "val_SAMPLE_ATTRIBUTES",
+            "val_exp_accession",
+            "val_study_accession",
+            "val_sample_accession",
+            "val_LIBRARY_STRATEGY",
+            "val_LIBRARY_SOURCE",
+            "val_LIBRARY_SELECTION",
+            "val_LIBRARY_LAYOUT",
+            "val_LIBRARY_CONSTRUCTION_PROTOCOL",
+            "val_STUDY_TITLE",
+            "val_STUDY_ABSTRACT",
+            "val_STUDY_DESCRIPTION",
+            "val_CENTER_PROJECT_NAME",
+            "val_TITLE",
+            "val_TAXON_ID",
+            "val_TAXON_SCIENTIFIC_NAME",
+        ],
+    ).drop_duplicates()
+    df_metadata = (
+        df_metadata.set_index("Run")
+        .join(df_meta_xml.set_index("id_sra"))
+        .reset_index(drop=False)
+    )  # join data from XML to data from the Run table
+    df_metadata.rename(
+        columns={"index": "SRR_ID"}, inplace=True
+    )  # rename the column used for indexing
     return df_metadata
+
 
 """ PIP functions """
 
@@ -17521,6 +17639,7 @@ def Shankey_Compare_Annotations(
     if title is not None:
         fig.update_layout(title_text=title, font_size=font_size)
     return fig
+
 
 class Map(object):
     def __init__(self, dict_a2b):
