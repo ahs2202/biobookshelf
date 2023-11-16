@@ -130,12 +130,8 @@ def create_gene_count_from_raw_ont_data(
         ):
             # retrieve a flag indicating the barcoding kit was used.
             flag_barcoding = id_barcoding_kit is not None
-            # automatically detect output file type
-            raw_data_type = (
-                "fast5"
-                if len(glob.glob(f"{path_folder_nanopore_data}fast5*/")) > 0
-                else "pod5"
-            )
+            # automatically detect output file type # as of 2023/10/06, output generates both fast5 and pod5 are generated, and should be basecalled together
+            raw_data_type = 'fast5_or_pod5'
             # create folders
             path_folder_raw = f"{path_folder_nanopore_data}{raw_data_type}_all/"
             path_folder_guppy_output = f"{path_folder_nanopore_data}guppy_out/"
@@ -168,13 +164,13 @@ def create_gene_count_from_raw_ont_data(
             # collect raw output files
             for path_file in (
                 glob.glob(
-                    f"{path_folder_nanopore_data}{raw_data_type}_skip/*.{raw_data_type}"
+                    f"{path_folder_nanopore_data}*5_skip/*"
                 )
                 + glob.glob(
-                    f"{path_folder_nanopore_data}{raw_data_type}_fail/{'*/' if flag_barcoding else ''}*.{raw_data_type}"
+                    f"{path_folder_nanopore_data}*5_fail/{'*/' if flag_barcoding else ''}*"
                 )
                 + glob.glob(
-                    f"{path_folder_nanopore_data}{raw_data_type}_pass/{'*/' if flag_barcoding else ''}*.{raw_data_type}"
+                    f"{path_folder_nanopore_data}*5_pass/{'*/' if flag_barcoding else ''}*"
                 )
             ):
                 os.rename(

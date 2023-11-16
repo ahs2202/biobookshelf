@@ -3041,6 +3041,8 @@ def PD_Search(
                 query = (
                     queries.lower()
                 )  # convert query to lower cases if 'ignore_case' is set to True.
+            else :
+                query = queries
             mask = Search_list_of_strings_Return_mask(
                 data, query, is_negative_query=is_negative_query
             )
@@ -14466,6 +14468,23 @@ def FASTQ_Write(path_file, dict_seq=None, dict_quality=None, df_fastq=None):
             )
             file.write(str_record.encode() if flag_gzipped else str_record)
 
+def FASTQ_Subsample( path_file_fastq_input : str, path_file_fastq_output : str, int_subsampling_ratio : int = 3, int_num_reads_to_subsample : int = 200000 ) :
+    """ # 2023-11-01 21:09:40 
+    path_file_fastq_input : str, # input FASTQ file to subsample
+    path_file_fastq_output : str, # subsampled FASTQ output file
+    int_subsampling_ratio : int = 3, # every 'int_subsampling_ratio' number of reads will be written to the output fastq file
+    int_num_reads_to_subsample : int = 200000, # once this number of reads were written, the reads will be no longer written to the output file
+    """
+    int_count = 0
+    int_count_subsampled = 0
+    with gzip.open( path_file_fastq_output, 'wt' ) as newfile :
+        for r in FASTQ_Iterate( path_file_fastq_input ) :
+            if int_count % 3 == 0 : # subsample readsfsa
+                newfile.write( '\n'.join( r ) + '\n' )
+                int_count_subsampled += 1
+                if int_count_subsampled >= int_num_reads_to_subsample :
+                    break
+            int_count += 1    
 
 # In[ ]:
 

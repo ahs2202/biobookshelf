@@ -1,5 +1,5 @@
 # Version of biobookshelf package
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 from .__main__ import *
 from biobookshelf.main import *
 from biobookshelf import *
