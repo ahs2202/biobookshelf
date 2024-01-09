@@ -120,8 +120,8 @@ def Release_Memory_from_Orphaned_Idle_Processes(
     # get username of the current user
     user_name = os.getlogin()
 
-    df_process = bk.OS_Currently_running_processes()
-    df_process = bk.PD_Select(df_process, UID=user_name, PPID=1)
+    df_process = OS_Currently_running_processes()
+    df_process = PD_Select(df_process, UID=user_name, PPID=1)
     name_col_cmd = list({"CMD", "TIME CMD"}.intersection(df_process.columns.values))[
         0
     ]  # some process brakes bk.Parse_Printed_Table by printing showing output that is not matched with the table format. in that case, TIME and CMD columns are combined into a single column. # identify the column name containing the CMD line
@@ -130,11 +130,11 @@ def Release_Memory_from_Orphaned_Idle_Processes(
     if flag_match_at_least_one_query:
         mask = np.zeros(len(arr_cmd_lines), dtype=bool)
         for query in l_query:
-            mask |= bk.Search_list_of_strings_with_multiple_query(
+            mask |= Search_list_of_strings_with_multiple_query(
                 arr_cmd_lines, query, return_mask=True
             )
     else:
-        mask = bk.Search_list_of_strings_with_multiple_query(
+        mask = Search_list_of_strings_with_multiple_query(
             arr_cmd_lines, *l_query, return_mask=True
         )
     df_process = df_process.loc[
