@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name="biobookshelf",
-    version="0.2.8",
+    version="0.2.9",
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="a collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -62,6 +62,7 @@ setup(
             "biobook-run_guppy_and_combine_output=biobookshelf.ONT.nanopore_functions:Guppy_Run_and_Combine_Output",
             "biobook-Server_Status=biobookshelf.CLI.unclassified_programs:Server_Status",
             "biobook-Stop_a_job=biobookshelf.CLI.unclassified_programs:Stop_a_job",
+            "biobook-Release_Memory=biobookshelf.CLI.unclassified_programs:Release_Memory_from_Orphaned_Idle_Processes",
         ]
     },
 )

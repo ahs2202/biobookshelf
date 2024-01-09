@@ -170,6 +170,9 @@ def create_gene_count_from_raw_ont_data(
                 + glob.glob(
                     f"{path_folder_nanopore_data}*5_pass/{'*/' if flag_barcoding else ''}*"
                 )
+                + glob.glob(
+                    f"{path_folder_nanopore_data}*5/*"
+                )
             ):
                 os.rename(
                     path_file,
