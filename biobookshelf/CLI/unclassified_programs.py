@@ -90,13 +90,16 @@ def Server_Status():
         .sort_values("MEM", ascending=False)
     )
     print()
-    
-def Release_Memory_from_Orphaned_Idle_Processes( * l_query, flag_dry_run : bool = False, flag_match_at_least_one_query : bool = True ) :
+
+
+def Release_Memory_from_Orphaned_Idle_Processes(
+    *l_query, flag_dry_run: bool = False, flag_match_at_least_one_query: bool = True
+):
     """
     * l_query, # list of query strings
     flag_dry_run : bool = False, # if True, does not terminate the processes and simply return the list of processes that will be terminated.
     flag_match_at_least_one_query : bool = True, # if True, only single query match will cause the process to be terminated. if False, the CMD line of the process should be matched with all queries in 'l_query'
-    # 2024-01-09 12:44:35 
+    # 2024-01-09 12:44:35
     """
     flag_entry_point = PKG.Detect_Entry_Point(
         "biobook"
@@ -106,31 +109,42 @@ def Release_Memory_from_Orphaned_Idle_Processes( * l_query, flag_dry_run : bool 
             description="Release Orphaned Idle Processes (Interactive Python and R Jupyter kernels). This program has been developed by Hyunsu An."
         )
         args = parser.parse_args()
-        
+
     # set default queries
-    if len( l_query ) == 0 :
-        l_query = [ 'python -m ipykernel_launcher -f ', 'R --slave -e IRkernel::main() --args ' ]
-    
+    if len(l_query) == 0:
+        l_query = [
+            "python -m ipykernel_launcher -f ",
+            "R --slave -e IRkernel::main() --args ",
+        ]
+
     # get username of the current user
     user_name = os.getlogin()
-        
-    df_process = bk.OS_Currently_running_processes( )
-    df_process = bk.PD_Select( df_process, UID = user_name, PPID = 1 )
-    name_col_cmd = list( { 'CMD', 'TIME CMD' }.intersection( df_process.columns.values ) )[ 0 ] # some process brakes bk.Parse_Printed_Table by printing showing output that is not matched with the table format. in that case, TIME and CMD columns are combined into a single column. # identify the column name containing the CMD line
-    arr_cmd_lines = df_process[ name_col_cmd ].values
-    
-    if flag_match_at_least_one_query :
-        mask = np.zeros( len( arr_cmd_lines ), dtype = bool )
-        for query in l_query :
-            mask |= bk.Search_list_of_strings_with_multiple_query( arr_cmd_lines, query, return_mask = True )
-    else :
-        mask = bk.Search_list_of_strings_with_multiple_query( arr_cmd_lines, * l_query, return_mask = True )
-    df_process = df_process.loc[ mask ] # search the processes matched with at least one of the search queries
-    
-    print( f"{len( df_process )} number of processes will be terminated." )
-    
-    if not flag_dry_run : # release memory of the matched orphaned processes
-        for int_pid in df_process.PID.values :
+
+    df_process = bk.OS_Currently_running_processes()
+    df_process = bk.PD_Select(df_process, UID=user_name, PPID=1)
+    name_col_cmd = list({"CMD", "TIME CMD"}.intersection(df_process.columns.values))[
+        0
+    ]  # some process brakes bk.Parse_Printed_Table by printing showing output that is not matched with the table format. in that case, TIME and CMD columns are combined into a single column. # identify the column name containing the CMD line
+    arr_cmd_lines = df_process[name_col_cmd].values
+
+    if flag_match_at_least_one_query:
+        mask = np.zeros(len(arr_cmd_lines), dtype=bool)
+        for query in l_query:
+            mask |= bk.Search_list_of_strings_with_multiple_query(
+                arr_cmd_lines, query, return_mask=True
+            )
+    else:
+        mask = bk.Search_list_of_strings_with_multiple_query(
+            arr_cmd_lines, *l_query, return_mask=True
+        )
+    df_process = df_process.loc[
+        mask
+    ]  # search the processes matched with at least one of the search queries
+
+    print(f"{len( df_process )} number of processes will be terminated.")
+
+    if not flag_dry_run:  # release memory of the matched orphaned processes
+        for int_pid in df_process.PID.values:
             os.system(f"kill {int_pid}")
-    
+
     return df_process

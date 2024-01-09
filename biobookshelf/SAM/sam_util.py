@@ -211,7 +211,7 @@ def Retrieve_List_of_Mapped_Segments(
     flag_return_splice_junction=False,
     flag_is_cigartuples_from_mappy=False,
 ):
-    """# 2024-01-06 20:04:15 
+    """# 2024-01-06 20:04:15
     return l_seq and int_total_aligned_length for given cigartuples (returned by pysam cigartuples) and 'pos_start' (0-based coordinates, assuming pos_start is 0-based coordinate)
     'return_1_based_coordinate' : return 1-based coordinate, assuming 'pos_start' is 0-based coordinate (pysam returns 0-based coordinate)
     'flag_return_splice_junction' : additionally return list of splice junction tuples
@@ -263,6 +263,8 @@ def Retrieve_List_of_Mapped_Segments(
         return l_seg, int_total_aligned_length, l_sj
     else:
         return l_seg, int_total_aligned_length
+
+
 Retrive_List_of_Mapped_Segments = Retrieve_List_of_Mapped_Segments
 
 
