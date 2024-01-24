@@ -3,21 +3,22 @@ from biobookshelf import PKG
 
 
 # Command line programs
-def Recursively_stop_subprocesses(int_pid, df_processes = None):
+def Recursively_stop_subprocesses(int_pid, df_processes=None):
     if int_pid < 1e3:
         print(
             "ERROR: given PID {} has less than 4 digits. For security reasons, this program failed".format(
                 int_pid
             )
         ), sys.exit(2)
-    if df_processes is None : # get list of currently running processes
+    if df_processes is None:  # get list of currently running processes
         df_processes = OS_Currently_running_processes()
     if int_pid in df_processes.PID.values:
         # print( f'terminating {int_pid}' )
         os.system("kill {}".format(int_pid))
     df_subprocesses = PD_Select(df_processes, PPID=int_pid)
     for int_pid_subprocess in df_subprocesses.PID.values:
-        Recursively_stop_subprocesses(int_pid_subprocess, df_processes = df_processes)
+        Recursively_stop_subprocesses(int_pid_subprocess, df_processes=df_processes)
+
 
 def Stop_a_job(pid=None):
     """
@@ -49,7 +50,8 @@ def Stop_a_job(pid=None):
             sys.exit()
         else:
             return -1
-    Recursively_stop_subprocesses(int_pid) # stop a process
+    Recursively_stop_subprocesses(int_pid)  # stop a process
+
 
 def Server_Status():
     """
