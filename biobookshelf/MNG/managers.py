@@ -1,6 +1,7 @@
 """
 classes and functions for sharing data across multiple forked processes
 """
+
 from multiprocessing.managers import BaseManager
 import numpy as np
 from typing import Union, List, Dict

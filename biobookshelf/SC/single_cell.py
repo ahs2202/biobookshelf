@@ -297,10 +297,12 @@ def CB_Match_Batch(
     df_id_cell_2.rename(
         columns={"id_sample_from_id_cell": "id_sample_from_id_cell_2"}, inplace=True
     )
-    df_id_cell_1[
-        "id_sample_from_id_cell_2"
-    ] = df_id_cell_1.id_sample_from_id_cell_1.apply(
-        MAP.Map(df_sample_matched.set_index("id_sample_1").id_sample_2.to_dict()).a2b
+    df_id_cell_1["id_sample_from_id_cell_2"] = (
+        df_id_cell_1.id_sample_from_id_cell_1.apply(
+            MAP.Map(
+                df_sample_matched.set_index("id_sample_1").id_sample_2.to_dict()
+            ).a2b
+        )
     )
     df_id_cell_1.dropna(
         subset=["id_sample_from_id_cell_2"], inplace=True
@@ -1631,9 +1633,9 @@ def MTX_10X_Summarize_Counts(
                                 arr_id_feature, "|mode=atac"
                             )
                         )
-                        dict_name_set_feature_to_l_id_feature[
-                            "atac_all"
-                        ] = arr_id_feature_atac
+                        dict_name_set_feature_to_l_id_feature["atac_all"] = (
+                            arr_id_feature_atac
+                        )
                     elif str_preset == "atac":
                         arr_id_feature_atac = arr_id_feature
                     # add sets of promoter and gene_body features
@@ -1653,9 +1655,9 @@ def MTX_10X_Summarize_Counts(
                     dict_name_set_feature_to_l_id_feature[
                         "atac_promoter_and_gene_body"
                     ] = arr_id_feature_atac_promoter_and_gene_body
-                    dict_name_set_feature_to_l_id_feature[
-                        "atac_promoter"
-                    ] = arr_id_feature_atac_promoter
+                    dict_name_set_feature_to_l_id_feature["atac_promoter"] = (
+                        arr_id_feature_atac_promoter
+                    )
 
             # make sure that 'name_set_feature' does not contains characters incompatible with linux file path
             for name_set_feature in dict_name_set_feature_to_l_id_feature:
@@ -2752,8 +2754,10 @@ def __Merge_Sort_MTX_10X__(
                 float(float_value),
             )  # 0-based coordinates
             yield index_row if flag_ramtx_sorted_by_id_feature else index_column, (
-                line if flag_input_binary else line.encode()
-            ) if flag_output_binary else line_decoded
+                (line if flag_input_binary else line.encode())
+                if flag_output_binary
+                else line_decoded
+            )
 
     Merge_Sort_Files(
         file_output, *list(__decorate_mtx_file__(file) for file in l_file_input)
@@ -2839,8 +2843,10 @@ def __Merge_Sort_and_Index_MTX_10X__(
                 float(float_value),
             )  # 0-based coordinates
             yield index_row if flag_ramtx_sorted_by_id_feature else index_column, (
-                line if flag_input_binary else line.encode()
-            ) if flag_output_binary else line_decoded
+                (line if flag_input_binary else line.encode())
+                if flag_output_binary
+                else line_decoded
+            )
 
     # perform merge sorting
     index_entry_currently_being_written = -1
@@ -3159,16 +3165,16 @@ def MTX_Convert_10x_MEX_to_10x_HDF5_Format(
                 id_col_current + 1 < id_col
             ):  # if there are some skipped columns ('barcodes' with zero number of records)
                 for id_col_with_no_records in range(id_col_current + 1, id_col):
-                    arr_indptr[
-                        id_col_with_no_records
-                    ] = i  # add 'indptr' for the 'barcodes' with zero number of records
+                    arr_indptr[id_col_with_no_records] = (
+                        i  # add 'indptr' for the 'barcodes' with zero number of records
+                    )
             id_col_current = id_col  # update 'id_col_current'
             arr_indptr[id_col] = i
     if id_col_current + 1 < int_num_bc:
         for id_col_with_no_records in range(id_col_current + 1, int_num_bc):
-            arr_indptr[
-                id_col_with_no_records
-            ] = int_num_records  # add 'indptr' for the 'barcodes' with zero number of records
+            arr_indptr[id_col_with_no_records] = (
+                int_num_records  # add 'indptr' for the 'barcodes' with zero number of records
+            )
     mtx.create_dataset("indptr", (len(arr_indptr),), "i8", arr_indptr)
 
     # create matrix group

@@ -235,9 +235,11 @@ def Retrieve_List_of_Mapped_Segments(
             l_seg.append(
                 (
                     start,
-                    (start + int_aligned_length - 1)
-                    if return_1_based_coordinate
-                    else (start + int_aligned_length),
+                    (
+                        (start + int_aligned_length - 1)
+                        if return_1_based_coordinate
+                        else (start + int_aligned_length)
+                    ),
                 )
             )  # set the end position
             start = start + int_aligned_length + length  # set the next start position
@@ -249,9 +251,11 @@ def Retrieve_List_of_Mapped_Segments(
         l_seg.append(
             (
                 start,
-                (start + int_aligned_length - 1)
-                if return_1_based_coordinate
-                else (start + int_aligned_length),
+                (
+                    (start + int_aligned_length - 1)
+                    if return_1_based_coordinate
+                    else (start + int_aligned_length)
+                ),
             )
         )
         int_total_aligned_length += int_aligned_length
@@ -863,12 +867,12 @@ def Call_Variant(r, dict_fasta_genome, function_for_processing_reference_name=No
 
     ns = dict()  # create a namespace
     # initialilze the namespace
-    ns[
-        "pos_ref_variant_start"
-    ] = None  # 0-based coordinate of the start of the alternative allele on the reference
-    ns[
-        "pos_ref_variant_end"
-    ] = None  # 0-based coordinate of the end of the alternative allele on the reference
+    ns["pos_ref_variant_start"] = (
+        None  # 0-based coordinate of the start of the alternative allele on the reference
+    )
+    ns["pos_ref_variant_end"] = (
+        None  # 0-based coordinate of the end of the alternative allele on the reference
+    )
     ns["alt"] = ""
 
     def __update_alt(pos_ref: int, len_bases_ref: int = 0, bases_alt: str = ""):
@@ -1460,9 +1464,11 @@ def Plot_alignment(
         # draw an alignment on the reference
         y = i
         ax[0].arrow(
-            x=r.query_alignment_start
-            if not r.is_reverse > 0
-            else len(r.seq) - r.query_alignment_end,
+            x=(
+                r.query_alignment_start
+                if not r.is_reverse > 0
+                else len(r.seq) - r.query_alignment_end
+            ),
             y=y,
             dx=max(r.query_alignment_end - r.query_alignment_start, min_dx_abs),
             dy=0,

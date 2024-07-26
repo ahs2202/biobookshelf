@@ -435,11 +435,15 @@ def Iterate_Kmer(
     for i in range(0, len(seq) - window_size + 1, 1):
         kmer = seq[i : i + window_size]
         yield (
-            kmer,
-            i,
-            i + window_size,
-            False,
-        ) if flag_return_start_and_end_positions else (kmer, False)
+            (
+                kmer,
+                i,
+                i + window_size,
+                False,
+            )
+            if flag_return_start_and_end_positions
+            else (kmer, False)
+        )
     """ if 'flag_generate_kmer_for_reverse_complement_too' is True, iterate reverse complement of the given sequence, too """
     if flag_generate_kmer_for_reverse_complement_too:
         seq_rc = Reverse_Complement(seq)
@@ -447,8 +451,12 @@ def Iterate_Kmer(
         for i in range(0, len_seq - window_size + 1, 1):
             kmer = seq_rc[i : i + window_size]
             yield (
-                kmer,
-                len_seq - window_size - i,
-                len_seq - i,
-                True,
-            ) if flag_return_start_and_end_positions else (kmer, True)
+                (
+                    kmer,
+                    len_seq - window_size - i,
+                    len_seq - i,
+                    True,
+                )
+                if flag_return_start_and_end_positions
+                else (kmer, True)
+            )

@@ -760,13 +760,17 @@ def ASCII_Encode(
                 l_value,
                 "".join(
                     list(
-                        str_ascii_encoding_representing_invalid_value
-                        if np.isnan(value)
-                        else arr_level_to_ascii_encoding[
-                            int(
-                                (value - value_min) / (value_max - value_min) * n_levels
-                            )
-                        ]
+                        (
+                            str_ascii_encoding_representing_invalid_value
+                            if np.isnan(value)
+                            else arr_level_to_ascii_encoding[
+                                int(
+                                    (value - value_min)
+                                    / (value_max - value_min)
+                                    * n_levels
+                                )
+                            ]
+                        )
                         for value in l_l_value[l_value]
                     )
                 ),
@@ -777,11 +781,15 @@ def ASCII_Encode(
         else list(
             "".join(
                 list(
-                    str_ascii_encoding_representing_invalid_value
-                    if np.isnan(value)
-                    else arr_level_to_ascii_encoding[
-                        int((value - value_min) / (value_max - value_min) * n_levels)
-                    ]
+                    (
+                        str_ascii_encoding_representing_invalid_value
+                        if np.isnan(value)
+                        else arr_level_to_ascii_encoding[
+                            int(
+                                (value - value_min) / (value_max - value_min) * n_levels
+                            )
+                        ]
+                    )
                     for value in l_value
                 )
             )
@@ -2654,9 +2662,9 @@ def DF_Count_and_Drop_Duplicates(
             columns=col_name_for_duplicate_counts, inplace=True
         )
     else:
-        df[
-            col_name_for_duplicate_counts
-        ] = 1  # if a column for counting duplicates already exist in the given dataframe, sum values in the columns while dropping duplicates instead of counting duplicates.
+        df[col_name_for_duplicate_counts] = (
+            1  # if a column for counting duplicates already exist in the given dataframe, sum values in the columns while dropping duplicates instead of counting duplicates.
+        )
     df = (
         df[l_col_for_identifying_duplicates + [col_name_for_duplicate_counts]]
         .groupby(l_col_for_identifying_duplicates, dropna=False)
@@ -2731,9 +2739,9 @@ def DF_COLUMN_labels_replace_incompatible_characters(
             0
         ].isdigit():  # if first character is a digit character, add '_' in front of the label
             column_after = "_" + column_after
-        dict_column_b4_column_after[
-            column
-        ] = column_after  # build a dictionary for renaming the columns
+        dict_column_b4_column_after[column] = (
+            column_after  # build a dictionary for renaming the columns
+        )
     return df.rename(
         columns=dict_column_b4_column_after
     )  # return dataFrame with changed column_labels
@@ -5579,12 +5587,12 @@ def subplot_relation_matrix__Gene_IDs(
             df
         )  # copy dataframe to create a mask that will be used to locate a given list of genes
         mask.iloc[:, :] = 0
-        mask[
-            valid_Gene_IDs
-        ] = 1  # change colors of columns of a given list of gene_ids to white
-        mask.loc[
-            valid_Gene_IDs
-        ] = 1  # change colors of rows of a given list of gene_ids to white
+        mask[valid_Gene_IDs] = (
+            1  # change colors of columns of a given list of gene_ids to white
+        )
+        mask.loc[valid_Gene_IDs] = (
+            1  # change colors of rows of a given list of gene_ids to white
+        )
         if add_Log2FC:  # adjust the shape of a mask when Log2FC bar is added
             mask = np.vstack((mask.values, arr_mask)).T
         ax.imshow(
@@ -6364,9 +6372,9 @@ def MPL_Scatter_Align_Two_Series(
                 ),
             )
     if "x_label" not in dict_mpl_basic_config:
-        dict_mpl_basic_config[
-            "x_label"
-        ] = s_1.name  # use pandas Series names as default axis labels
+        dict_mpl_basic_config["x_label"] = (
+            s_1.name
+        )  # use pandas Series names as default axis labels
     if "y_label" not in dict_mpl_basic_config:
         dict_mpl_basic_config["y_label"] = s_2.name
     MATPLOTLIB_basic_configuration(**dict_mpl_basic_config)
@@ -6392,9 +6400,9 @@ def MPL_2D_Hist(
         s_1, s_2 = s_1.dropna().align(s_2.dropna(), join="inner")
         arr_1, arr_2 = s_1.values.astype(float), s_2.values.astype(float)
         if "x_label" not in dict_mpl_basic_config and s_1.name is not None:
-            dict_mpl_basic_config[
-                "x_label"
-            ] = s_1.name  # use series name as default axis label
+            dict_mpl_basic_config["x_label"] = (
+                s_1.name
+            )  # use series name as default axis label
         if "y_label" not in dict_mpl_basic_config and s_2.name is not None:
             dict_mpl_basic_config["y_label"] = s_2.name
     else:
@@ -6596,9 +6604,9 @@ def BOKEH_transform_arr_values_into_a_range_from_0_to_1(
     arr_values_transformed = (
         arr_values - arr_values_without_outliers_min
     ) / arr_values_without_outliers_max
-    arr_values_transformed[
-        arr_values_transformed > 1
-    ] = 1  # set transformed values of outliers to maxinum (1) and minimum (0) values
+    arr_values_transformed[arr_values_transformed > 1] = (
+        1  # set transformed values of outliers to maxinum (1) and minimum (0) values
+    )
     arr_values_transformed[arr_values_transformed < 0] = 0
     return arr_values_transformed
 
@@ -9015,9 +9023,9 @@ def PLOT_NORMALIZE_boxplots_organelle_amount_along_with_Gene_data(
         df
     )  # retrive number of 'Organelle_Gene_Set' genes that exist in df
     selection_mask = np.array(np.zeros(len(series_organelle_amount)), dtype=bool)
-    selection_mask[
-        ::n_skip_samples
-    ] = True  # mask that will select every n_skip_samples-th samples from the sorted
+    selection_mask[::n_skip_samples] = (
+        True  # mask that will select every n_skip_samples-th samples from the sorted
+    )
     list_selected_sorted_samples = series_organelle_amount.sort_values()[
         selection_mask
     ].index.values
@@ -9397,10 +9405,10 @@ def CORREL_df(
                 if flag_symmetric and index_var_2 > index_var_1:
                     continue
                 else:
-                    arr_corr[
-                        index_var_1, index_var_2
-                    ] = CORREL_INTERNAL_Retrive_correl_coeff_from_scipy_modules(
-                        Function_correl(data_var_1, data_var_2)
+                    arr_corr[index_var_1, index_var_2] = (
+                        CORREL_INTERNAL_Retrive_correl_coeff_from_scipy_modules(
+                            Function_correl(data_var_1, data_var_2)
+                        )
                     )  # calculate a correlation coefficient
     df_corr = pd.DataFrame(arr_corr, index=l_var_1, columns=l_var_2)
     df_corr.index.name, df_corr.columns.name = "Indices of df", "Indices of df_target"
@@ -10907,12 +10915,12 @@ def CCLE_EXPLORATORY_CL_Genes_Mutation_Table(l_genes=None, l_cl=None):
             df_search_res.isTCGAhotspot.values.astype(bool),
             df_search_res.index.values,
         )  # retrive Genome Change values
-        arr_mut[
-            ~pd.isnull(df_search_res.cDNA_Change).values
-        ] = df_search_res.cDNA_Change.dropna().values  # update cDNA Change values
-        arr_mut[
-            ~pd.isnull(df_search_res.Protein_Change).values
-        ] = df_search_res.Protein_Change.dropna().values  # update Genome Change values
+        arr_mut[~pd.isnull(df_search_res.cDNA_Change).values] = (
+            df_search_res.cDNA_Change.dropna().values
+        )  # update cDNA Change values
+        arr_mut[~pd.isnull(df_search_res.Protein_Change).values] = (
+            df_search_res.Protein_Change.dropna().values
+        )  # update Genome Change values
         arr_mut[arr_mask_hotspot] = (
             arr_mut[arr_mask_hotspot] + " (Hotspot)"
         )  # annotate hotspot mutation
@@ -12062,9 +12070,7 @@ def GTF_Interval_Tree_Combine(*l_dict_it):
     for dict_it in l_dict_it:
         for key in dict_it:
             if key not in dict_it_combined:
-                dict_it_combined[
-                    key
-                ] = (
+                dict_it_combined[key] = (
                     intervaltree.IntervalTree()
                 )  # initialize an empty interval tree for each key
             dict_it_combined[key].update(
@@ -13285,9 +13291,11 @@ def SAM_Retrive_List_of_Mapped_Segments(
             l_seg.append(
                 (
                     start,
-                    (start + int_aligned_length - 1)
-                    if return_1_based_coordinate
-                    else (start + int_aligned_length),
+                    (
+                        (start + int_aligned_length - 1)
+                        if return_1_based_coordinate
+                        else (start + int_aligned_length)
+                    ),
                 )
             )  # set the end position
             start = start + int_aligned_length + length  # set the next start position
@@ -13299,9 +13307,11 @@ def SAM_Retrive_List_of_Mapped_Segments(
         l_seg.append(
             (
                 start,
-                (start + int_aligned_length - 1)
-                if return_1_based_coordinate
-                else (start + int_aligned_length),
+                (
+                    (start + int_aligned_length - 1)
+                    if return_1_based_coordinate
+                    else (start + int_aligned_length)
+                ),
             )
         )
         int_total_aligned_length += int_aligned_length
@@ -13568,8 +13578,10 @@ def FASTA_Write(
     if os.path.exists(path_file_fasta) and not overwrite_existing_file:
         print("the file already exists")
         return -1
-    with gzip.open(path_file_fasta, "wb") if flag_file_gzipped else open(
-        path_file_fasta, "w"
+    with (
+        gzip.open(path_file_fasta, "wb")
+        if flag_file_gzipped
+        else open(path_file_fasta, "w")
     ) as newfile:
         for str_id in dict_fasta:
             seq = dict_fasta[str_id]
@@ -14339,8 +14351,8 @@ def FASTQ_Iterate(path_file, return_only_at_index=None):
     bool_flag_file_gzipped = (
         ".gz" in path_file[-3:]
     )  # set a flag indicating whether a file has been gzipped.
-    with gzip.open(path_file, "rb") if bool_flag_file_gzipped else open(
-        path_file
+    with (
+        gzip.open(path_file, "rb") if bool_flag_file_gzipped else open(path_file)
     ) as file:
         while True:
             record = (
@@ -16166,9 +16178,7 @@ def CIF_from_PDB(df, l_label_entity_id=None):  # 2020-08-08 15:21:53
     df.label_asym_id = df.label_asym_id.replace(
         "", "A"
     )  # default chain_id (label_asym_id) is 'A'
-    df[
-        "auth_asym_id"
-    ] = (
+    df["auth_asym_id"] = (
         df.label_asym_id
     )  # copy 'label_asym_id' attribute to the 'auth_asym_id' attribute.
     return df[l_col_required]

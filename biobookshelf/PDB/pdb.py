@@ -506,17 +506,20 @@ def Identify_Protein_and_Assign_Chain_identifier(df, **dict_identifiable_chains)
             if (
                 np.sum(
                     list(
-                        PD.Select(
-                            df_a_chain, Residue_sequence_number=int_residue_number
-                        ).Residue_name.values[0]
-                        != str_residue_name
-                        if len(
+                        (
                             PD.Select(
                                 df_a_chain, Residue_sequence_number=int_residue_number
+                            ).Residue_name.values[0]
+                            != str_residue_name
+                            if len(
+                                PD.Select(
+                                    df_a_chain,
+                                    Residue_sequence_number=int_residue_number,
+                                )
                             )
+                            > 0
+                            else True
                         )
-                        > 0
-                        else True
                         for int_residue_number, str_residue_name in dict_sequence_signature.items()
                     )
                 )
