@@ -139,7 +139,7 @@ def create_gene_count_from_raw_ont_data(
                 os.makedirs(path_folder, exist_ok=True)
             # if skipped raw data does not exist, indicating all raw data has been analyzed by MinKNOW, search for fastq output files and move the fastq output files to the guppy_out folder
             if (
-                not os.path.exists(f"{path_folder_nanopore_data}{raw_data_type}_skip/")
+                ( len(glob.glob(f"{path_folder_nanopore_data}*_skip/")) == 0 )
                 and len(glob.glob(f"{path_folder_nanopore_data}fastq*/")) > 0
             ):  # if skipped raw data does not exist and fastq output files exist, move these files into the guppy_out folder
                 bk.OS_Run(
@@ -570,7 +570,6 @@ def create_gene_count_from_raw_ont_data(
         fig.write_html(
             f"{path_folder_graph}accumulated_sequencing_throughput/{name_sample}.accumulated_sequencing_throughput.gene_level.html"
         )  # write the graph
-
 
 create_gene_count_from_fast5 = create_gene_count_from_raw_ont_data
 
