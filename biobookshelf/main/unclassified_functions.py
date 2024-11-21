@@ -2812,7 +2812,7 @@ def Series_Subset(s, set_index):
     return s[list(True if e in set_index else False for e in s.index.values)]
 
 
-def PD_Threshold(df, AND_operation=True, verbose = False, **dict_thresholds):
+def PD_Threshold(df, AND_operation=True, verbose=False, **dict_thresholds):
     """
     Select rows of a given DataFrame or indices of Series based on a given threshold for each given column or the given series.
     Add 'b' or 'B' at the end of column_label to select rows below the threshold, or add 'a' or 'A' to select rows above the threshold.
@@ -2821,44 +2821,60 @@ def PD_Threshold(df, AND_operation=True, verbose = False, **dict_thresholds):
     """
     # detect data type
     flag_is_dataframe = type(df) is pd.DataFrame
-    if flag_is_dataframe :
-        set_columns = set( df.columns.values )
-        flag_has_multiindex = isinstance( df.columns, pd.MultiIndex ) # detect dataframe containing 'multiindex' columns
-        if flag_has_multiindex :
-            n_multiindex_levels = len( df.columns.names )
-            def compose_multiindex_col( dict_select, l_multiindex = [ ] ) :
+    if flag_is_dataframe:
+        set_columns = set(df.columns.values)
+        flag_has_multiindex = isinstance(
+            df.columns, pd.MultiIndex
+        )  # detect dataframe containing 'multiindex' columns
+        if flag_has_multiindex:
+            n_multiindex_levels = len(df.columns.names)
+
+            def compose_multiindex_col(dict_select, l_multiindex=[]):
                 """
                 compose multiindex col recursively
                 2024-11-21 by IEUM An
                 """
-                if len( l_multiindex ) + 1 == n_multiindex_levels :
-                    return dict( ( tuple( l_multiindex + [ k ] ), dict_select[ k ] ) for k in dict_select )
-                else :
-                    dict_select_multiindex_col = dict( )
-                    for k in dict_select :
-                        v = dict_select[ k ]
-                        dict_select_multiindex_col.update( compose_multiindex_col( v, l_multiindex = l_multiindex + [ k ] ) )
+                if len(l_multiindex) + 1 == n_multiindex_levels:
+                    return dict(
+                        (tuple(l_multiindex + [k]), dict_select[k]) for k in dict_select
+                    )
+                else:
+                    dict_select_multiindex_col = dict()
+                    for k in dict_select:
+                        v = dict_select[k]
+                        dict_select_multiindex_col.update(
+                            compose_multiindex_col(v, l_multiindex=l_multiindex + [k])
+                        )
                     return dict_select_multiindex_col
-            dict_thresholds = compose_multiindex_col( dict_thresholds, l_multiindex = [ ] ) # convert 'dict_thresholds' (nested dictionaries) to tuple-based dictionary for the select operation
-    else :
-        assert( type(df) is pd.Series ) # other allowed data type is pandas Series
-        set_columns = set([""]) # allow search values for pandas Series without the need to refer to a column
-        
+
+            dict_thresholds = compose_multiindex_col(
+                dict_thresholds, l_multiindex=[]
+            )  # convert 'dict_thresholds' (nested dictionaries) to tuple-based dictionary for the select operation
+    else:
+        assert type(df) is pd.Series  # other allowed data type is pandas Series
+        set_columns = set(
+            [""]
+        )  # allow search values for pandas Series without the need to refer to a column
+
     mask_filter = (
         np.ones(len(df), dtype=bool) if AND_operation else np.zeros(len(df), dtype=bool)
     )
     for col_direction, threshold in dict_thresholds.items():
-        if flag_has_multiindex :
+        if flag_has_multiindex:
             # when input data is a multiindex dataframe
             # extract the filtering direction from the last entry of the input tuple.
-            last_col_direction = col_direction[ -1 ]
-            col, direction = last_col_direction[:-1], last_col_direction[-1] 
-            col = tuple( list( col_direction[ : -1 ] ) + [ col ] )
-        else :
+            last_col_direction = col_direction[-1]
+            col, direction = last_col_direction[:-1], last_col_direction[-1]
+            col = tuple(list(col_direction[:-1]) + [col])
+        else:
             col, direction = col_direction[:-1], col_direction[-1]
         if col not in set_columns:
-            if verbose :
-                print("'{}' column_label does not exist in the given DataFrame".format(col))
+            if verbose:
+                print(
+                    "'{}' column_label does not exist in the given DataFrame".format(
+                        col
+                    )
+                )
             continue
         data = df[col].values if type(df) is pd.DataFrame else df.values
         if direction.lower() == "a":
@@ -2866,7 +2882,7 @@ def PD_Threshold(df, AND_operation=True, verbose = False, **dict_thresholds):
         elif direction.lower() == "b":
             current_mask = data < threshold
         else:
-            if verbose :
+            if verbose:
                 print(
                     "'{}' direction is not either 'a' or 'b' and thus invalid".format(
                         direction
@@ -2882,46 +2898,60 @@ def PD_Threshold(df, AND_operation=True, verbose = False, **dict_thresholds):
 # In[ ]:
 
 
-def PD_Select(df, deselect = False, verbose = False, ** dict_select ) :
+def PD_Select(df, deselect=False, verbose=False, **dict_select):
     """
     Select and filter rows of df according to the given dict_select. If 'deselect' is set to True, deselect rows according to the given dict_select  Usage example : PANDAS_Select( df_meta_imid_ubi, dict(  Data_Type = [ 'Proteome', 'Ubi_Profiling' ], Value_Type = 'log2fc' ) )
     2024-11-21 19:50 by IEUM An
     """
     # detect data type
-    
+
     flag_is_dataframe = type(df) is pd.DataFrame
-    if flag_is_dataframe :
-        set_columns = set( df.columns.values )
-        flag_has_multiindex = isinstance( df.columns, pd.MultiIndex ) # detect dataframe containing 'multiindex' columns
-        if flag_has_multiindex :
-            n_multiindex_levels = len( df.columns.names )
-            def compose_multiindex_col( dict_select, l_multiindex = [ ] ) :
+    if flag_is_dataframe:
+        set_columns = set(df.columns.values)
+        flag_has_multiindex = isinstance(
+            df.columns, pd.MultiIndex
+        )  # detect dataframe containing 'multiindex' columns
+        if flag_has_multiindex:
+            n_multiindex_levels = len(df.columns.names)
+
+            def compose_multiindex_col(dict_select, l_multiindex=[]):
                 """
                 compose multiindex col recursively
                 2024-11-21 by IEUM An
                 """
-                if len( l_multiindex ) + 1 == n_multiindex_levels :
-                    return dict( ( tuple( l_multiindex + [ k ] ), dict_select[ k ] ) for k in dict_select )
-                else :
-                    dict_select_multiindex_col = dict( )
-                    for k in dict_select :
-                        v = dict_select[ k ]
-                        dict_select_multiindex_col.update( compose_multiindex_col( v, l_multiindex = l_multiindex + [ k ] ) )
+                if len(l_multiindex) + 1 == n_multiindex_levels:
+                    return dict(
+                        (tuple(l_multiindex + [k]), dict_select[k]) for k in dict_select
+                    )
+                else:
+                    dict_select_multiindex_col = dict()
+                    for k in dict_select:
+                        v = dict_select[k]
+                        dict_select_multiindex_col.update(
+                            compose_multiindex_col(v, l_multiindex=l_multiindex + [k])
+                        )
                     return dict_select_multiindex_col
-            dict_select = compose_multiindex_col( dict_select, l_multiindex = [ ] ) # convert 'dict_select' (nested dictionaries) to tuple-based dictionary for the select operation
-    else :
-        assert( type(df) is pd.Series ) # other allowed data type is pandas Series
-        
+
+            dict_select = compose_multiindex_col(
+                dict_select, l_multiindex=[]
+            )  # convert 'dict_select' (nested dictionaries) to tuple-based dictionary for the select operation
+    else:
+        assert type(df) is pd.Series  # other allowed data type is pandas Series
+
     # detect query type
     for col, query in dict_select.items():
-        if not flag_is_dataframe :
+        if not flag_is_dataframe:
             data_values = (
                 df.index.values if col == "index" else df.values
             )  # select values or indices of a given pd.Series
-        else :
+        else:
             if col not in set_columns and col != "index":
-                if verbose :
-                    print("'{}' does not exist in columns of a given DataFrame".format(col))
+                if verbose:
+                    print(
+                        "'{}' does not exist in columns of a given DataFrame".format(
+                            col
+                        )
+                    )
                 continue
             data_values = df.index.values if col == "index" else df[col].values
         if isinstance(
