@@ -1079,18 +1079,20 @@ def COUNTER(l_values, dict_counter=None, ignore_float=True):  # 2020-07-29 23:49
     """
     if dict_counter is None:
         dict_counter = dict()
-    if isinstance( l_values, dict ) :
+    if isinstance(l_values, dict):
         # when 'l_values' is another 'dict_counter'
         dict_counter_incoming = l_values
         # update 'dict_counter' with 'dict_counter_incoming'
-        for k in dict_counter_incoming :
-            if k in dict_counter :
-                dict_counter[ k ] += dict_counter_incoming[ k ]
-            else :
-                dict_counter[ k ] = dict_counter_incoming[ k ]
-    else :
+        for k in dict_counter_incoming:
+            if k in dict_counter:
+                dict_counter[k] += dict_counter_incoming[k]
+            else:
+                dict_counter[k] = dict_counter_incoming[k]
+    else:
         # when 'l_values' is list of values
-        if ignore_float:  # if 'ignore_float' is True, ignore float values, including np.nan
+        if (
+            ignore_float
+        ):  # if 'ignore_float' is True, ignore float values, including np.nan
             for value in l_values:
                 if isinstance(value, float):
                     continue  # ignore float values

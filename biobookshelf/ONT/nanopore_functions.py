@@ -959,7 +959,7 @@ def Minimap2_Align(
         f"{path_folder_minimap2_output}{name_file_fastq}.minimap2_aligned.bam"
     )
     # if index file of the output BAM file exists, exit
-    if os.path.exists( f"{path_file_bam}.bai" ) :
+    if os.path.exists(f"{path_file_bam}.bai"):
         return
 
     l_bash_shellscript = []
