@@ -12102,20 +12102,24 @@ def GTF_Write(
             col for col in df_gtf.columns.values if col not in l_col_essential
         )  # all non-essential columns will be considered as the columns
 
-        empty_attribute_value = '' # define empty attribute value
-        if len( l_col_attribute ) == 0 :
+        empty_attribute_value = ""  # define empty attribute value
+        if len(l_col_attribute) == 0:
             # when there is no columns to include in the attribute
-            l_attribute_new = list( empty_attribute_value for _ in range( len( df_gtf ) ) )
-        else :
-            # compose the attribute column using the given columns 
+            l_attribute_new = list(empty_attribute_value for _ in range(len(df_gtf)))
+        else:
+            # compose the attribute column using the given columns
             l_attribute_new = list()
             for arr in df_gtf[l_col_attribute].values:
-                str_attribute = empty_attribute_value # initialize as 'empty_attribute_value'
+                str_attribute = (
+                    empty_attribute_value  # initialize as 'empty_attribute_value'
+                )
                 for name, val in zip(l_col_attribute, arr):
                     if isinstance(val, float) and np.isnan(val):
                         continue
                     str_attribute += (
-                        f"{name}={val};" if flag_filetype_is_gff3 else f'{name} "{val}"; '
+                        f"{name}={val};"
+                        if flag_filetype_is_gff3
+                        else f'{name} "{val}"; '
                     )  # encode attributes according to the gff3 file format
                 str_attribute = str_attribute.strip()
                 l_attribute_new.append(str_attribute)
@@ -12134,7 +12138,6 @@ def GTF_Write(
             "attribute",
         ]
     ].to_csv(path_file, index=False, header=None, sep="\t", quoting=csv.QUOTE_NONE)
-
 
 
 def GTF_Interval_Tree(
