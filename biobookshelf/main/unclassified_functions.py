@@ -12096,10 +12096,12 @@ def GTF_Read(
 def GTF_Write(
     df_gtf, path_file, flag_update_attribute=True, flag_filetype_is_gff3=False
 ):
-    """# 2021-08-24 21:02:08
+    """
     write gtf file as an unzipped tsv file
     'flag_update_attribute' : ignore the 'attribute' column present in the given dataframe 'df_gtf', and compose a new column based on all the non-essential columns of the dataframe.
     'flag_filetype_is_gff3' : a flag indicating the filetype of the output file. According to the output filetype, columns containing attributes will be encoded into the values of the attribute column before writing the file.
+
+    # 2021-08-24 21:02:08 - 2024-11-25 14:30 by IEUM-An
     """
     if flag_update_attribute:
         l_col_essential = [
@@ -12118,17 +12120,28 @@ def GTF_Write(
             col for col in df_gtf.columns.values if col not in l_col_essential
         )  # all non-essential columns will be considered as the columns
 
-        l_attribute_new = list()
-        for arr in df_gtf[l_col_attribute].values:
-            str_attribute = ""  # initialize
-            for name, val in zip(l_col_attribute, arr):
-                if isinstance(val, float) and np.isnan(val):
-                    continue
-                str_attribute += (
-                    f"{name}={val};" if flag_filetype_is_gff3 else f'{name} "{val}"; '
-                )  # encode attributes according to the gff3 file format
-            str_attribute = str_attribute.strip()
-            l_attribute_new.append(str_attribute)
+        empty_attribute_value = ""  # define empty attribute value
+        if len(l_col_attribute) == 0:
+            # when there is no columns to include in the attribute
+            l_attribute_new = list(empty_attribute_value for _ in range(len(df_gtf)))
+        else:
+            # compose the attribute column using the given columns
+            l_attribute_new = list()
+            for arr in df_gtf[l_col_attribute].values:
+                str_attribute = (
+                    empty_attribute_value  # initialize as 'empty_attribute_value'
+                )
+                for name, val in zip(l_col_attribute, arr):
+                    if isinstance(val, float) and np.isnan(val):
+                        continue
+                    str_attribute += (
+                        f"{name}={val};"
+                        if flag_filetype_is_gff3
+                        else f'{name} "{val}"; '
+                    )  # encode attributes according to the gff3 file format
+                str_attribute = str_attribute.strip()
+                l_attribute_new.append(str_attribute)
+        # add the attribute column
         df_gtf["attribute"] = l_attribute_new  # update attributes
     df_gtf[
         [
