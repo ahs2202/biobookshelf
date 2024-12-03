@@ -11969,18 +11969,36 @@ def ANNDATA_Combine_Var(*l_ad):
 
 def GTF_Parse_Attribute(attr):
     """
-    # 2021-02-06 18:51:47
     parse attribute string of a gtf file
+    # 2021-02-06 18:51:47
+    2024-12-03 by IEUM An, support for integer/float data type was added 
     """
     dict_data = dict()
-    for e in attr.split('";'):
+    l_e = attr.split('; ')
+    if len( l_e ) > 0 :
+        last_e = l_e[ -1 ]
+        if len( last_e ) > 0 and last_e[ -1 ] == ';' :
+            l_e[ -1 ] = last_e[ : -1 ] # discard the ';' character at the end of the last element
+    for e in l_e :
         e = e.strip()
+        # skip empty element
         if len(e) == 0:
             continue
-        str_key, str_value = e.split(' "')
-        if str_value[-1] == '"':
-            str_value = str_value[:-1]
-        dict_data[str_key] = str_value
+        # check dtype
+        if '"' in e :
+            # string dtype
+            str_key, str_value = e.split(' "', 1) # there should be 1 occurrence of ' "'
+            # remove the trailing '"'
+            if str_value[-1] == '"':
+                str_value = str_value[:-1]
+            value = str_value # use the value as-is
+        else :
+            # integer or float dtype
+            str_key, str_value = e.split(' ', 1) # the attribute name should not contain ' ' when integer/float value is contained
+            value = float( str_value ) # for simplicity, it will be converted to float first
+            if value == int( value ) : # perform the equivalent test, and convert the value to the integer
+                value = int( value )
+        dict_data[str_key] = value
     return dict_data
 
 
