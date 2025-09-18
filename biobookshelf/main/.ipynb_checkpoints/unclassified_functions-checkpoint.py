@@ -66,7 +66,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors  # for normalization
 from matplotlib import cm  # to map scalar values to color using colormap
-from matplotlib.collections import BrokenBarHCollection  # for chromosome plotting
 from mpl_toolkits.mplot3d import Axes3D  # module for 3D plotting
 
 ## defining short cut for modules
@@ -11905,39 +11904,6 @@ def annotate_heatmap(
     return texts
 
 
-# In[ ]:
-
-
-def chromosome_collections(df, y_positions, height, **kwargs):
-    """
-    Yields BrokenBarHCollection of features that can be added to an Axes
-    object.
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Must at least have columns ['chrom', 'start', 'end', 'color']. If no
-        column 'width', it will be calculated from start/end.
-    y_positions : dict
-        Keys are chromosomes, values are y-value at which to anchor the
-        BrokenBarHCollection
-    height : float
-        Height of each BrokenBarHCollection
-    Additional kwargs are passed to BrokenBarHCollection
-    """
-    del_width = False
-    if "width" not in df.columns:
-        del_width = True
-        df["width"] = df["end"] - df["start"]
-    for chrom, group in df.groupby("chrom"):
-        # print ( chrom )
-        yrange = (y_positions[chrom], height)
-        xranges = group[["start", "width"]].values
-        yield BrokenBarHCollection(
-            xranges, yrange, facecolors=group["colors"], **kwargs
-        )
-    if del_width:
-        del df["width"]
-
 
 # ### Functions parsing files into DataFrames
 
@@ -11971,33 +11937,43 @@ def GTF_Parse_Attribute(attr):
     """
     parse attribute string of a gtf file
     # 2021-02-06 18:51:47
-    2024-12-03 by IEUM An, support for integer/float data type was added 
+    2024-12-03 by IEUM An, support for integer/float data type was added
     """
     dict_data = dict()
-    l_e = attr.split('; ')
-    if len( l_e ) > 0 :
-        last_e = l_e[ -1 ]
-        if len( last_e ) > 0 and last_e[ -1 ] == ';' :
-            l_e[ -1 ] = last_e[ : -1 ] # discard the ';' character at the end of the last element
-    for e in l_e :
+    l_e = attr.split("; ")
+    if len(l_e) > 0:
+        last_e = l_e[-1]
+        if len(last_e) > 0 and last_e[-1] == ";":
+            l_e[-1] = last_e[
+                :-1
+            ]  # discard the ';' character at the end of the last element
+    for e in l_e:
         e = e.strip()
         # skip empty element
         if len(e) == 0:
             continue
         # check dtype
-        if '"' in e :
+        if '"' in e:
             # string dtype
-            str_key, str_value = e.split(' "', 1) # there should be 1 occurrence of ' "'
+            str_key, str_value = e.split(
+                ' "', 1
+            )  # there should be 1 occurrence of ' "'
             # remove the trailing '"'
             if str_value[-1] == '"':
                 str_value = str_value[:-1]
-            value = str_value # use the value as-is
-        else :
+            value = str_value  # use the value as-is
+        else:
             # integer or float dtype
-            str_key, str_value = e.split(' ', 1) # the attribute name should not contain ' ' when integer/float value is contained
-            value = float( str_value ) # for simplicity, it will be converted to float first
-            if value == int( value ) : # perform the equivalent test, and convert the value to the integer
-                value = int( value )
+            str_key, str_value = e.split(
+                " ", 1
+            )  # the attribute name should not contain ' ' when integer/float value is contained
+            value = float(
+                str_value
+            )  # for simplicity, it will be converted to float first
+            if value == int(
+                value
+            ):  # perform the equivalent test, and convert the value to the integer
+                value = int(value)
         dict_data[str_key] = value
     return dict_data
 
@@ -12120,20 +12096,24 @@ def GTF_Write(
             col for col in df_gtf.columns.values if col not in l_col_essential
         )  # all non-essential columns will be considered as the columns
 
-        empty_attribute_value = '' # define empty attribute value
-        if len( l_col_attribute ) == 0 :
+        empty_attribute_value = ""  # define empty attribute value
+        if len(l_col_attribute) == 0:
             # when there is no columns to include in the attribute
-            l_attribute_new = list( empty_attribute_value for _ in range( len( df_gtf ) ) )
-        else :
-            # compose the attribute column using the given columns 
+            l_attribute_new = list(empty_attribute_value for _ in range(len(df_gtf)))
+        else:
+            # compose the attribute column using the given columns
             l_attribute_new = list()
             for arr in df_gtf[l_col_attribute].values:
-                str_attribute = empty_attribute_value # initialize as 'empty_attribute_value'
+                str_attribute = (
+                    empty_attribute_value  # initialize as 'empty_attribute_value'
+                )
                 for name, val in zip(l_col_attribute, arr):
                     if isinstance(val, float) and np.isnan(val):
                         continue
                     str_attribute += (
-                        f"{name}={val};" if flag_filetype_is_gff3 else f'{name} "{val}"; '
+                        f"{name}={val};"
+                        if flag_filetype_is_gff3
+                        else f'{name} "{val}"; '
                     )  # encode attributes according to the gff3 file format
                 str_attribute = str_attribute.strip()
                 l_attribute_new.append(str_attribute)
@@ -12152,7 +12132,6 @@ def GTF_Write(
             "attribute",
         ]
     ].to_csv(path_file, index=False, header=None, sep="\t", quoting=csv.QUOTE_NONE)
-
 
 
 def GTF_Interval_Tree(

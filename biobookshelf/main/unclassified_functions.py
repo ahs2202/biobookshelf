@@ -66,7 +66,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors  # for normalization
 from matplotlib import cm  # to map scalar values to color using colormap
-from matplotlib.collections import BrokenBarHCollection  # for chromosome plotting
 from mpl_toolkits.mplot3d import Axes3D  # module for 3D plotting
 
 ## defining short cut for modules
@@ -11904,39 +11903,6 @@ def annotate_heatmap(
                 texts.append(text)
     return texts
 
-
-# In[ ]:
-
-
-def chromosome_collections(df, y_positions, height, **kwargs):
-    """
-    Yields BrokenBarHCollection of features that can be added to an Axes
-    object.
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Must at least have columns ['chrom', 'start', 'end', 'color']. If no
-        column 'width', it will be calculated from start/end.
-    y_positions : dict
-        Keys are chromosomes, values are y-value at which to anchor the
-        BrokenBarHCollection
-    height : float
-        Height of each BrokenBarHCollection
-    Additional kwargs are passed to BrokenBarHCollection
-    """
-    del_width = False
-    if "width" not in df.columns:
-        del_width = True
-        df["width"] = df["end"] - df["start"]
-    for chrom, group in df.groupby("chrom"):
-        # print ( chrom )
-        yrange = (y_positions[chrom], height)
-        xranges = group[["start", "width"]].values
-        yield BrokenBarHCollection(
-            xranges, yrange, facecolors=group["colors"], **kwargs
-        )
-    if del_width:
-        del df["width"]
 
 
 # ### Functions parsing files into DataFrames
