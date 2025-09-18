@@ -11904,7 +11904,6 @@ def annotate_heatmap(
     return texts
 
 
-
 # ### Functions parsing files into DataFrames
 
 # In[ ]:
