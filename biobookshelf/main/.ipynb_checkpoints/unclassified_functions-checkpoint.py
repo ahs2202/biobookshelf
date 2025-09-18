@@ -68,12 +68,8 @@ import matplotlib.colors as colors  # for normalization
 from matplotlib import cm  # to map scalar values to color using colormap
 from mpl_toolkits.mplot3d import Axes3D  # module for 3D plotting
 
-## defining short cut for modules
-np_str = np.core.defchararray
-
 # for adjusting jupyter notebook cell width
 from IPython.core.display import display, HTML
-
 
 # network
 import requests  # for retriving HTML documents
