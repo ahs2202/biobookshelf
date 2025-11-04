@@ -69,7 +69,7 @@ from matplotlib import cm  # to map scalar values to color using colormap
 from mpl_toolkits.mplot3d import Axes3D  # module for 3D plotting
 
 # for adjusting jupyter notebook cell width
-from IPython.core.display import display, HTML
+from IPython.display import display, HTML
 
 # network
 import requests  # for retriving HTML documents
@@ -187,7 +187,7 @@ def Wide(int_percent_html_code_cell_width=95):
     # 20210224
     widen jupyter notebook cell
     """
-    from IPython.core.display import display, HTML
+    from IPython.display import display, HTML
 
     display(HTML("<style>.container { width:100% !important; }</style>"))
     display(

@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name="biobookshelf",
-    version="0.3.1",
+    version="0.3.2",
     author="Hyunsu An",
     author_email="ahs2202@gm.gist.ac.kr",
     description="A collection of python scripts and functions for exploratory analysis of bioinformatic data in Python",
@@ -24,7 +24,7 @@ setup(
     include_package_data=True,
     python_requires=">=3.8, <4",
     install_requires=[
-        "ipython>=7.19.0",
+        "ipython>=8.30.0",
         "plotly>=4.11.0",
         "plotnine>=0.10.1",
         "pandas>=1.1.4",
